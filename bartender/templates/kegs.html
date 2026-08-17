@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Kegs{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>🛢 Kegs</h1>
+  <button class="btn btn-primary" onclick="openAddKeg()">+ Add Keg</button>
+</div>
+
+<div class="filter-bar">
+  <label>Filter by status:</label>
+  <select id="statusFilter" onchange="filterKegs()" class="form-control form-control-sm">
+    <option value="">All</option>
+    <option value="full">Full</option>
+    <option value="in_use">In Use</option>
+    <option value="empty">Empty</option>
+    <option value="cleaning">Cleaning</option>
+    <option value="retired">Retired</option>
+  </select>
+</div>
+
+<div class="keg-grid" id="kegGrid">
+  {% for keg in kegs %}
+  <div class="keg-card" data-status="{{ keg.status }}" data-id="{{ keg.id }}">
+    <div class="keg-card-header">
+      <span class="keg-name">{{ keg.name or 'Unnamed Keg' }}</span>
+      <span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span>
+    </div>
+    <div class="keg-card-body">
+      <p><strong>Type:</strong> {{ keg.type or '—' }}</p>
+      <p><strong>Size:</strong> {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{ keg.size or '—' }}{% endif %}</p>
+      <p><strong>Brewery:</strong> {{ keg.brewery or '—' }}</p>
+      <p><strong>ABV:</strong> {{ keg.abv or '—' }}</p>
+      {% if keg.notes %}<p class="muted">{{ keg.notes }}</p>{% endif %}
+    </div>
+    <div class="keg-card-footer">
+      <button class="btn btn-sm btn-secondary" onclick="editKeg({{ keg | tojson }})">Edit</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteKeg({{ keg.id }})">Delete</button>
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">No kegs yet. Add your first keg!</p>
+  {% endfor %}
+</div>
+
+<!-- Keg Modal -->
+<div class="modal" id="kegModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="kegModalTitle">Add Keg</h3>
+      <button class="btn btn-icon" onclick="closeModal('kegModal')">✕</button>
+    </div>
+    <form id="kegForm" onsubmit="submitKeg(event)">
+      <input type="hidden" id="kegId" />
+      <div class="form-group">
+        <label>Name / Beer *</label>
+        <input type="text" id="kegName" required class="form-control" placeholder="e.g. Hazy IPA" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <input type="text" id="kegType" class="form-control" list="beerTypes" placeholder="IPA, Lager, Stout…" />
+          <datalist id="beerTypes">
+            <option value="IPA" /><option value="Pale Ale" /><option value="Lager" />
+            <option value="Stout" /><option value="Porter" /><option value="Wheat" />
+            <option value="Sour" /><option value="Cider" /><option value="Other" />
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="kegStatus" class="form-control">
+            <option value="full">Full</option>
+            <option value="in_use">In Use</option>
+            <option value="empty">Empty</option>
+            <option value="cleaning">Cleaning</option>
+            <option value="retired">Retired</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Size</label>
+          <select id="kegSize" class="form-control" onchange="toggleCustomSize()">
+            <option value="">Select size…</option>
+            <optgroup label="US" id="sizeGroupUS">
+              <option value="1/6 bbl (5.2 gal)">1/6 bbl (5.2 gal)</option>
+              <option value="1/4 bbl (7.75 gal)">1/4 bbl (7.75 gal)</option>
+              <option value="1/2 bbl (15.5 gal)">1/2 bbl (15.5 gal)</option>
+              <option value="Corny (5 gal)">Corny (5 gal)</option>
+            </optgroup>
+            <optgroup label="Metric" id="sizeGroupMetric">
+              <option value="20 L">20 L</option>
+              <option value="30 L">30 L</option>
+              <option value="50 L">50 L</option>
+            </optgroup>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group" id="customSizeGroup" style="display:none">
+          <label>Custom Size</label>
+          <input type="text" id="kegCustomSize" class="form-control" placeholder="e.g. 19 L" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brewery</label>
+          <input type="text" id="kegBrewery" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>ABV (%)</label>
+          <input type="text" id="kegAbv" class="form-control" placeholder="e.g. 5.2" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Purchased Date</label>
+          <input type="date" id="kegPurchased" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Tapped Date</label>
+          <input type="date" id="kegTapped" class="form-control" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="kegNotes" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('kegModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const INGRESS = '{{ ingress }}';
+
+function toggleCustomSize() {
+  const v = document.getElementById('kegSize').value;
+  document.getElementById('customSizeGroup').style.display = v === 'Custom' ? '' : 'none';
+}
+
+function openAddKeg() {
+  document.getElementById('kegModalTitle').textContent = 'Add Keg';
+  document.getElementById('kegForm').reset();
+  document.getElementById('kegId').value = '';
+  document.getElementById('customSizeGroup').style.display = 'none';
+  openModal('kegModal');
+}
+
+function editKeg(keg) {
+  document.getElementById('kegModalTitle').textContent = 'Edit Keg';
+  document.getElementById('kegId').value = keg.id;
+  document.getElementById('kegName').value = keg.name;
+  document.getElementById('kegType').value = keg.type;
+  document.getElementById('kegStatus').value = keg.status;
+  document.getElementById('kegSize').value = keg.size;
+  document.getElementById('kegCustomSize').value = keg.custom_size;
+  document.getElementById('kegBrewery').value = keg.brewery;
+  document.getElementById('kegAbv').value = keg.abv;
+  document.getElementById('kegNotes').value = keg.notes;
+  document.getElementById('kegPurchased').value = keg.purchased_date;
+  document.getElementById('kegTapped').value = keg.tapped_date;
+  toggleCustomSize();
+  openModal('kegModal');
+}
+
+async function submitKeg(e) {
+  e.preventDefault();
+  const id = document.getElementById('kegId').value;
+  const body = {
+    name: document.getElementById('kegName').value,
+    type: document.getElementById('kegType').value,
+    status: document.getElementById('kegStatus').value,
+    size: document.getElementById('kegSize').value,
+    custom_size: document.getElementById('kegCustomSize').value,
+    brewery: document.getElementById('kegBrewery').value,
+    abv: document.getElementById('kegAbv').value,
+    notes: document.getElementById('kegNotes').value,
+    purchased_date: document.getElementById('kegPurchased').value,
+    tapped_date: document.getElementById('kegTapped').value,
+  };
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `${INGRESS}/api/kegs/${id}` : `${INGRESS}/api/kegs`;
+  await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  location.reload();
+}
+
+async function deleteKeg(id) {
+  if (!confirm('Delete this keg?')) return;
+  await fetch(`${INGRESS}/api/kegs/${id}`, { method: 'DELETE' });
+  location.reload();
+}
+
+function filterKegs() {
+  const status = document.getElementById('statusFilter').value;
+  document.querySelectorAll('.keg-card').forEach(card => {
+    card.style.display = (!status || card.dataset.status === status) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
