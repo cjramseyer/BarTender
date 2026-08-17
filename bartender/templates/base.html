@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ settings.theme }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}BarTender{% endblock %} – {{ settings.bar_name }}</title>
+  <link rel="stylesheet" href="{{ ingress }}/static/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <a class="nav-brand" href="{{ ingress }}/">🍺 {{ settings.bar_name }}</a>
+    <ul class="nav-links">
+      <li><a href="{{ ingress }}/">Dashboard</a></li>
+      <li><a href="{{ ingress }}/stock">Bar Stock</a></li>
+      <li><a href="{{ ingress }}/kegs">Kegs</a></li>
+      <li><a href="{{ ingress }}/taps">Taps</a></li>
+      <li><a href="{{ ingress }}/settings">⚙ Settings</a></li>
+    </ul>
+    <button id="themeToggle" class="btn btn-icon" title="Toggle theme">🌙</button>
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ ingress }}/static/js/app.js"></script>
+  <script>
+    initTheme('{{ settings.theme }}', '{{ ingress }}');
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

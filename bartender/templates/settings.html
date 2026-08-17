@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>⚙ Settings</h1>
+<div class="card settings-card">
+  <form id="settingsForm" onsubmit="saveSettings(event)">
+    <div class="form-group">
+      <label>Bar Name</label>
+      <input type="text" id="barName" class="form-control" value="{{ settings.bar_name }}" required />
+    </div>
+    <div class="form-group">
+      <label>Measurement System</label>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="measurement" value="us" {% if settings.measurement == 'us' %}checked{% endif %} />
+          US (gallons, oz)
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="measurement" value="metric" {% if settings.measurement == 'metric' %}checked{% endif %} />
+          Metric (liters, ml)
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Theme</label>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="theme" value="light" {% if settings.theme == 'light' %}checked{% endif %} />
+          ☀ Light
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="theme" value="dark" {% if settings.theme == 'dark' %}checked{% endif %} />
+          🌙 Dark
+        </label>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save Settings</button>
+      <span id="saveMsg" class="save-msg"></span>
+    </div>
+  </form>
+</div>
+
+<div class="card settings-card">
+  <h2>📤 Export Data</h2>
+  <p class="muted">Download your bar data for backup or migration.</p>
+  <div class="export-buttons">
+    <a class="btn btn-secondary" href="{{ ingress }}/api/export/json">Export JSON (full)</a>
+    <a class="btn btn-secondary" href="{{ ingress }}/api/export/csv">Export CSV (all)</a>
+    <a class="btn btn-secondary" href="{{ ingress }}/api/export/csv?section=stock">Export Stock CSV</a>
+    <a class="btn btn-secondary" href="{{ ingress }}/api/export/csv?section=kegs">Export Kegs CSV</a>
+    <a class="btn btn-secondary" href="{{ ingress }}/api/export/csv?section=taps">Export Taps CSV</a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const INGRESS = '{{ ingress }}';
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const body = {
+    bar_name: document.getElementById('barName').value,
+    measurement: document.querySelector('input[name="measurement"]:checked').value,
+    theme: document.querySelector('input[name="theme"]:checked').value,
+  };
+  const res = await fetch(`${INGRESS}/api/settings`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    document.getElementById('saveMsg').textContent = '✓ Saved!';
+    setTimeout(() => { document.getElementById('saveMsg').textContent = ''; }, 2000);
+    document.documentElement.dataset.theme = body.theme;
+    localStorage.setItem('bartender_theme', body.theme);
+    updateThemeIcon(body.theme);
+  }
+}
+</script>
+{% endblock %}
