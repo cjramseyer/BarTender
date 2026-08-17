@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ settings.theme }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="60" />
+  <title>{{ settings.bar_name }} – Bar Status</title>
+  <style>
+    /* Inline styles so this page is self-contained with no external asset deps */
+    :root {
+      --bg: #f5f6fa; --surface: #ffffff; --surface2: #eef0f5;
+      --border: #d0d5e0; --text: #1a1d27; --text-muted: #6b7280;
+      --primary: #4f79e0; --nav-bg: #1e2333; --nav-text: #c8ccde;
+      --badge-full: #22c55e; --badge-in_use: #3b82f6;
+      --badge-empty: #9ca3af; --badge-cleaning: #f59e0b; --badge-retired: #6b7280;
+      --radius: 8px; --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    [data-theme="dark"] {
+      --bg: #111318; --surface: #1e2333; --surface2: #262c3e;
+      --border: #2e3550; --text: #e8eaf2; --text-muted: #9499b0;
+      --primary: #6b8fef; --nav-bg: #0e1018; --nav-text: #a0a8c0;
+      --badge-full: #16a34a; --badge-in_use: #2563eb;
+      --badge-empty: #4b5563; --badge-cleaning: #d97706; --badge-retired: #4b5563;
+      --shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; }
+    header { background: var(--nav-bg); color: #fff; padding: 1rem 1.5rem;
+             display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.4rem; }
+    header .subtitle { font-size: 0.82rem; opacity: 0.6; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.25rem; }
+    .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; }
+    /* Taps */
+    .taps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+    .tap-card { background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    .tap-card-header { background: var(--nav-bg); color: #fff; padding: 0.65rem 1rem;
+                       display: flex; align-items: center; justify-content: space-between; }
+    .tap-number { font-weight: 700; font-size: 1rem; }
+    .tap-label-badge { background: rgba(255,255,255,0.12); padding: 0.15rem 0.5rem;
+                       border-radius: 4px; font-size: 0.8rem; }
+    .tap-card-body { padding: 0.85rem 1rem; }
+    .tap-card-body p { font-size: 0.88rem; margin-bottom: 0.3rem; }
+    .keg-on-tap { font-size: 1.05rem !important; font-weight: 600; }
+    .no-keg { font-style: italic; color: var(--text-muted); }
+    /* Stock */
+    .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; }
+    .stock-card { background: var(--surface); border: 1px solid var(--border);
+                  border-radius: var(--radius); padding: 0.85rem 1rem; box-shadow: var(--shadow); }
+    .stock-name { font-weight: 600; font-size: 0.95rem; }
+    .stock-qty { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+    .stock-unit { font-size: 0.8rem; color: var(--text-muted); }
+    .stock-cat { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+    /* Badge */
+    .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 999px;
+             font-size: 0.76rem; font-weight: 600; text-transform: capitalize; color: #fff; }
+    .badge-full { background: var(--badge-full); }
+    .badge-in_use { background: var(--badge-in_use); }
+    .badge-empty { background: var(--badge-empty); color: #374151; }
+    .badge-cleaning { background: var(--badge-cleaning); }
+    .badge-retired { background: var(--badge-retired); }
+    .muted { color: var(--text-muted); font-size: 0.87rem; }
+    footer { text-align: center; padding: 1.5rem; font-size: 0.78rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🍺 {{ settings.bar_name }}</h1>
+      <div class="subtitle">Bar Status Display · auto-refreshes every 60 s</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Taps -->
+    <div class="section-title">🍺 Taps on Tap</div>
+    <div class="taps-grid">
+      {% for tap in taps %}
+        {% set keg = kegs | selectattr('id', 'equalto', tap.keg_id) | first %}
+        <div class="tap-card">
+          <div class="tap-card-header">
+            <span class="tap-number">Tap #{{ tap.number }}</span>
+            {% if tap.label %}<span class="tap-label-badge">{{ tap.label }}</span>{% endif %}
+          </div>
+          <div class="tap-card-body">
+            {% if keg %}
+              <p class="keg-on-tap">{{ keg.name }}</p>
+              <p><span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span></p>
+              <p class="muted">{{ keg.type or '' }}{% if keg.brewery %} · {{ keg.brewery }}{% endif %}{% if keg.abv %} · {{ keg.abv }}% ABV{% endif %}</p>
+              <p class="muted">{% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{ keg.size or '' }}{% endif %}</p>
+            {% else %}
+              <p class="no-keg">— No keg assigned —</p>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <p class="muted">No taps configured.</p>
+      {% endfor %}
+    </div>
+
+    <!-- Bar Stock -->
+    {% if bar_stock %}
+    <div class="section-title">📦 Bar Stock</div>
+    <div class="stock-grid">
+      {% for item in bar_stock %}
+      <div class="stock-card">
+        <div class="stock-name">{{ item.name }}</div>
+        <div><span class="stock-qty">{{ item.quantity }}</span> <span class="stock-unit">{{ item.unit }}</span></div>
+        {% if item.category %}<div class="stock-cat">{{ item.category }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <footer>BarTender · display view only · management available via Home Assistant ingress</footer>
+</body>
+</html>

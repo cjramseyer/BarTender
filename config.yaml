@@ -12,6 +12,7 @@ map:
   - data:rw
 ports:
   8099/tcp: null
+  8100/tcp: 8100
 ingress: true
 ingress_port: 8099
 ingress_stream: false
