@@ -4,9 +4,20 @@
 [![Release](https://github.com/cjramseyer/BarTender/actions/workflows/deploy.yaml/badge.svg)](https://github.com/cjramseyer/BarTender/actions/workflows/deploy.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Home Assistant add-on for managing your bar — track kegs, taps, and bar stock from a clean web UI with ingress support.
+This repository is structured as a Home Assistant add-on repository (like keypad-app).
 
-## Features
+- Add-on source lives in `bartender/`
+- Mobile viewer app lives in `mobile/`
+
+BarTender is a Home Assistant add-on for managing your bar — track kegs, taps, and bar stock from a clean web UI with ingress support.
+
+## Repository Layout
+
+- `repository.yaml` - Home Assistant add-on repository index file
+- `bartender/` - BarTender add-on (Dockerfile, config, runtime script, Python app)
+- `mobile/` - Flutter mobile read-only viewer
+
+## Add-on Features
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
@@ -66,6 +77,10 @@ CSV export accepts an optional `?section=stock|kegs|taps` query parameter.
 ## Contributing
 
 See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
+
+## Additional Docs
+
+- Add-on documentation: [bartender/DOCS.md](bartender/DOCS.md)
 
 ## License
 
