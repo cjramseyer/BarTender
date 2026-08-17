@@ -35,7 +35,7 @@ jobs:
 
       - name: Tag arch images as dev
         run: |
-          for arch in amd64 aarch64 armv7; do
+          for arch in amd64 aarch64; do
             docker buildx imagetools create \
               --tag "ghcr.io/${{ github.repository_owner }}/bartender/${arch}:dev" \
               "ghcr.io/${{ github.repository_owner }}/bartender/${arch}:edge"

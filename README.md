@@ -39,32 +39,32 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 
 No required configuration. Optional options can be set in the add-on configuration tab.
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| _(none)_ | — | All settings are managed from within the web UI |
+| Option   | Default | Description                                     |
+| -------- | ------- | ----------------------------------------------- |
+| _(none)_ | —       | All settings are managed from within the web UI |
 
 ## REST API
 
 The add-on exposes a JSON REST API at the ingress URL.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/settings` | Get current settings |
-| POST | `/api/settings` | Update settings |
-| GET | `/api/stock` | List all bar stock items |
-| POST | `/api/stock` | Add a stock item |
-| PUT | `/api/stock/<id>` | Update a stock item |
-| DELETE | `/api/stock/<id>` | Delete a stock item |
-| GET | `/api/kegs` | List all kegs |
-| POST | `/api/kegs` | Add a keg |
-| PUT | `/api/kegs/<id>` | Update a keg |
-| DELETE | `/api/kegs/<id>` | Delete a keg |
-| GET | `/api/taps` | List all taps |
-| POST | `/api/taps` | Add a tap |
-| PUT | `/api/taps/<id>` | Update a tap |
-| DELETE | `/api/taps/<id>` | Delete a tap |
-| GET | `/api/export/json` | Export all data as JSON |
-| GET | `/api/export/csv` | Export all data (or a section) as CSV |
+| Method | Endpoint           | Description                           |
+| ------ | ------------------ | ------------------------------------- |
+| GET    | `/api/settings`    | Get current settings                  |
+| POST   | `/api/settings`    | Update settings                       |
+| GET    | `/api/stock`       | List all bar stock items              |
+| POST   | `/api/stock`       | Add a stock item                      |
+| PUT    | `/api/stock/<id>`  | Update a stock item                   |
+| DELETE | `/api/stock/<id>`  | Delete a stock item                   |
+| GET    | `/api/kegs`        | List all kegs                         |
+| POST   | `/api/kegs`        | Add a keg                             |
+| PUT    | `/api/kegs/<id>`   | Update a keg                          |
+| DELETE | `/api/kegs/<id>`   | Delete a keg                          |
+| GET    | `/api/taps`        | List all taps                         |
+| POST   | `/api/taps`        | Add a tap                             |
+| PUT    | `/api/taps/<id>`   | Update a tap                          |
+| DELETE | `/api/taps/<id>`   | Delete a tap                          |
+| GET    | `/api/export/json` | Export all data as JSON               |
+| GET    | `/api/export/csv`  | Export all data (or a section) as CSV |
 
 CSV export accepts an optional `?section=stock|kegs|taps` query parameter.
 
@@ -72,7 +72,6 @@ CSV export accepts an optional `?section=stock|kegs|taps` query parameter.
 
 - `amd64`
 - `aarch64`
-- `armv7`
 
 ## Contributing
 
