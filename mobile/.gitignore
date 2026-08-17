@@ -1,0 +1,29 @@
+# Flutter/Dart build outputs
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.g.dart
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/google-services.json
+android/captures/
+*.apk
+*.aab
+
+# iOS
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner/GeneratedPluginRegistrant.*
+*.ipa
+
+# macOS
+macos/Pods/
+
+# Generated
+pubspec.lock
