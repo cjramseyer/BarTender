@@ -1,0 +1,58 @@
+---
+name: Feature Request
+description: Suggest a new feature for BarTender.
+title: "[Feature]: "
+labels: ["feature-request"]
+assignees:
+  - cjramseyer
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for something new? Describe what you'd like to see added.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What problem does this feature solve, or what use case does it enable?
+      placeholder: I'm trying to … but there's no way to …
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature you'd like. Be as specific as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried working around the problem another way?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Bar stock management
+        - Keg tracking
+        - Tap management
+        - Web dashboard UI
+        - REST API
+        - Data export
+        - Configuration options
+        - Display view
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Mockups, links, or any other useful information.

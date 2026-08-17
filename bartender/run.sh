@@ -10,7 +10,7 @@ export DISPLAY_PORT="8100"
 bashio::log.info "Starting BarTender management server on port ${PORT} (ingress: ${INGRESS_PATH})"
 bashio::log.info "Starting BarTender display server on port ${DISPLAY_PORT}"
 
-cd /app
+cd /app || exit 1
 
 # Start the read-only display server in the background
 python3 -m bartender.display &

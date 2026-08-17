@@ -1,8 +1,12 @@
-ARG BUILD_FROM=ghcr.io/hassio-addons/base:14.0.1
-FROM $BUILD_FROM
+ARG BUILD_FROM=ghcr.io/hassio-addons/base:21.0.1
+# hadolint ignore=DL3006
+FROM ${BUILD_FROM}
 
 # Install Python and dependencies
-RUN apk add --no-cache python3 py3-pip
+# hadolint ignore=DL3018
+RUN apk add --no-cache \
+	python3 \
+	py3-pip
 
 WORKDIR /app
 COPY bartender/ bartender/
