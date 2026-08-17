@@ -1,3 +1,4 @@
+---
 name: "BarTender"
 description: "Manage your bar: track kegs, taps, and stock with a web UI."
 version: "dev"

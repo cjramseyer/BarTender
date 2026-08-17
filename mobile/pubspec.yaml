@@ -1,3 +1,4 @@
+---
 name: bartender_mobile
 description: Read-only BarTender mobile viewer for Home Assistant.
 version: 1.0.0+1
