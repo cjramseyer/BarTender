@@ -1,0 +1,64 @@
+---
+name: Enhancement
+description: Suggest an improvement to an existing feature.
+title: "[Enhancement]: "
+labels: ["enhancement"]
+assignees:
+  - cjramseyer
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to propose improvements to something that already works but could be better.
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: How does the feature work today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: improved
+    attributes:
+      label: Improved behavior
+      description: How should it work instead? What would be better about it?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Bar stock management
+        - Keg tracking
+        - Tap management
+        - Web dashboard UI
+        - REST API
+        - Data export
+        - Configuration options
+        - Display view
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: How much would this improvement affect your daily use?
+      options:
+        - High — I work around this limitation constantly
+        - Medium — Would be a noticeable improvement
+        - Low — Nice to have
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Examples, mockups, or related issues.

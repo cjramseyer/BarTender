@@ -1,0 +1,84 @@
+---
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "🚀 Features"
+    labels:
+      - "feature"
+      - "feature-request"
+      - "enhancement"
+  - title: "🐛 Bug Fixes"
+    labels:
+      - "bug"
+      - "fix"
+  - title: "🔒 Security"
+    labels:
+      - "security"
+  - title: "🧰 Maintenance"
+    labels:
+      - "chore"
+      - "dependencies"
+      - "refactor"
+  - title: "📚 Documentation"
+    labels:
+      - "documentation"
+      - "docs"
+
+version-resolver:
+  major:
+    labels:
+      - "breaking-change"
+      - "major"
+  minor:
+    labels:
+      - "feature"
+      - "feature-request"
+      - "enhancement"
+  patch:
+    labels:
+      - "bug"
+      - "fix"
+      - "security"
+      - "chore"
+      - "dependencies"
+      - "documentation"
+      - "docs"
+  default: patch
+
+autolabeler:
+  - label: "feature"
+    title:
+      - "/^feat(\\(.+\\))?:/i"
+  - label: "bug"
+    title:
+      - "/^fix(\\(.+\\))?:/i"
+  - label: "chore"
+    title:
+      - "/^chore(\\(.+\\))?:/i"
+      - "/^ci(\\(.+\\))?:/i"
+      - "/^style(\\(.+\\))?:/i"
+      - "/^refactor(\\(.+\\))?:/i"
+      - "/^build(\\(.+\\))?:/i"
+  - label: "documentation"
+    title:
+      - "/^docs(\\(.+\\))?:/i"
+  - label: "security"
+    title:
+      - "/^(fix|chore|security)(\\(.+\\))?:.*CVE/i"
+      - "/^(fix|chore|security)(\\(.+\\))?:.*GHSA/i"
+      - "/^(fix|chore|security)(\\(.+\\))?:.*vulnerabilit/i"
+  - label: "dependencies"
+    title:
+      - "/^chore.*bump/i"
+      - "/⬆️/"
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

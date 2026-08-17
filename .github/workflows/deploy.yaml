@@ -1,0 +1,48 @@
+---
+name: Deploy
+
+# yamllint disable-line rule:truthy
+on:
+  release:
+    types:
+      - published
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  workflows:
+    uses: hassio-addons/workflows/.github/workflows/addon-deploy.yaml@main
+    secrets:
+      DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+
+  tag-dev-alias:
+    name: Create dev image aliases
+    needs: workflows
+    if: ${{ github.event_name == 'workflow_run' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Tag arch images as dev
+        run: |
+          for arch in amd64 aarch64 armv7; do
+            docker buildx imagetools create \
+              --tag "ghcr.io/${{ github.repository_owner }}/bartender/${arch}:dev" \
+              "ghcr.io/${{ github.repository_owner }}/bartender/${arch}:edge"
+          done
+
+      - name: Tag multi-arch image as dev
+        run: |
+          docker buildx imagetools create \
+            --tag "ghcr.io/${{ github.repository_owner }}/bartender:dev" \
+            "ghcr.io/${{ github.repository_owner }}/bartender:edge"
