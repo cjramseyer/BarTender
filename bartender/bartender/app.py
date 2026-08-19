@@ -392,10 +392,16 @@ def api_fill_keg(keg_id: int):
 @app.route("/api/kegs/<int:keg_id>", methods=["DELETE"])
 def api_delete_keg(keg_id: int):
     data = load_data()
-    # unassign from taps
-    for tap in data["taps"]:
-        if tap.get("keg_id") == keg_id:
-            tap["keg_id"] = None
+    assigned_taps = [tap for tap in data["taps"] if tap.get("keg_id") == keg_id]
+    if assigned_taps:
+        tap_numbers = [tap.get("number") for tap in assigned_taps if tap.get("number") is not None]
+        return jsonify({
+            "error": "This keg is assigned to one or more taps. Disconnect it from all taps (or delete those taps) before deleting the keg.",
+            "code": "KEG_ASSIGNED_TO_TAP",
+            "tap_count": len(assigned_taps),
+            "tap_numbers": tap_numbers,
+        }), 409
+
     data["kegs"] = [k for k in data["kegs"] if k["id"] != keg_id]
     save_data(data)
     return jsonify({"ok": True})

@@ -296,7 +296,25 @@
 
   async function deleteKeg(id) {
     if (!confirm("Delete this keg?")) return;
-    await fetch(`${INGRESS}/api/kegs/${id}`, { method: "DELETE" });
+    const response = await fetch(`${INGRESS}/api/kegs/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      let message = "Unable to delete keg.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) {
+          message = errorBody.error;
+          if (Array.isArray(errorBody.tap_numbers) && errorBody.tap_numbers.length) {
+            message += ` Assigned taps: ${errorBody.tap_numbers.join(", ")}.`;
+          }
+        }
+      } catch (err) {
+        // Ignore parse errors and keep generic fallback message.
+      }
+      alert(message);
+      return;
+    }
     location.reload();
   }
 
