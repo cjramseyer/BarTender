@@ -34,6 +34,7 @@ DEFAULT_DATA = {
         "measurement": "us",
         "theme": "light",
         "bar_name": "My Bar",
+        "manage_button_position": "top-right",
     },
     "bar_stock": [],
     "kegs": [],
@@ -49,6 +50,17 @@ def load_data() -> dict:
         for key, value in DEFAULT_DATA.items():
             if key not in data:
                 data[key] = value
+        # Backward compatibility: migrate legacy purchase_date field to filled_date.
+        for keg in data.get("kegs", []):
+            if not keg.get("filled_date") and keg.get("purchased_date"):
+                keg["filled_date"] = keg.get("purchased_date", "")
+            keg.pop("purchased_date", None)
+            if keg.get("status") == "filled":
+                keg["status"] = "full"
+            if "percent_full" not in keg:
+                keg["percent_full"] = _default_percent_for_status(keg.get("status", "empty"))
+            else:
+                keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(keg.get("status", "empty")))
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 
@@ -67,6 +79,58 @@ def _next_id(items: list) -> int:
     if not items:
         return 1
     return max(item.get("id", 0) for item in items) + 1
+
+
+def _set_keg_tapped_date_if_missing(data: dict, keg_id) -> None:
+    if keg_id is None:
+        return
+    for keg in data["kegs"]:
+        if keg.get("id") == keg_id and not keg.get("tapped_date"):
+            keg["tapped_date"] = datetime.utcnow().date().isoformat()
+            break
+
+
+def _set_filled_date_for_status_transition(keg: dict, incoming_status: str) -> None:
+    is_full_transition = incoming_status in ("full", "filled")
+    if is_full_transition and not keg.get("filled_date"):
+        keg["filled_date"] = _today_utc_date()
+
+
+def _normalize_keg_status(status):
+    if status == "filled":
+        return "full"
+    return status
+
+
+def _default_percent_for_status(status: str) -> int:
+    status = _normalize_keg_status(status)
+    if status == "full":
+        return 100
+    if status == "in_use":
+        return 50
+    return 0
+
+
+def _clamp_percent_full(value, fallback: int) -> int:
+    try:
+        return max(0, min(100, int(float(value))))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _sync_percent_for_status(keg: dict, status: str, percent_explicit: bool) -> None:
+    status = _normalize_keg_status(status)
+    if percent_explicit:
+        keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(status))
+        return
+
+    if status == "full":
+        keg["percent_full"] = 100
+    elif status in ("empty", "cleaning", "retired"):
+        keg["percent_full"] = 0
+    elif status == "in_use":
+        current = _clamp_percent_full(keg.get("percent_full"), 50)
+        keg["percent_full"] = current if 0 < current < 100 else 50
 
 
 # ---------------------------------------------------------------------------
@@ -144,10 +208,14 @@ def api_get_settings():
 def api_save_settings():
     data = load_data()
     body = request.get_json(force=True)
-    allowed = {"measurement", "theme", "bar_name"}
+    allowed = {"measurement", "theme", "bar_name", "manage_button_position"}
     for key in allowed:
         if key in body:
             data["settings"][key] = body[key]
+
+    if data["settings"].get("manage_button_position") not in ("top-right", "bottom-left", "bottom-right"):
+        data["settings"]["manage_button_position"] = "top-right"
+
     save_data(data)
     return jsonify(data["settings"])
 
@@ -212,6 +280,10 @@ KEG_SIZES_METRIC = ["20 L", "30 L", "50 L", "Custom"]
 KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
 
 
+def _today_utc_date() -> str:
+    return datetime.utcnow().date().isoformat()
+
+
 @app.route("/api/kegs", methods=["GET"])
 def api_list_kegs():
     data = load_data()
@@ -222,20 +294,26 @@ def api_list_kegs():
 def api_add_keg():
     data = load_data()
     body = request.get_json(force=True)
+    initial_status = _normalize_keg_status(body.get("status", "empty"))
+    incoming_filled_date = body.get("filled_date", body.get("purchased_date", ""))
+    has_percent_full = "percent_full" in body
     keg = {
         "id": _next_id(data["kegs"]),
         "name": body.get("name", ""),
         "type": body.get("type", ""),
         "size": body.get("size", ""),
         "custom_size": body.get("custom_size", ""),
-        "status": body.get("status", "full"),
+        "status": initial_status,
         "brewery": body.get("brewery", ""),
         "abv": body.get("abv", ""),
         "notes": body.get("notes", ""),
-        "purchased_date": body.get("purchased_date", ""),
         "tapped_date": body.get("tapped_date", ""),
+        "filled_date": incoming_filled_date,
+        "percent_full": _clamp_percent_full(body.get("percent_full"), _default_percent_for_status(initial_status)),
         "updated_at": datetime.utcnow().isoformat(),
     }
+    _set_filled_date_for_status_transition(keg, initial_status)
+    _sync_percent_for_status(keg, initial_status, has_percent_full)
     data["kegs"].append(keg)
     save_data(data)
     return jsonify(keg), 201
@@ -247,9 +325,50 @@ def api_update_keg(keg_id: int):
     for keg in data["kegs"]:
         if keg["id"] == keg_id:
             body = request.get_json(force=True)
-            for field in ("name", "type", "size", "custom_size", "status", "brewery", "abv", "notes", "purchased_date", "tapped_date"):
+            if "purchased_date" in body and "filled_date" not in body:
+                body["filled_date"] = body["purchased_date"]
+
+            if "status" in body:
+                body["status"] = _normalize_keg_status(body["status"])
+
+            has_percent_full = "percent_full" in body
+            if has_percent_full:
+                body["percent_full"] = _clamp_percent_full(body.get("percent_full"), _default_percent_for_status(body.get("status", keg.get("status", "empty"))))
+
+            for field in ("name", "type", "size", "custom_size", "status", "brewery", "abv", "notes", "tapped_date", "filled_date", "percent_full"):
                 if field in body:
                     keg[field] = body[field]
+
+            if "status" in body:
+                _set_filled_date_for_status_transition(keg, body["status"])
+                _sync_percent_for_status(keg, body["status"], has_percent_full)
+
+            if "status" not in body and has_percent_full:
+                keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(keg.get("status", "empty")))
+
+            keg.pop("purchased_date", None)
+            keg["updated_at"] = datetime.utcnow().isoformat()
+            save_data(data)
+            return jsonify(keg)
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.route("/api/kegs/<int:keg_id>/fill", methods=["POST"])
+def api_fill_keg(keg_id: int):
+    data = load_data()
+    body = request.get_json(silent=True) or {}
+    for keg in data["kegs"]:
+        if keg["id"] == keg_id:
+            if keg.get("status") != "empty" and not body.get("force", False):
+                return jsonify({"error": "Keg is not empty", "status": keg.get("status")}), 409
+
+            target_status = _normalize_keg_status(body.get("status", "full"))
+            if target_status not in KEG_STATUSES:
+                return jsonify({"error": "Invalid status"}), 400
+
+            keg["status"] = target_status
+            keg["filled_date"] = body.get("filled_date") or _today_utc_date()
+            keg["percent_full"] = _clamp_percent_full(body.get("percent_full"), 100)
             keg["updated_at"] = datetime.utcnow().isoformat()
             save_data(data)
             return jsonify(keg)
@@ -290,6 +409,7 @@ def api_add_tap():
         "notes": body.get("notes", ""),
         "updated_at": datetime.utcnow().isoformat(),
     }
+    _set_keg_tapped_date_if_missing(data, tap.get("keg_id"))
     data["taps"].append(tap)
     save_data(data)
     return jsonify(tap), 201
@@ -304,6 +424,7 @@ def api_update_tap(tap_id: int):
             for field in ("number", "label", "keg_id", "notes"):
                 if field in body:
                     tap[field] = body[field]
+            _set_keg_tapped_date_if_missing(data, tap.get("keg_id"))
             tap["updated_at"] = datetime.utcnow().isoformat()
             save_data(data)
             return jsonify(tap)
@@ -360,7 +481,7 @@ def export_csv():
         write_section(
             "Kegs",
             data["kegs"],
-            ["id", "name", "type", "size", "custom_size", "status", "brewery", "abv", "notes", "purchased_date", "tapped_date", "updated_at"],
+            ["id", "name", "type", "size", "custom_size", "status", "brewery", "abv", "notes", "tapped_date", "filled_date", "percent_full", "updated_at"],
         )
     if section in ("all", "taps"):
         write_section(

@@ -47,24 +47,25 @@ No required configuration. Optional options can be set in the add-on configurati
 
 The add-on exposes a JSON REST API at the ingress URL.
 
-| Method | Endpoint           | Description                           |
-| ------ | ------------------ | ------------------------------------- |
-| GET    | `/api/settings`    | Get current settings                  |
-| POST   | `/api/settings`    | Update settings                       |
-| GET    | `/api/stock`       | List all bar stock items              |
-| POST   | `/api/stock`       | Add a stock item                      |
-| PUT    | `/api/stock/<id>`  | Update a stock item                   |
-| DELETE | `/api/stock/<id>`  | Delete a stock item                   |
-| GET    | `/api/kegs`        | List all kegs                         |
-| POST   | `/api/kegs`        | Add a keg                             |
-| PUT    | `/api/kegs/<id>`   | Update a keg                          |
-| DELETE | `/api/kegs/<id>`   | Delete a keg                          |
-| GET    | `/api/taps`        | List all taps                         |
-| POST   | `/api/taps`        | Add a tap                             |
-| PUT    | `/api/taps/<id>`   | Update a tap                          |
-| DELETE | `/api/taps/<id>`   | Delete a tap                          |
-| GET    | `/api/export/json` | Export all data as JSON               |
-| GET    | `/api/export/csv`  | Export all data (or a section) as CSV |
+| Method | Endpoint              | Description                           |
+| ------ | --------------------- | ------------------------------------- |
+| GET    | `/api/settings`       | Get current settings                  |
+| POST   | `/api/settings`       | Update settings                       |
+| GET    | `/api/stock`          | List all bar stock items              |
+| POST   | `/api/stock`          | Add a stock item                      |
+| PUT    | `/api/stock/<id>`     | Update a stock item                   |
+| DELETE | `/api/stock/<id>`     | Delete a stock item                   |
+| GET    | `/api/kegs`           | List all kegs                         |
+| POST   | `/api/kegs`           | Add a keg                             |
+| PUT    | `/api/kegs/<id>`      | Update a keg                          |
+| POST   | `/api/kegs/<id>/fill` | Fill/refill a keg                     |
+| DELETE | `/api/kegs/<id>`      | Delete a keg                          |
+| GET    | `/api/taps`           | List all taps                         |
+| POST   | `/api/taps`           | Add a tap                             |
+| PUT    | `/api/taps/<id>`      | Update a tap                          |
+| DELETE | `/api/taps/<id>`      | Delete a tap                          |
+| GET    | `/api/export/json`    | Export all data as JSON               |
+| GET    | `/api/export/csv`     | Export all data (or a section) as CSV |
 
 CSV export accepts an optional `?section=stock|kegs|taps` query parameter.
 
@@ -79,7 +80,11 @@ See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
 ## Additional Docs
 
-- Add-on documentation: [bartender/DOCS.md](bartender/DOCS.md)
+- Add-on summary: [bartender/DOCS.md](bartender/DOCS.md)
+- Core app and add-on reference: [docs/core-app.md](docs/core-app.md)
+- Mobile app guide: [docs/mobile-app.md](docs/mobile-app.md)
+- Getting started guide: [docs/getting-started.md](docs/getting-started.md)
+- Troubleshooting and FAQ: [docs/troubleshooting-faq.md](docs/troubleshooting-faq.md)
 
 ## License
 

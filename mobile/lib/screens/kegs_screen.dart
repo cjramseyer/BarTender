@@ -90,11 +90,16 @@ class _KegsScreenState extends State<KegsScreen> {
                           if (keg.type.isNotEmpty) _InfoChip(label: keg.type),
                           if (keg.size.isNotEmpty) _InfoChip(label: keg.size),
                           if (keg.abv.isNotEmpty) _InfoChip(label: '${keg.abv}% ABV'),
+                          _InfoChip(label: '${keg.percentFull}% full'),
                         ],
                       ),
                       if (keg.notes.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(keg.notes, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                      ],
+                      if (keg.filledDate.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text('Filled: ${keg.filledDate}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
                       ],
                     ],
                   ),
