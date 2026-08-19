@@ -1,34 +1,55 @@
-{% extends "base.html" %}
-{% block title %}Taps{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}Taps{% endblock %} {% block content
+%}
 <div class="page-header">
   <h1>🍺 Taps</h1>
-  <button class="btn btn-primary manage-btn" onclick="openAddTap()">+ Add Tap</button>
+  <button class="btn btn-primary manage-btn" onclick="openAddTap()">
+    + Add Tap
+  </button>
 </div>
 
 <div class="taps-grid" id="tapsGrid">
-  {% for tap in taps %}
-    {% set keg = kegs | selectattr('id', 'equalto', tap.keg_id) | first %}
+  {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
+  tap.keg_id) | first %}
   <div class="tap-card" data-id="{{ tap.id }}">
     <div class="tap-card-header">
       <span class="tap-number">Tap #{{ tap.number }}</span>
-      {% if tap.label %}<span class="tap-label-badge">{{ tap.label }}</span>{% endif %}
+      {% if tap.label %}<span class="tap-label-badge">{{ tap.label }}</span>{%
+      endif %}
     </div>
     <div class="tap-card-body">
       {% if keg %}
-        <p class="keg-on-tap">{{ keg.name }}</p>
-        <p><span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span></p>
-        <p class="muted">{{ keg.type or '' }} {% if keg.brewery %}· {{ keg.brewery }}{% endif %} {% if keg.abv %}· {{ keg.abv }}% ABV{% endif %}</p>
-        <p class="muted">Size: {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{ keg.size or '—' }}{% endif %}</p>
-        {% if keg.tapped_date %}<p class="muted">Tapped: {{ keg.tapped_date }}</p>{% endif %}
-      {% else %}
-        <p class="muted no-keg">— No keg assigned —</p>
+      <p class="keg-on-tap">{{ keg.name }}</p>
+      <p>
+        <span class="badge badge-{{ keg.status }}"
+          >{{ keg.status | replace('_', ' ') | title }}</span
+        >
+      </p>
+      <p class="muted">
+        {{ keg.type or '' }} {% if keg.brewery %}· {{ keg.brewery }}{% endif %}
+        {% if keg.abv %}· {{ keg.abv }}% ABV{% endif %}
+      </p>
+      <p class="muted">
+        Size: {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{
+        keg.size or '—' }}{% endif %}
+      </p>
+      {% if keg.tapped_date %}
+      <p class="muted">Tapped: {{ keg.tapped_date }}</p>
+      {% endif %} {% else %}
+      <p class="muted no-keg">— No keg assigned —</p>
+      {% endif %} {% if tap.notes %}
+      <p class="muted">{{ tap.notes }}</p>
       {% endif %}
-      {% if tap.notes %}<p class="muted">{{ tap.notes }}</p>{% endif %}
     </div>
     <div class="tap-card-footer">
-      <button class="btn btn-sm btn-secondary" onclick='editTap({{ tap | tojson | forceescape }})'>Edit</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">Delete</button>
+      <button
+        class="btn btn-sm btn-secondary"
+        onclick="editTap({{ tap | tojson | forceescape }})"
+      >
+        Edit
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">
+        Delete
+      </button>
     </div>
   </div>
   {% else %}
@@ -48,22 +69,35 @@
       <div class="form-row">
         <div class="form-group">
           <label>Tap Number *</label>
-          <input type="number" id="tapNumber" required class="form-control" min="1" value="1" />
+          <input
+            type="number"
+            id="tapNumber"
+            required
+            class="form-control"
+            min="1"
+            value="1"
+          />
         </div>
         <div class="form-group">
           <label>Label</label>
-          <input type="text" id="tapLabel" class="form-control" placeholder="e.g. Left, Right, Nitro…" />
+          <input
+            type="text"
+            id="tapLabel"
+            class="form-control"
+            placeholder="e.g. Left, Right, Nitro…"
+          />
         </div>
       </div>
       <div class="form-group">
         <label>Assigned Keg</label>
         <select id="tapKeg" class="form-control">
           <option value="">— None —</option>
-          {% for keg in kegs %}
-            {% if keg.status in ('full', 'in_use') %}
-            <option value="{{ keg.id }}">{{ keg.name }} ({{ keg.status | replace('_', ' ') }}{% if keg.size %}, {{ keg.size }}{% endif %})</option>
-            {% endif %}
-          {% endfor %}
+          {% for keg in kegs %} {% if keg.status in ('full', 'in_use') %}
+          <option value="{{ keg.id }}">
+            {{ keg.name }} ({{ keg.status | replace('_', ' ') }}{% if keg.size
+            %}, {{ keg.size }}{% endif %})
+          </option>
+          {% endif %} {% endfor %}
         </select>
         <small class="muted">Only full / in-use kegs shown.</small>
       </div>
@@ -72,55 +106,61 @@
         <textarea id="tapNotes" class="form-control" rows="2"></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn" onclick="closeModal('tapModal')">Cancel</button>
+        <button type="button" class="btn" onclick="closeModal('tapModal')">
+          Cancel
+        </button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
   </div>
 </div>
-{% endblock %}
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
-const INGRESS = '{{ ingress }}';
+  const INGRESS = "{{ ingress }}";
 
-function openAddTap() {
-  document.getElementById('tapModalTitle').textContent = 'Add Tap';
-  document.getElementById('tapForm').reset();
-  document.getElementById('tapId').value = '';
-  document.getElementById('tapNumber').value = document.querySelectorAll('.tap-card').length + 1;
-  openModal('tapModal');
-}
+  function openAddTap() {
+    document.getElementById("tapModalTitle").textContent = "Add Tap";
+    document.getElementById("tapForm").reset();
+    document.getElementById("tapId").value = "";
+    document.getElementById("tapNumber").value =
+      document.querySelectorAll(".tap-card").length + 1;
+    openModal("tapModal");
+  }
 
-function editTap(tap) {
-  document.getElementById('tapModalTitle').textContent = 'Edit Tap';
-  document.getElementById('tapId').value = tap.id;
-  document.getElementById('tapNumber').value = tap.number;
-  document.getElementById('tapLabel').value = tap.label;
-  document.getElementById('tapKeg').value = tap.keg_id || '';
-  document.getElementById('tapNotes').value = tap.notes;
-  openModal('tapModal');
-}
+  function editTap(tap) {
+    document.getElementById("tapModalTitle").textContent = "Edit Tap";
+    document.getElementById("tapId").value = tap.id;
+    document.getElementById("tapNumber").value = tap.number;
+    document.getElementById("tapLabel").value = tap.label;
+    document.getElementById("tapKeg").value = tap.keg_id || "";
+    document.getElementById("tapNotes").value = tap.notes;
+    openModal("tapModal");
+  }
 
-async function submitTap(e) {
-  e.preventDefault();
-  const id = document.getElementById('tapId').value;
-  const kegVal = document.getElementById('tapKeg').value;
-  const body = {
-    number: parseInt(document.getElementById('tapNumber').value),
-    label: document.getElementById('tapLabel').value,
-    keg_id: kegVal ? parseInt(kegVal) : null,
-    notes: document.getElementById('tapNotes').value,
-  };
-  const method = id ? 'PUT' : 'POST';
-  const url = id ? `${INGRESS}/api/taps/${id}` : `${INGRESS}/api/taps`;
-  await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  location.reload();
-}
+  async function submitTap(e) {
+    e.preventDefault();
+    const id = document.getElementById("tapId").value;
+    const kegVal = document.getElementById("tapKeg").value;
+    const body = {
+      number: parseInt(document.getElementById("tapNumber").value),
+      label: document.getElementById("tapLabel").value,
+      keg_id: kegVal ? parseInt(kegVal) : null,
+      notes: document.getElementById("tapNotes").value,
+    };
+    const method = id ? "PUT" : "POST";
+    const url = id ? `${INGRESS}/api/taps/${id}` : `${INGRESS}/api/taps`;
+    await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    location.reload();
+  }
 
-async function deleteTap(id) {
-  if (!confirm('Delete this tap?')) return;
-  await fetch(`${INGRESS}/api/taps/${id}`, { method: 'DELETE' });
-  location.reload();
-}
+  async function deleteTap(id) {
+    if (!confirm("Delete this tap?")) return;
+    await fetch(`${INGRESS}/api/taps/${id}`, { method: "DELETE" });
+    location.reload();
+  }
 </script>
 {% endblock %}

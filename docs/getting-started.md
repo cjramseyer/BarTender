@@ -4,6 +4,7 @@ Last updated: 2026-08-19
 Audience: first-time users
 
 ## Quick Setup
+
 1. In Home Assistant, open Settings -> Add-ons -> Add-on Store.
 2. Add repository URL: https://github.com/cjramseyer/BarTender
 3. Install the BarTender add-on.
@@ -11,17 +12,22 @@ Audience: first-time users
 5. Open BarTender from the Home Assistant sidebar.
 
 ## First-Time Configuration
+
 Open Settings in BarTender UI and set:
+
 - Bar Name
 - Measurement (us or metric)
 - Theme (light or dark)
 
 Recommended defaults:
+
 - Measurement: us (if using US keg sizes) or metric based on your inventory.
 - Theme: use the one with best readability on your display device.
 
 ## First-Use Workflow
+
 Use this order for a clean initial setup:
+
 1. Add bar stock items.
 2. Add kegs.
 3. Add taps.
@@ -37,12 +43,14 @@ flowchart LR
 ```
 
 ### Step 1: Add Bar Stock
+
 - Go to Bar Stock.
 - Click Add Item.
 - Enter name, category, quantity, unit, notes.
 - Save.
 
 ### Step 2: Add Kegs
+
 - Go to Kegs.
 - Click Add Keg.
 - Enter keg details (name, type, size, status, brewery, ABV).
@@ -50,53 +58,66 @@ flowchart LR
 - Save.
 
 Default behavior note:
+
 - New kegs default status to empty unless you choose another status.
 
 ### Step 3: Add Taps
+
 - Go to Taps.
 - Click Add Tap.
 - Enter tap number and optional label/notes.
 - Save.
 
 ### Step 4: Assign Kegs to Taps
+
 - Edit a tap and select Assigned Keg.
 - Save.
 
 Auto-fill behavior note:
+
 - When a keg is connected to a tap and tapped date is empty, tapped date auto-fills.
 - Existing tapped dates are preserved.
 
 ### Step 5: Verify Display
+
 - Check dashboard and taps page for current assignment.
 - Open display service if using a wallboard.
 
 ## Common Pitfalls
+
 - Using ingress-only URLs from external clients: mobile may not reach them directly.
 - Forgetting to back up data before major changes.
 - Entering freeform status values outside expected set.
 - Assuming import exists: current release supports export only.
 
 ## Backup and Upgrade Basics
+
 Before upgrading:
+
 1. Export JSON backup from /api/export/json.
 2. Optionally export CSV by section.
 3. Store backup outside the HA host.
 
 After upgrading:
+
 1. Start add-on.
 2. Open dashboard and settings.
 3. Validate taps, kegs, and stock counts.
 4. Spot-check one record from each section.
 
 ## Quick API Smoke Test
+
 Use browser or HTTP client:
+
 - GET /api/settings
 - GET /api/stock
 - GET /api/kegs
 - GET /api/taps
 
 Expected:
+
 - 200 responses with JSON arrays/objects.
 
 ## Troubleshooting and FAQ
+
 See docs/troubleshooting-faq.md for detailed troubleshooting and common questions.
