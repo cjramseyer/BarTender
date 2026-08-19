@@ -4,26 +4,7 @@ function initTheme(serverTheme, ingress) {
   const stored = localStorage.getItem("bartender_theme");
   const theme = stored || serverTheme || "light";
   document.documentElement.dataset.theme = theme;
-  updateThemeIcon(theme);
-
-  document.getElementById("themeToggle").addEventListener("click", () => {
-    const current = document.documentElement.dataset.theme;
-    const next = current === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem("bartender_theme", next);
-    updateThemeIcon(next);
-    // Persist to server
-    fetch(`${ingress}/api/settings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: next }),
-    });
-  });
-}
-
-function updateThemeIcon(theme) {
-  const btn = document.getElementById("themeToggle");
-  if (btn) btn.textContent = theme === "dark" ? "☀" : "🌙";
+  localStorage.setItem("bartender_theme", theme);
 }
 
 function openModal(id) {

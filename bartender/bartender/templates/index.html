@@ -12,8 +12,9 @@ content %}
         <span class="tap-number">Tap {{ tap.number }}</span>
         <span class="tap-label">{{ tap.label or '—' }}</span>
         {% if keg %}
-        <span class="badge badge-{{ keg.status }}"
-          >{{ keg.name }} ({{ keg.status | replace('_', ' ') }})</span
+        {% set dashboard_status = 'in_use' if tap.keg_id else keg.status %}
+        <span class="badge badge-{{ dashboard_status }}"
+          >{{ keg.name }} ({{ dashboard_status | replace('_', ' ') }})</span
         >
         {% else %}
         <span class="badge badge-empty">No keg assigned</span>

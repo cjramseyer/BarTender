@@ -50,6 +50,12 @@ def load_data() -> dict:
         for key, value in DEFAULT_DATA.items():
             if key not in data:
                 data[key] = value
+        # Ensure nested settings keys exist for backward compatibility.
+        if not isinstance(data.get("settings"), dict):
+            data["settings"] = json.loads(json.dumps(DEFAULT_DATA["settings"]))
+        else:
+            for key, value in DEFAULT_DATA["settings"].items():
+                data["settings"].setdefault(key, value)
         # Backward compatibility: migrate legacy purchase_date field to filled_date.
         for keg in data.get("kegs", []):
             if not keg.get("filled_date") and keg.get("purchased_date"):
@@ -61,6 +67,8 @@ def load_data() -> dict:
                 keg["percent_full"] = _default_percent_for_status(keg.get("status", "empty"))
             else:
                 keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(keg.get("status", "empty")))
+            # Keep capacity values consistent with status for migrated/legacy data.
+            _sync_percent_for_status(keg, keg.get("status", "empty"), False)
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 
@@ -120,15 +128,21 @@ def _clamp_percent_full(value, fallback: int) -> int:
 
 def _sync_percent_for_status(keg: dict, status: str, percent_explicit: bool) -> None:
     status = _normalize_keg_status(status)
-    if percent_explicit:
-        keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(status))
-        return
-
     if status == "full":
         keg["percent_full"] = 100
-    elif status in ("empty", "cleaning", "retired"):
+        return
+
+    if status in ("empty", "cleaning", "retired"):
         keg["percent_full"] = 0
-    elif status == "in_use":
+        return
+
+    if percent_explicit:
+        # Allow custom % only for in-use kegs, but keep it bounded.
+        current = _clamp_percent_full(keg.get("percent_full"), 50)
+        keg["percent_full"] = current if 0 < current < 100 else 50
+        return
+
+    if status == "in_use":
         current = _clamp_percent_full(keg.get("percent_full"), 50)
         keg["percent_full"] = current if 0 < current < 100 else 50
 
@@ -378,10 +392,16 @@ def api_fill_keg(keg_id: int):
 @app.route("/api/kegs/<int:keg_id>", methods=["DELETE"])
 def api_delete_keg(keg_id: int):
     data = load_data()
-    # unassign from taps
-    for tap in data["taps"]:
-        if tap.get("keg_id") == keg_id:
-            tap["keg_id"] = None
+    assigned_taps = [tap for tap in data["taps"] if tap.get("keg_id") == keg_id]
+    if assigned_taps:
+        tap_numbers = [tap.get("number") for tap in assigned_taps if tap.get("number") is not None]
+        return jsonify({
+            "error": "This keg is assigned to one or more taps. Disconnect it from all taps (or delete those taps) before deleting the keg.",
+            "code": "KEG_ASSIGNED_TO_TAP",
+            "tap_count": len(assigned_taps),
+            "tap_numbers": tap_numbers,
+        }), 409
+
     data["kegs"] = [k for k in data["kegs"] if k["id"] != keg_id]
     save_data(data)
     return jsonify({"ok": True})
