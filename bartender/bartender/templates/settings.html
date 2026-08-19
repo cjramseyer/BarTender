@@ -163,6 +163,7 @@ content %}
       }, 2000);
       document.documentElement.dataset.theme = body.theme;
       document.documentElement.dataset.managePos = body.manage_button_position;
+      document.body.dataset.managePos = body.manage_button_position;
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
       document.getElementById("saveMsg").textContent = "Save failed";
