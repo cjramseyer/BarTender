@@ -115,6 +115,11 @@ body {
   color: var(--nav-active);
 }
 
+.nav-display-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 /* Container */
 .container {
   max-width: 1100px;
@@ -310,13 +315,17 @@ textarea.form-control {
   margin-left: auto;
 }
 
-[data-manage-pos="bottom-left"] .page-header,
-[data-manage-pos="bottom-right"] .page-header {
+html[data-manage-pos="bottom-left"] .page-header,
+html[data-manage-pos="bottom-right"] .page-header,
+body[data-manage-pos="bottom-left"] .page-header,
+body[data-manage-pos="bottom-right"] .page-header {
   justify-content: flex-start;
 }
 
-[data-manage-pos="bottom-left"] .manage-btn,
-[data-manage-pos="bottom-right"] .manage-btn {
+html[data-manage-pos="bottom-left"] .manage-btn,
+html[data-manage-pos="bottom-right"] .manage-btn,
+body[data-manage-pos="bottom-left"] .manage-btn,
+body[data-manage-pos="bottom-right"] .manage-btn {
   position: fixed;
   bottom: 1.25rem;
   z-index: 950;
@@ -324,11 +333,13 @@ textarea.form-control {
   box-shadow: var(--shadow);
 }
 
-[data-manage-pos="bottom-left"] .manage-btn {
+html[data-manage-pos="bottom-left"] .manage-btn,
+body[data-manage-pos="bottom-left"] .manage-btn {
   left: 1.25rem;
 }
 
-[data-manage-pos="bottom-right"] .manage-btn {
+html[data-manage-pos="bottom-right"] .manage-btn,
+body[data-manage-pos="bottom-right"] .manage-btn {
   right: 1.25rem;
 }
 

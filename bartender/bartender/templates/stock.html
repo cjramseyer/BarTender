@@ -28,7 +28,7 @@ content %}
       <td>{{ item.name }}</td>
       <td>{{ item.category }}</td>
       <td>{{ item.quantity }}</td>
-      <td>{{ item.unit }}</td>
+      <td>{{ item.size_label or item.unit }}</td>
       <td>{{ item.notes }}</td>
       <td>
         <button
@@ -97,12 +97,19 @@ content %}
         />
       </div>
       <div class="form-group">
-        <label>Unit</label>
+        <label>Size</label>
+        <select id="stockStandardSize" class="form-control" onchange="toggleCustomStockSize()">
+          <option value="">Select a standard size…</option>
+          <option value="__custom__">Other / Custom</option>
+        </select>
+      </div>
+      <div class="form-group" id="customStockSizeGroup" style="display: none">
+        <label>Custom Size</label>
         <input
           type="text"
-          id="stockUnit"
+          id="stockCustomSize"
           class="form-control"
-          placeholder="bottles, cans, oz, L…"
+          placeholder="e.g. 12 oz can, 3 L box"
         />
       </div>
       <div class="form-group">
@@ -121,6 +128,78 @@ content %}
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const MEASUREMENT = "{{ settings.measurement or 'us' }}";
+  const STANDARD_SIZES_US = ["50 ml", "200 ml", "375 ml", "750 ml", "1 L", "1.75 L"];
+  const STANDARD_SIZES_METRIC = ["50 ml", "200 ml", "375 ml", "500 ml", "700 ml", "1 L", "1.5 L"];
+
+  function parseSizeLabel(label) {
+    const m = (label || "").trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(ml|l)$/i);
+    if (!m) {
+      return { size_value: null, size_unit: "" };
+    }
+    return { size_value: parseFloat(m[1]), size_unit: m[2].toLowerCase() };
+  }
+
+  function populateStockSizeOptions() {
+    const select = document.getElementById("stockStandardSize");
+    const current = select.value;
+    while (select.options.length > 2) {
+      select.remove(2);
+    }
+
+    const sizes = MEASUREMENT === "metric" ? STANDARD_SIZES_METRIC : STANDARD_SIZES_US;
+    sizes.forEach((size) => {
+      const option = document.createElement("option");
+      option.value = size;
+      option.textContent = size;
+      select.appendChild(option);
+    });
+
+    select.value = current;
+  }
+
+  function toggleCustomStockSize() {
+    const useCustom =
+      document.getElementById("stockStandardSize").value === "__custom__";
+    document.getElementById("customStockSizeGroup").style.display = useCustom
+      ? ""
+      : "none";
+  }
+
+  function setStockSizeFromItem(item) {
+    const select = document.getElementById("stockStandardSize");
+    const customInput = document.getElementById("stockCustomSize");
+    const label = (item.size_label || item.unit || "").trim();
+    if (!label) {
+      select.value = "";
+      customInput.value = "";
+      toggleCustomStockSize();
+      return;
+    }
+
+    const options = Array.from(select.options).map((o) => o.value);
+    if (options.includes(label)) {
+      select.value = label;
+      customInput.value = "";
+    } else {
+      select.value = "__custom__";
+      customInput.value = label;
+    }
+    toggleCustomStockSize();
+  }
+
+  function resolveStockSizePayload() {
+    const selectVal = document.getElementById("stockStandardSize").value;
+    const customVal = document.getElementById("stockCustomSize").value.trim();
+    const sizeLabel = selectVal === "__custom__" ? customVal : selectVal;
+    const parsed = parseSizeLabel(sizeLabel);
+    return {
+      size_label: sizeLabel,
+      size_value: parsed.size_value,
+      size_unit: parsed.size_unit,
+      unit: sizeLabel,
+    };
+  }
 
   function editStock(item) {
     document.getElementById("stockModalTitle").textContent = "Edit Stock Item";
@@ -128,7 +207,7 @@ content %}
     document.getElementById("stockName").value = item.name;
     document.getElementById("stockCategory").value = item.category;
     document.getElementById("stockQuantity").value = item.quantity;
-    document.getElementById("stockUnit").value = item.unit;
+    setStockSizeFromItem(item);
     document.getElementById("stockNotes").value = item.notes;
     openModal("addStockModal");
   }
@@ -136,11 +215,15 @@ content %}
   async function submitStock(e) {
     e.preventDefault();
     const id = document.getElementById("stockId").value;
+    const sizePayload = resolveStockSizePayload();
     const body = {
       name: document.getElementById("stockName").value,
       category: document.getElementById("stockCategory").value,
       quantity: parseFloat(document.getElementById("stockQuantity").value),
-      unit: document.getElementById("stockUnit").value,
+      unit: sizePayload.unit,
+      size_label: sizePayload.size_label,
+      size_value: sizePayload.size_value,
+      size_unit: sizePayload.size_unit,
       notes: document.getElementById("stockNotes").value,
     };
     const method = id ? "PUT" : "POST";
@@ -163,7 +246,12 @@ content %}
     document.getElementById("stockModalTitle").textContent = "Add Stock Item";
     document.getElementById("stockForm").reset();
     document.getElementById("stockId").value = "";
+    document.getElementById("stockStandardSize").value = "";
+    document.getElementById("stockCustomSize").value = "";
+    toggleCustomStockSize();
     openModal("addStockModal");
   }
+
+  populateStockSizeOptions();
 </script>
 {% endblock %}
