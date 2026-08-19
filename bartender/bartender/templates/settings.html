@@ -21,13 +21,7 @@ content %}
             type="radio"
             name="measurement"
             value="us"
-            {%
-            if
-            settings.measurement=""
-            ="us"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.measurement or 'us') == 'us' %}checked{% endif %}
           />
           US (gallons, oz)
         </label>
@@ -36,13 +30,7 @@ content %}
             type="radio"
             name="measurement"
             value="metric"
-            {%
-            if
-            settings.measurement=""
-            ="metric"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.measurement or 'us') == 'metric' %}checked{% endif %}
           />
           Metric (liters, ml)
         </label>
@@ -56,13 +44,7 @@ content %}
             type="radio"
             name="theme"
             value="light"
-            {%
-            if
-            settings.theme=""
-            ="light"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.theme or 'light') == 'light' %}checked{% endif %}
           />
           ☀ Light
         </label>
@@ -71,13 +53,7 @@ content %}
             type="radio"
             name="theme"
             value="dark"
-            {%
-            if
-            settings.theme=""
-            ="dark"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.theme or 'light') == 'dark' %}checked{% endif %}
           />
           🌙 Dark
         </label>
@@ -91,13 +67,7 @@ content %}
             type="radio"
             name="manage_button_position"
             value="top-right"
-            {%
-            if
-            settings.manage_button_position=""
-            ="top-right"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.manage_button_position or 'top-right') == 'top-right' %}checked{% endif %}
           />
           Top Right
         </label>
@@ -106,13 +76,7 @@ content %}
             type="radio"
             name="manage_button_position"
             value="bottom-left"
-            {%
-            if
-            settings.manage_button_position=""
-            ="bottom-left"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.manage_button_position or 'top-right') == 'bottom-left' %}checked{% endif %}
           />
           Bottom Left
         </label>
@@ -121,13 +85,7 @@ content %}
             type="radio"
             name="manage_button_position"
             value="bottom-right"
-            {%
-            if
-            settings.manage_button_position=""
-            ="bottom-right"
-            %}checked{%
-            endif
-            %}
+            {% if (settings.manage_button_position or 'top-right') == 'bottom-right' %}checked{% endif %}
           />
           Bottom Right
         </label>
@@ -173,21 +131,32 @@ content %}
 
   async function saveSettings(e) {
     e.preventDefault();
+    const measurementInput = document.querySelector(
+      'input[name="measurement"]:checked'
+    );
+    const themeInput = document.querySelector('input[name="theme"]:checked');
+    const managePosInput = document.querySelector(
+      'input[name="manage_button_position"]:checked'
+    );
+
     const body = {
       bar_name: document.getElementById("barName").value,
-      measurement: document.querySelector('input[name="measurement"]:checked')
-        .value,
-      theme: document.querySelector('input[name="theme"]:checked').value,
-      manage_button_position: document.querySelector(
-        'input[name="manage_button_position"]:checked',
-      ).value,
+      measurement: measurementInput ? measurementInput.value : "us",
+      theme: themeInput ? themeInput.value : "light",
+      manage_button_position: managePosInput
+        ? managePosInput.value
+        : "top-right",
     };
-    const res = await fetch(`${INGRESS}/api/settings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch(`${INGRESS}/api/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        throw new Error(`Save failed: ${res.status}`);
+      }
+
       document.getElementById("saveMsg").textContent = "✓ Saved!";
       setTimeout(() => {
         document.getElementById("saveMsg").textContent = "";
@@ -195,7 +164,9 @@ content %}
       document.documentElement.dataset.theme = body.theme;
       document.documentElement.dataset.managePos = body.manage_button_position;
       localStorage.setItem("bartender_theme", body.theme);
-      updateThemeIcon(body.theme);
+    } catch (err) {
+      document.getElementById("saveMsg").textContent = "Save failed";
+      console.error(err);
     }
   }
 </script>
