@@ -20,3 +20,10 @@ No configuration required. All settings are managed from within the web UI after
 
 - [Open an issue](https://github.com/cjramseyer/BarTender/issues)
 - [View the source](https://github.com/cjramseyer/BarTender)
+
+## Full Documentation
+
+- Core app and add-on reference: [../docs/core-app.md](../docs/core-app.md)
+- Mobile app guide: [../docs/mobile-app.md](../docs/mobile-app.md)
+- Getting started guide: [../docs/getting-started.md](../docs/getting-started.md)
+- Troubleshooting and FAQ: [../docs/troubleshooting-faq.md](../docs/troubleshooting-faq.md)

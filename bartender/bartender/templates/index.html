@@ -1,27 +1,30 @@
-{% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}Dashboard{% endblock %} {% block
+content %}
 <h1>Dashboard</h1>
 <div class="dashboard-grid">
   <div class="card">
     <h2>🍺 Taps ({{ taps | length }})</h2>
     {% if taps %}
-      <ul class="tap-list">
-        {% for tap in taps %}
-          {% set keg = kegs | selectattr('id', 'equalto', tap.keg_id) | first %}
-          <li class="tap-item">
-            <span class="tap-number">Tap {{ tap.number }}</span>
-            <span class="tap-label">{{ tap.label or '—' }}</span>
-            {% if keg %}
-              <span class="badge badge-{{ keg.status }}">{{ keg.name }} ({{ keg.status | replace('_', ' ') }})</span>
-            {% else %}
-              <span class="badge badge-empty">No keg assigned</span>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
+    <ul class="tap-list">
+      {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
+      tap.keg_id) | first %}
+      <li class="tap-item">
+        <span class="tap-number">Tap {{ tap.number }}</span>
+        <span class="tap-label">{{ tap.label or '—' }}</span>
+        {% if keg %}
+        <span class="badge badge-{{ keg.status }}"
+          >{{ keg.name }} ({{ keg.status | replace('_', ' ') }})</span
+        >
+        {% else %}
+        <span class="badge badge-empty">No keg assigned</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
     {% else %}
-      <p class="muted">No taps configured. <a href="{{ ingress }}/taps">Add a tap</a>.</p>
+    <p class="muted">
+      No taps configured. <a href="{{ ingress }}/taps">Add a tap</a>.
+    </p>
     {% endif %}
     <a class="btn btn-sm" href="{{ ingress }}/taps">Manage Taps</a>
   </div>
@@ -29,9 +32,24 @@
   <div class="card">
     <h2>🛢 Kegs ({{ kegs | length }})</h2>
     <div class="stat-row">
-      <div class="stat"><span class="stat-value">{{ kegs | selectattr('status', 'equalto', 'full') | list | length }}</span><span class="stat-label">Full</span></div>
-      <div class="stat"><span class="stat-value">{{ kegs | selectattr('status', 'equalto', 'in_use') | list | length }}</span><span class="stat-label">In Use</span></div>
-      <div class="stat"><span class="stat-value">{{ kegs | selectattr('status', 'equalto', 'empty') | list | length }}</span><span class="stat-label">Empty</span></div>
+      <div class="stat">
+        <span class="stat-value"
+          >{{ kegs | selectattr('status', 'equalto', 'full') | list | length
+          }}</span
+        ><span class="stat-label">Full</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value"
+          >{{ kegs | selectattr('status', 'equalto', 'in_use') | list | length
+          }}</span
+        ><span class="stat-label">In Use</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value"
+          >{{ kegs | selectattr('status', 'equalto', 'empty') | list | length
+          }}</span
+        ><span class="stat-label">Empty</span>
+      </div>
     </div>
     <a class="btn btn-sm" href="{{ ingress }}/kegs">Manage Kegs</a>
   </div>
@@ -39,16 +57,17 @@
   <div class="card">
     <h2>📦 Bar Stock ({{ bar_stock | length }} items)</h2>
     {% if bar_stock %}
-      <ul class="stock-summary">
-        {% for item in bar_stock[:5] %}
-          <li>{{ item.name }} – {{ item.quantity }} {{ item.unit }}</li>
-        {% endfor %}
-        {% if bar_stock | length > 5 %}
-          <li class="muted">…and {{ bar_stock | length - 5 }} more</li>
-        {% endif %}
-      </ul>
+    <ul class="stock-summary">
+      {% for item in bar_stock[:5] %}
+      <li>{{ item.name }} – {{ item.quantity }} {{ item.unit }}</li>
+      {% endfor %} {% if bar_stock | length > 5 %}
+      <li class="muted">…and {{ bar_stock | length - 5 }} more</li>
+      {% endif %}
+    </ul>
     {% else %}
-      <p class="muted">No stock items. <a href="{{ ingress }}/stock">Add stock</a>.</p>
+    <p class="muted">
+      No stock items. <a href="{{ ingress }}/stock">Add stock</a>.
+    </p>
     {% endif %}
     <a class="btn btn-sm" href="{{ ingress }}/stock">Manage Stock</a>
   </div>

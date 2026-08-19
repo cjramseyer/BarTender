@@ -1,15 +1,25 @@
-{% extends "base.html" %}
-{% block title %}Bar Stock{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}Bar Stock{% endblock %} {% block
+content %}
 <div class="page-header">
   <h1>📦 Bar Stock</h1>
-  <button class="btn btn-primary" id="openAddStockBtn" onclick="openAddStock()">+ Add Item</button>
+  <button
+    class="btn btn-primary manage-btn"
+    id="openAddStockBtn"
+    onclick="openAddStock()"
+  >
+    + Add Item
+  </button>
 </div>
 
 <table class="table" id="stockTable">
   <thead>
     <tr>
-      <th>Name</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Notes</th><th>Actions</th>
+      <th>Name</th>
+      <th>Category</th>
+      <th>Quantity</th>
+      <th>Unit</th>
+      <th>Notes</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -21,12 +31,24 @@
       <td>{{ item.unit }}</td>
       <td>{{ item.notes }}</td>
       <td>
-        <button class="btn btn-sm btn-secondary" onclick="editStock({{ item | tojson }})">Edit</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteStock({{ item.id }})">Delete</button>
+        <button
+          class="btn btn-sm btn-secondary"
+          onclick="editStock({{ item | tojson | forceescape }})"
+        >
+          Edit
+        </button>
+        <button
+          class="btn btn-sm btn-danger"
+          onclick="deleteStock({{ item.id }})"
+        >
+          Delete
+        </button>
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="6" class="muted text-center">No stock items yet.</td></tr>
+    <tr>
+      <td colspan="6" class="muted text-center">No stock items yet.</td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>
@@ -36,7 +58,9 @@
   <div class="modal-dialog">
     <div class="modal-header">
       <h3 id="stockModalTitle">Add Stock Item</h3>
-      <button class="btn btn-icon" onclick="closeModal('addStockModal')">✕</button>
+      <button class="btn btn-icon" onclick="closeModal('addStockModal')">
+        ✕
+      </button>
     </div>
     <form id="stockForm" onsubmit="submitStock(event)">
       <input type="hidden" id="stockId" />
@@ -46,74 +70,100 @@
       </div>
       <div class="form-group">
         <label>Category</label>
-        <input type="text" id="stockCategory" class="form-control" list="categoryList" />
+        <input
+          type="text"
+          id="stockCategory"
+          class="form-control"
+          list="categoryList"
+        />
         <datalist id="categoryList">
-          <option value="Beer" /><option value="Wine" /><option value="Spirits" />
-          <option value="Mixers" /><option value="Garnish" /><option value="Other" />
+          <option value="Beer" />
+          <option value="Wine" />
+          <option value="Spirits" />
+          <option value="Mixers" />
+          <option value="Garnish" />
+          <option value="Other" />
         </datalist>
       </div>
       <div class="form-group">
         <label>Quantity</label>
-        <input type="number" id="stockQuantity" class="form-control" min="0" step="0.1" value="1" />
+        <input
+          type="number"
+          id="stockQuantity"
+          class="form-control"
+          min="0"
+          step="0.1"
+          value="1"
+        />
       </div>
       <div class="form-group">
         <label>Unit</label>
-        <input type="text" id="stockUnit" class="form-control" placeholder="bottles, cans, oz, L…" />
+        <input
+          type="text"
+          id="stockUnit"
+          class="form-control"
+          placeholder="bottles, cans, oz, L…"
+        />
       </div>
       <div class="form-group">
         <label>Notes</label>
         <textarea id="stockNotes" class="form-control" rows="2"></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn" onclick="closeModal('addStockModal')">Cancel</button>
+        <button type="button" class="btn" onclick="closeModal('addStockModal')">
+          Cancel
+        </button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
   </div>
 </div>
-{% endblock %}
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
-const INGRESS = '{{ ingress }}';
+  const INGRESS = "{{ ingress }}";
 
-function editStock(item) {
-  document.getElementById('stockModalTitle').textContent = 'Edit Stock Item';
-  document.getElementById('stockId').value = item.id;
-  document.getElementById('stockName').value = item.name;
-  document.getElementById('stockCategory').value = item.category;
-  document.getElementById('stockQuantity').value = item.quantity;
-  document.getElementById('stockUnit').value = item.unit;
-  document.getElementById('stockNotes').value = item.notes;
-  openModal('addStockModal');
-}
+  function editStock(item) {
+    document.getElementById("stockModalTitle").textContent = "Edit Stock Item";
+    document.getElementById("stockId").value = item.id;
+    document.getElementById("stockName").value = item.name;
+    document.getElementById("stockCategory").value = item.category;
+    document.getElementById("stockQuantity").value = item.quantity;
+    document.getElementById("stockUnit").value = item.unit;
+    document.getElementById("stockNotes").value = item.notes;
+    openModal("addStockModal");
+  }
 
-async function submitStock(e) {
-  e.preventDefault();
-  const id = document.getElementById('stockId').value;
-  const body = {
-    name: document.getElementById('stockName').value,
-    category: document.getElementById('stockCategory').value,
-    quantity: parseFloat(document.getElementById('stockQuantity').value),
-    unit: document.getElementById('stockUnit').value,
-    notes: document.getElementById('stockNotes').value,
-  };
-  const method = id ? 'PUT' : 'POST';
-  const url = id ? `${INGRESS}/api/stock/${id}` : `${INGRESS}/api/stock`;
-  await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  location.reload();
-}
+  async function submitStock(e) {
+    e.preventDefault();
+    const id = document.getElementById("stockId").value;
+    const body = {
+      name: document.getElementById("stockName").value,
+      category: document.getElementById("stockCategory").value,
+      quantity: parseFloat(document.getElementById("stockQuantity").value),
+      unit: document.getElementById("stockUnit").value,
+      notes: document.getElementById("stockNotes").value,
+    };
+    const method = id ? "PUT" : "POST";
+    const url = id ? `${INGRESS}/api/stock/${id}` : `${INGRESS}/api/stock`;
+    await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    location.reload();
+  }
 
-async function deleteStock(id) {
-  if (!confirm('Delete this stock item?')) return;
-  await fetch(`${INGRESS}/api/stock/${id}`, { method: 'DELETE' });
-  location.reload();
-}
+  async function deleteStock(id) {
+    if (!confirm("Delete this stock item?")) return;
+    await fetch(`${INGRESS}/api/stock/${id}`, { method: "DELETE" });
+    location.reload();
+  }
 
-function openAddStock() {
-  document.getElementById('stockModalTitle').textContent = 'Add Stock Item';
-  document.getElementById('stockForm').reset();
-  document.getElementById('stockId').value = '';
-  openModal('addStockModal');
-}
+  function openAddStock() {
+    document.getElementById("stockModalTitle").textContent = "Add Stock Item";
+    document.getElementById("stockForm").reset();
+    document.getElementById("stockId").value = "";
+    openModal("addStockModal");
+  }
 </script>
 {% endblock %}
