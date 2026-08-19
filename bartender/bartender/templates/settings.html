@@ -34,6 +34,23 @@
         </label>
       </div>
     </div>
+    <div class="form-group">
+      <label>Manage Button Position</label>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="manage_button_position" value="top-right" {% if (settings.manage_button_position or 'top-right') == 'top-right' %}checked{% endif %} />
+          Top Right
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="manage_button_position" value="bottom-left" {% if settings.manage_button_position == 'bottom-left' %}checked{% endif %} />
+          Bottom Left
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="manage_button_position" value="bottom-right" {% if settings.manage_button_position == 'bottom-right' %}checked{% endif %} />
+          Bottom Right
+        </label>
+      </div>
+    </div>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save Settings</button>
       <span id="saveMsg" class="save-msg"></span>
@@ -63,6 +80,7 @@ async function saveSettings(e) {
     bar_name: document.getElementById('barName').value,
     measurement: document.querySelector('input[name="measurement"]:checked').value,
     theme: document.querySelector('input[name="theme"]:checked').value,
+    manage_button_position: document.querySelector('input[name="manage_button_position"]:checked').value,
   };
   const res = await fetch(`${INGRESS}/api/settings`, {
     method: 'POST',
@@ -73,6 +91,7 @@ async function saveSettings(e) {
     document.getElementById('saveMsg').textContent = '✓ Saved!';
     setTimeout(() => { document.getElementById('saveMsg').textContent = ''; }, 2000);
     document.documentElement.dataset.theme = body.theme;
+    document.documentElement.dataset.managePos = body.manage_button_position;
     localStorage.setItem('bartender_theme', body.theme);
     updateThemeIcon(body.theme);
   }

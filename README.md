@@ -58,6 +58,7 @@ The add-on exposes a JSON REST API at the ingress URL.
 | GET    | `/api/kegs`        | List all kegs                         |
 | POST   | `/api/kegs`        | Add a keg                             |
 | PUT    | `/api/kegs/<id>`   | Update a keg                          |
+| POST   | `/api/kegs/<id>/fill` | Fill/refill a keg                    |
 | DELETE | `/api/kegs/<id>`   | Delete a keg                          |
 | GET    | `/api/taps`        | List all taps                         |
 | POST   | `/api/taps`        | Add a tap                             |
@@ -79,7 +80,11 @@ See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines.
 
 ## Additional Docs
 
-- Add-on documentation: [bartender/DOCS.md](bartender/DOCS.md)
+- Add-on summary: [bartender/DOCS.md](bartender/DOCS.md)
+- Core app and add-on reference: [docs/core-app.md](docs/core-app.md)
+- Mobile app guide: [docs/mobile-app.md](docs/mobile-app.md)
+- Getting started guide: [docs/getting-started.md](docs/getting-started.md)
+- Troubleshooting and FAQ: [docs/troubleshooting-faq.md](docs/troubleshooting-faq.md)
 
 ## License
 

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1>📦 Bar Stock</h1>
-  <button class="btn btn-primary" id="openAddStockBtn" onclick="openAddStock()">+ Add Item</button>
+  <button class="btn btn-primary manage-btn" id="openAddStockBtn" onclick="openAddStock()">+ Add Item</button>
 </div>
 
 <table class="table" id="stockTable">
@@ -21,7 +21,7 @@
       <td>{{ item.unit }}</td>
       <td>{{ item.notes }}</td>
       <td>
-        <button class="btn btn-sm btn-secondary" onclick="editStock({{ item | tojson }})">Edit</button>
+        <button class="btn btn-sm btn-secondary" onclick='editStock({{ item | tojson | forceescape }})'>Edit</button>
         <button class="btn btn-sm btn-danger" onclick="deleteStock({{ item.id }})">Delete</button>
       </td>
     </tr>

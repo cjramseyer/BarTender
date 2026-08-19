@@ -197,6 +197,31 @@ textarea.form-control { resize: vertical; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
 .page-header h1 { margin-bottom: 0; }
 
+/* Global manage button positioning across management panels */
+.manage-btn { margin-left: auto; }
+
+[data-manage-pos="bottom-left"] .page-header,
+[data-manage-pos="bottom-right"] .page-header {
+  justify-content: flex-start;
+}
+
+[data-manage-pos="bottom-left"] .manage-btn,
+[data-manage-pos="bottom-right"] .manage-btn {
+  position: fixed;
+  bottom: 1.25rem;
+  z-index: 950;
+  margin-left: 0;
+  box-shadow: var(--shadow);
+}
+
+[data-manage-pos="bottom-left"] .manage-btn {
+  left: 1.25rem;
+}
+
+[data-manage-pos="bottom-right"] .manage-btn {
+  right: 1.25rem;
+}
+
 /* Table */
 .table {
   width: 100%;
@@ -246,6 +271,57 @@ textarea.form-control { resize: vertical; }
 .keg-card-body { padding: 0.85rem 1rem; }
 .keg-card-body p { font-size: 0.88rem; margin-bottom: 0.3rem; }
 .keg-card-footer { display: flex; gap: 0.5rem; padding: 0.6rem 1rem; border-top: 1px solid var(--border); }
+
+.keg-level {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+}
+.keg-level-shell {
+  width: 34px;
+  height: 58px;
+  border-radius: 8px 8px 10px 10px;
+  border: 2px solid var(--border);
+  background: var(--surface2);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.keg-level-shell::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 7px;
+  right: 7px;
+  height: 5px;
+  border-radius: 4px;
+  background: var(--border);
+}
+.keg-level-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(180deg, var(--badge-in_use), var(--badge-full));
+  transition: height 0.2s ease;
+}
+.keg-level-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.keg-level-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.keg-level-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
 
 /* Taps grid */
 .taps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }

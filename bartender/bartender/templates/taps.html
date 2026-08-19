@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
   <h1>🍺 Taps</h1>
-  <button class="btn btn-primary" onclick="openAddTap()">+ Add Tap</button>
+  <button class="btn btn-primary manage-btn" onclick="openAddTap()">+ Add Tap</button>
 </div>
 
 <div class="taps-grid" id="tapsGrid">
@@ -20,13 +20,14 @@
         <p><span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span></p>
         <p class="muted">{{ keg.type or '' }} {% if keg.brewery %}· {{ keg.brewery }}{% endif %} {% if keg.abv %}· {{ keg.abv }}% ABV{% endif %}</p>
         <p class="muted">Size: {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{ keg.size or '—' }}{% endif %}</p>
+        {% if keg.tapped_date %}<p class="muted">Tapped: {{ keg.tapped_date }}</p>{% endif %}
       {% else %}
         <p class="muted no-keg">— No keg assigned —</p>
       {% endif %}
       {% if tap.notes %}<p class="muted">{{ tap.notes }}</p>{% endif %}
     </div>
     <div class="tap-card-footer">
-      <button class="btn btn-sm btn-secondary" onclick="editTap({{ tap | tojson }})">Edit</button>
+      <button class="btn btn-sm btn-secondary" onclick='editTap({{ tap | tojson | forceescape }})'>Edit</button>
       <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">Delete</button>
     </div>
   </div>

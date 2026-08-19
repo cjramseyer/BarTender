@@ -7,6 +7,8 @@ class Keg {
   final String brewery;
   final String abv;
   final String notes;
+  final String filledDate;
+  final int percentFull;
 
   const Keg({
     required this.id,
@@ -17,6 +19,8 @@ class Keg {
     required this.brewery,
     required this.abv,
     required this.notes,
+    required this.filledDate,
+    required this.percentFull,
   });
 
   factory Keg.fromJson(Map<String, dynamic> json) => Keg(
@@ -24,10 +28,15 @@ class Keg {
         name: json['name'] as String? ?? '',
         type: json['type'] as String? ?? '',
         size: json['size'] as String? ?? '',
-        status: json['status'] as String? ?? '',
+        status: json['status'] as String? ?? 'empty',
         brewery: json['brewery'] as String? ?? '',
         abv: json['abv'] as String? ?? '',
         notes: json['notes'] as String? ?? '',
+        filledDate: (json['filled_date'] as String?) ?? (json['purchased_date'] as String?) ?? '',
+        percentFull: (json['percent_full'] as num?)?.round() ??
+            ((json['status'] as String? ?? 'empty') == 'full'
+                ? 100
+                : ((json['status'] as String? ?? 'empty') == 'in_use' ? 50 : 0)),
       );
 
   Color get statusColor {
