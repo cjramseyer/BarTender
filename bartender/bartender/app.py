@@ -56,6 +56,12 @@ def load_data() -> dict:
         else:
             for key, value in DEFAULT_DATA["settings"].items():
                 data["settings"].setdefault(key, value)
+        # Backward compatibility for stock size fields.
+        for item in data.get("bar_stock", []):
+            if "size_label" not in item:
+                item["size_label"] = item.get("unit", "")
+            item.setdefault("size_value", None)
+            item.setdefault("size_unit", "")
         # Backward compatibility: migrate legacy purchase_date field to filled_date.
         for keg in data.get("kegs", []):
             if not keg.get("filled_date") and keg.get("purchased_date"):
@@ -67,8 +73,6 @@ def load_data() -> dict:
                 keg["percent_full"] = _default_percent_for_status(keg.get("status", "empty"))
             else:
                 keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(keg.get("status", "empty")))
-            # Keep capacity values consistent with status for migrated/legacy data.
-            _sync_percent_for_status(keg, keg.get("status", "empty"), False)
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 
@@ -128,18 +132,20 @@ def _clamp_percent_full(value, fallback: int) -> int:
 
 def _sync_percent_for_status(keg: dict, status: str, percent_explicit: bool) -> None:
     status = _normalize_keg_status(status)
+    if percent_explicit:
+        # Preserve user-entered values during add/edit/update flows.
+        keg["percent_full"] = _clamp_percent_full(
+            keg.get("percent_full"),
+            _default_percent_for_status(status),
+        )
+        return
+
     if status == "full":
         keg["percent_full"] = 100
         return
 
     if status in ("empty", "cleaning", "retired"):
         keg["percent_full"] = 0
-        return
-
-    if percent_explicit:
-        # Allow custom % only for in-use kegs, but keep it bounded.
-        current = _clamp_percent_full(keg.get("percent_full"), 50)
-        keg["percent_full"] = current if 0 < current < 100 else 50
         return
 
     if status == "in_use":
@@ -208,6 +214,18 @@ def settings():
     )
 
 
+@app.route("/display")
+def display_view():
+    data = load_data()
+    return render_template(
+        "display/index.html",
+        settings=data["settings"],
+        taps=data["taps"],
+        kegs=data["kegs"],
+        bar_stock=data["bar_stock"],
+    )
+
+
 # ---------------------------------------------------------------------------
 # API – Settings
 # ---------------------------------------------------------------------------
@@ -248,12 +266,18 @@ def api_list_stock():
 def api_add_stock():
     data = load_data()
     body = request.get_json(force=True)
+    size_label = body.get("size_label", body.get("unit", ""))
+    size_value = body.get("size_value", None)
+    size_unit = body.get("size_unit", "")
     item = {
         "id": _next_id(data["bar_stock"]),
         "name": body.get("name", ""),
         "category": body.get("category", ""),
         "quantity": body.get("quantity", 0),
-        "unit": body.get("unit", ""),
+        "unit": body.get("unit", size_label),
+        "size_label": size_label,
+        "size_value": size_value,
+        "size_unit": size_unit,
         "notes": body.get("notes", ""),
         "updated_at": datetime.utcnow().isoformat(),
     }
@@ -271,6 +295,12 @@ def api_update_stock(item_id: int):
             for field in ("name", "category", "quantity", "unit", "notes"):
                 if field in body:
                     item[field] = body[field]
+            for field in ("size_label", "size_value", "size_unit"):
+                if field in body:
+                    item[field] = body[field]
+            # Keep unit aligned to selected size for older clients/views.
+            if "size_label" in body and "unit" not in body:
+                item["unit"] = body.get("size_label") or ""
             item["updated_at"] = datetime.utcnow().isoformat()
             save_data(data)
             return jsonify(item)
@@ -347,7 +377,20 @@ def api_update_keg(keg_id: int):
 
             has_percent_full = "percent_full" in body
             if has_percent_full:
-                body["percent_full"] = _clamp_percent_full(body.get("percent_full"), _default_percent_for_status(body.get("status", keg.get("status", "empty"))))
+                incoming_percent = body.get("percent_full")
+                if incoming_percent in (None, ""):
+                    # Treat empty/omitted values as "do not change".
+                    has_percent_full = False
+                    body.pop("percent_full", None)
+                else:
+                    existing_percent = _clamp_percent_full(
+                        keg.get("percent_full"),
+                        _default_percent_for_status(keg.get("status", "empty")),
+                    )
+                    body["percent_full"] = _clamp_percent_full(
+                        incoming_percent,
+                        existing_percent,
+                    )
 
             for field in ("name", "type", "size", "custom_size", "status", "brewery", "abv", "notes", "tapped_date", "filled_date", "percent_full"):
                 if field in body:
@@ -355,7 +398,9 @@ def api_update_keg(keg_id: int):
 
             if "status" in body:
                 _set_filled_date_for_status_transition(keg, body["status"])
-                _sync_percent_for_status(keg, body["status"], has_percent_full)
+                # Preserve existing value when only status changes.
+                if has_percent_full:
+                    _sync_percent_for_status(keg, body["status"], True)
 
             if "status" not in body and has_percent_full:
                 keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(keg.get("status", "empty")))

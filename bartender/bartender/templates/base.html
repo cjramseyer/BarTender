@@ -22,6 +22,13 @@
         <li><a href="{{ ingress }}/taps">Taps</a></li>
         <li><a href="{{ ingress }}/settings">⚙ Settings</a></li>
       </ul>
+      <a
+        class="btn btn-sm btn-secondary nav-display-btn"
+        href="{{ ingress }}/display"
+        target="_blank"
+        rel="noopener noreferrer"
+        >View Display</a
+      >
     </nav>
 
     <main class="container">{% block content %}{% endblock %}</main>
@@ -29,6 +36,8 @@
     <script src="{{ ingress }}/static/js/app.js"></script>
     <script>
       initTheme("{{ settings.theme }}", "{{ ingress }}");
+      document.body.dataset.managePos =
+        document.documentElement.dataset.managePos || "top-right";
     </script>
     {% block scripts %}{% endblock %}
   </body>
