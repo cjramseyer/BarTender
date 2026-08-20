@@ -112,6 +112,21 @@ content %}
         Enable Bar Stock Feature
       </label>
     </div>
+    <div class="form-group">
+      <label>Pour Amount Presets</label>
+      <small class="muted">
+        Configure named pour options shown on each tap card.
+      </small>
+      <div id="pourOptionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        style="margin-top: 8px"
+        onclick="addPourOptionRow()"
+      >
+        + Add Pour Option
+      </button>
+    </div>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save Settings</button>
       <span id="saveMsg" class="save-msg"></span>
@@ -167,6 +182,72 @@ content %}
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
+
+  function createPourOptionRow(option = {}) {
+    const row = document.createElement("div");
+    row.className = "form-row pour-option-row";
+    row.innerHTML = `
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" class="form-control pour-option-name" value="${
+          (option.name || "").replace(/"/g, "&quot;")
+        }" placeholder="e.g. Pint" />
+      </div>
+      <div class="form-group">
+        <label>Amount</label>
+        <input type="number" class="form-control pour-option-amount" min="0.01" step="0.01" value="${
+          option.amount ?? ""
+        }" placeholder="e.g. 16" />
+      </div>
+      <div class="form-group">
+        <label>Unit</label>
+        <select class="form-control pour-option-unit">
+          <option value="oz">oz</option>
+          <option value="gal">gal</option>
+          <option value="ml">ml</option>
+          <option value="l">L</option>
+        </select>
+      </div>
+      <div class="form-group" style="align-self: end">
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.pour-option-row').remove()">Remove</button>
+      </div>
+    `;
+
+    const unitSelect = row.querySelector(".pour-option-unit");
+    unitSelect.value = (option.unit || "oz").toLowerCase();
+    return row;
+  }
+
+  function addPourOptionRow(option = null) {
+    document.getElementById("pourOptionsList").appendChild(
+      createPourOptionRow(option || {}),
+    );
+  }
+
+  function loadPourOptions() {
+    const options = Array.isArray(DEFAULT_POUR_OPTIONS) ? DEFAULT_POUR_OPTIONS : [];
+    if (!options.length) {
+      addPourOptionRow({ name: "Pint", amount: 16, unit: "oz" });
+      return;
+    }
+    options.forEach((option) => addPourOptionRow(option));
+  }
+
+  function collectPourOptions() {
+    const rows = document.querySelectorAll(".pour-option-row");
+    const options = [];
+    rows.forEach((row) => {
+      const name = row.querySelector(".pour-option-name").value.trim();
+      const amount = parseFloat(row.querySelector(".pour-option-amount").value);
+      const unit = row.querySelector(".pour-option-unit").value;
+      if (!name || Number.isNaN(amount) || amount <= 0 || !unit) return;
+      options.push({ name, amount, unit });
+    });
+    return options;
+  }
+
+  loadPourOptions();
 
   async function saveSettings(e) {
     e.preventDefault();
@@ -187,6 +268,7 @@ content %}
         ? managePosInput.value
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
+      pour_options: collectPourOptions(),
     };
     try {
       const res = await fetch(`${INGRESS}/api/settings`, {
