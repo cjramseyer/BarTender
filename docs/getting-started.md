@@ -16,6 +16,7 @@ Audience: first-time users
 Open Settings in BarTender UI and set:
 
 - Bar Name
+- Default Keg Type (optional)
 - Measurement (us or metric)
 - Theme (light or dark)
 
@@ -53,13 +54,15 @@ flowchart LR
 
 - Go to Kegs.
 - Click Add Keg.
-- Enter keg details (name, type, size, status, brewery, ABV).
+- Enter keg details (name, type, size, status, brewer, ABV/IBU, volume).
 - Optional: add filled date and notes.
 - Save.
 
 Default behavior note:
 
 - New kegs default status to empty unless you choose another status.
+- New keg name is prefilled as Keg N based on existing keg names.
+- Name/beer details are required only when status is full.
 
 ### Step 3: Add Taps
 
@@ -67,6 +70,10 @@ Default behavior note:
 - Click Add Tap.
 - Enter tap number and optional label/notes.
 - Save.
+
+Default behavior note:
+
+- New tap label is prefilled as Tap N based on existing tap labels.
 
 ### Step 4: Assign Kegs to Taps
 
@@ -88,14 +95,15 @@ Auto-fill behavior note:
 - Using ingress-only URLs from external clients: mobile may not reach them directly.
 - Forgetting to back up data before major changes.
 - Entering freeform status values outside expected set.
-- Assuming import exists: current release supports export only.
+- Selecting replace import mode accidentally when merge is desired.
+- Importing malformed backups that fail schema validation.
 
 ## Backup and Upgrade Basics
 
 Before upgrading:
 
 1. Export JSON backup from /api/export/json.
-2. Optionally export CSV by section.
+2. Optionally export ZIP archive from /api/export/archive.
 3. Store backup outside the HA host.
 
 After upgrading:
@@ -104,6 +112,17 @@ After upgrading:
 2. Open dashboard and settings.
 3. Validate taps, kegs, and stock counts.
 4. Spot-check one record from each section.
+
+Restore workflow:
+
+1. Open Settings -> Import Data.
+2. Select .json or .zip backup file.
+3. Choose import mode:
+
+- replace: overwrite all current data
+- merge: upsert imported records by id
+
+4. Review preview counts, confirm, and import.
 
 ## Quick API Smoke Test
 

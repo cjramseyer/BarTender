@@ -9,7 +9,12 @@
 
 <div class="taps-grid" id="tapsGrid">
   {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
-  tap.keg_id) | first %}
+  tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
+  keg.percent_full is defined else (100 if keg and keg.status == 'full' else
+  50 if keg and keg.status == 'in_use' else 0) %} {% set beer_brewer =
+  keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if keg else
+  '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set
+  beer_brewed_on = keg.beer_brewed_on if keg else '' %}
   <div class="tap-card" data-id="{{ tap.id }}">
     <div class="tap-card-header">
       <span class="tap-number">Tap #{{ tap.number }}</span>
@@ -19,18 +24,40 @@
     <div class="tap-card-body">
       {% if keg %}
       <p class="keg-on-tap">{{ keg.name }}</p>
+      <div
+        class="keg-level"
+        role="img"
+        aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
+      >
+        <div class="keg-level-shell">
+          <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
+        </div>
+        <div class="keg-level-meta">
+          <span class="keg-level-label">Current Fill</span>
+          <span class="keg-level-value">{{ fill_pct }}%</span>
+        </div>
+      </div>
       <p>
         <span class="badge badge-{{ keg.status }}"
           >{{ keg.status | replace('_', ' ') | title }}</span
         >
       </p>
+      <p class="muted">Type: {{ keg.type or '—' }}</p>
       <p class="muted">
-        {{ keg.type or '' }} {% if keg.brewery %}· {{ keg.brewery }}{% endif %}
-        {% if keg.abv %}· {{ keg.abv }}% ABV{% endif %}
+        Beer: {{ beer_brewer or keg.brewery or '—' }}{% if beer_abv or keg.abv
+        %} · {{ beer_abv or keg.abv }}% ABV{% endif %}{% if beer_ibu %} · {{
+        beer_ibu }} IBU{% endif %}
       </p>
+      {% if beer_brewed_on %}
+      <p class="muted">Brewed: {{ beer_brewed_on }}</p>
+      {% endif %}
       <p class="muted">
         Size: {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{
         keg.size or '—' }}{% endif %}
+      </p>
+      <p class="muted">
+        Volume: {% if keg.current_volume is not none %}{{ keg.current_volume }}
+        {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
       </p>
       {% if keg.tapped_date %}
       <p class="muted">Tapped: {{ keg.tapped_date }}</p>
@@ -117,6 +144,22 @@
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const TAPS = {{ taps | tojson }};
+
+  function nextIncrementedTapLabel() {
+    const regex = /^tap\s+(\d+)$/i;
+    let maxValue = 0;
+    for (const tap of TAPS) {
+      const text = (tap && tap.label ? String(tap.label) : "").trim();
+      const match = text.match(regex);
+      if (!match) continue;
+      const value = parseInt(match[1], 10);
+      if (!Number.isNaN(value)) {
+        maxValue = Math.max(maxValue, value);
+      }
+    }
+    return `Tap ${maxValue + 1}`;
+  }
 
   function openAddTap() {
     document.getElementById("tapModalTitle").textContent = "Add Tap";
@@ -124,6 +167,7 @@
     document.getElementById("tapId").value = "";
     document.getElementById("tapNumber").value =
       document.querySelectorAll(".tap-card").length + 1;
+    document.getElementById("tapLabel").value = nextIncrementedTapLabel();
     openModal("tapModal");
   }
 

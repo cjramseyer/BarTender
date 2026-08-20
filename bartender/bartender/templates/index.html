@@ -7,14 +7,30 @@ content %}
     {% if taps %}
     <ul class="tap-list">
       {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
-      tap.keg_id) | first %}
+      tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
+      keg.percent_full is defined else (100 if keg and keg.status == 'full'
+      else 50 if keg and keg.status == 'in_use' else 0) %}
       <li class="tap-item">
         <span class="tap-number">Tap {{ tap.number }}</span>
         <span class="tap-label">{{ tap.label or '—' }}</span>
         {% if keg %}
         {% set dashboard_status = 'in_use' if tap.keg_id else keg.status %}
+        <div
+          class="tap-keg-compact"
+          role="img"
+          aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
+        >
+          <div class="keg-level-shell keg-level-shell-sm">
+            <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
+          </div>
+          <span class="tap-keg-percent">{{ fill_pct }}%</span>
+        </div>
         <span class="badge badge-{{ dashboard_status }}"
           >{{ keg.name }} ({{ dashboard_status | replace('_', ' ') }})</span
+        >
+        <span class="tap-label"
+          >{% if keg.current_volume is not none %}{{ keg.current_volume }} {{
+          keg.volume_unit or '—' }}{% else %}—{% endif %}</span
         >
         {% else %}
         <span class="badge badge-empty">No keg assigned</span>
@@ -27,7 +43,11 @@ content %}
       No taps configured. <a href="{{ ingress }}/taps?add=1">Add a tap</a>.
     </p>
     {% endif %}
-    <a class="btn btn-sm" href="{{ ingress }}/taps">Manage Taps</a>
+    <div class="dashboard-manage-row">
+      <a class="btn btn-sm dashboard-manage-btn" href="{{ ingress }}/taps"
+        >Manage Taps</a
+      >
+    </div>
   </div>
 
   <div class="card">
@@ -52,9 +72,14 @@ content %}
         ><span class="stat-label">Empty</span>
       </div>
     </div>
-    <a class="btn btn-sm" href="{{ ingress }}/kegs">Manage Kegs</a>
+    <div class="dashboard-manage-row">
+      <a class="btn btn-sm dashboard-manage-btn" href="{{ ingress }}/kegs"
+        >Manage Kegs</a
+      >
+    </div>
   </div>
 
+  {% if settings.bar_stock_enabled %}
   <div class="card">
     <h2>📦 Bar Stock ({{ bar_stock | length }} items)</h2>
     {% if bar_stock %}
@@ -70,7 +95,12 @@ content %}
       No stock items. <a href="{{ ingress }}/stock">Add stock</a>.
     </p>
     {% endif %}
-    <a class="btn btn-sm" href="{{ ingress }}/stock">Manage Stock</a>
+    <div class="dashboard-manage-row">
+      <a class="btn btn-sm dashboard-manage-btn" href="{{ ingress }}/stock"
+        >Manage Stock</a
+      >
+    </div>
   </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -2,7 +2,7 @@
 <html
   lang="en"
   data-theme="{{ settings.theme }}"
-  data-manage-pos="{{ settings.manage_button_position or 'top-right' }}"
+  data-manage-pos="{{ settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right' }}"
 >
   <head>
     <meta charset="UTF-8" />
@@ -17,9 +17,11 @@
       <a class="nav-brand" href="{{ ingress }}/">🍺 {{ settings.bar_name }}</a>
       <ul class="nav-links">
         <li><a href="{{ ingress }}/">Dashboard</a></li>
-        <li><a href="{{ ingress }}/stock">Bar Stock</a></li>
-        <li><a href="{{ ingress }}/kegs">Kegs</a></li>
         <li><a href="{{ ingress }}/taps">Taps</a></li>
+        <li><a href="{{ ingress }}/kegs">Kegs</a></li>
+        {% if settings.bar_stock_enabled %}
+        <li><a href="{{ ingress }}/stock">Bar Stock</a></li>
+        {% endif %}
         <li><a href="{{ ingress }}/settings">⚙ Settings</a></li>
       </ul>
       <a

@@ -21,12 +21,31 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
-- **Keg Management** — Track kegs by name, type, size, brewery, ABV, and lifecycle status (`full`, `in_use`, `empty`, `cleaning`, `retired`)
+- **Keg Management** — Track kegs by name, type, size, brewer, ABV/IBU, brewed date, volume, and lifecycle status (`full`, `in_use`, `empty`, `cleaning`, `retired`)
 - **Tap Management** — Assign kegs to numbered taps and label each line
-- **Settings** — Configurable bar name, measurement system (US / metric), and UI theme (light / dark)
-- **Data Export** — Export all data as JSON or CSV (full or per-section)
+- **Settings** — Configurable bar name, measurement system (US / metric), UI theme (light / dark), bar stock visibility, and default keg type
+- **Pour Workflow** — Record pours against keg volume with unit conversion and validation
+- **Data Backup & Restore** — Export portable versioned JSON or ZIP archive, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Ingress** — Runs behind the Home Assistant ingress proxy; no port exposure required
+
+## Recent Changes
+
+- Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
+- Added backup restore support with import preview and explicit `replace`/`merge` modes.
+- Added portable versioned JSON backup export (`GET /api/export/json`).
+- Added ZIP archive backup export (`GET /api/export/archive`) and kept `GET /api/export/csv` as a legacy alias.
+- Added JSON and ZIP import endpoints:
+  - `POST /api/import/json/preview`
+  - `POST /api/import/json`
+  - `POST /api/import/archive/preview`
+  - `POST /api/import/archive`
+- Added default name auto-increment in UI for new kegs (`Keg N`) and new taps (`Tap N`).
+- Added keg full-status validation: kegs marked `full` must include name and beer details.
+- Added stricter keg lifecycle rules:
+  - only one line-cleaning keg can exist at a time
+  - cleaning status can only transition back to empty (clean)
+  - previously filled kegs that reach empty transition to cleaning
 
 ## Installation
 
@@ -47,27 +66,33 @@ No required configuration. Optional options can be set in the add-on configurati
 
 The add-on exposes a JSON REST API at the ingress URL.
 
-| Method | Endpoint              | Description                           |
-| ------ | --------------------- | ------------------------------------- |
-| GET    | `/api/settings`       | Get current settings                  |
-| POST   | `/api/settings`       | Update settings                       |
-| GET    | `/api/stock`          | List all bar stock items              |
-| POST   | `/api/stock`          | Add a stock item                      |
-| PUT    | `/api/stock/<id>`     | Update a stock item                   |
-| DELETE | `/api/stock/<id>`     | Delete a stock item                   |
-| GET    | `/api/kegs`           | List all kegs                         |
-| POST   | `/api/kegs`           | Add a keg                             |
-| PUT    | `/api/kegs/<id>`      | Update a keg                          |
-| POST   | `/api/kegs/<id>/fill` | Fill/refill a keg                     |
-| DELETE | `/api/kegs/<id>`      | Delete a keg                          |
-| GET    | `/api/taps`           | List all taps                         |
-| POST   | `/api/taps`           | Add a tap                             |
-| PUT    | `/api/taps/<id>`      | Update a tap                          |
-| DELETE | `/api/taps/<id>`      | Delete a tap                          |
-| GET    | `/api/export/json`    | Export all data as JSON               |
-| GET    | `/api/export/csv`     | Export all data (or a section) as CSV |
+| Method | Endpoint                      | Description                                      |
+| ------ | ----------------------------- | ------------------------------------------------ |
+| GET    | `/api/settings`               | Get current settings                             |
+| POST   | `/api/settings`               | Update settings                                  |
+| GET    | `/api/stock`                  | List all bar stock items                         |
+| POST   | `/api/stock`                  | Add a stock item                                 |
+| PUT    | `/api/stock/<id>`             | Update a stock item                              |
+| DELETE | `/api/stock/<id>`             | Delete a stock item                              |
+| GET    | `/api/kegs`                   | List all kegs                                    |
+| POST   | `/api/kegs`                   | Add a keg                                        |
+| PUT    | `/api/kegs/<id>`              | Update a keg                                     |
+| POST   | `/api/kegs/<id>/fill`         | Fill/refill a keg                                |
+| POST   | `/api/kegs/<id>/pour`         | Record a pour and reduce current volume          |
+| DELETE | `/api/kegs/<id>`              | Delete a keg                                     |
+| GET    | `/api/taps`                   | List all taps                                    |
+| POST   | `/api/taps`                   | Add a tap                                        |
+| PUT    | `/api/taps/<id>`              | Update a tap                                     |
+| DELETE | `/api/taps/<id>`              | Delete a tap                                     |
+| GET    | `/api/export/json`            | Export portable versioned JSON backup            |
+| GET    | `/api/export/archive`         | Export ZIP archive backup                        |
+| GET    | `/api/export/csv`             | Legacy alias for archive ZIP export              |
+| POST   | `/api/import/archive/preview` | Preview archive import result (replace or merge) |
+| POST   | `/api/import/archive`         | Import ZIP archive backup (replace or merge)     |
+| POST   | `/api/import/json/preview`    | Preview JSON import result (replace or merge)    |
+| POST   | `/api/import/json`            | Import JSON backup (replace or merge)            |
 
-CSV export accepts an optional `?section=stock|kegs|taps` query parameter.
+Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
 
 ## Supported Architectures
 
