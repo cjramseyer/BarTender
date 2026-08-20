@@ -44,6 +44,21 @@ def load_data() -> dict:
     return json.loads(json.dumps(DEFAULT_DATA))
 
 
+def _default_percent_for_status(status: str) -> int:
+    if status == "full":
+        return 100
+    if status == "in_use":
+        return 50
+    return 0
+
+
+def _clamp_percent_full(value, fallback: int) -> int:
+    try:
+        return max(0, min(100, int(float(value))))
+    except (TypeError, ValueError):
+        return fallback
+
+
 @display_app.route("/")
 def index():
     data = load_data()
@@ -53,6 +68,41 @@ def index():
         taps=data["taps"],
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
+    )
+
+
+@display_app.route("/menu")
+def menu():
+    data = load_data()
+    kegs_by_id = {
+        keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
+    }
+
+    on_tap = []
+    for tap in sorted(
+        data.get("taps", []),
+        key=lambda t: (t.get("number") is None, t.get("number", 0), t.get("id", 0)),
+    ):
+        keg_id = tap.get("keg_id")
+        if keg_id is None:
+            continue
+        keg = kegs_by_id.get(keg_id)
+        if not keg:
+            continue
+        fill_pct = _clamp_percent_full(
+            keg.get("percent_full"),
+            _default_percent_for_status(keg.get("status", "empty")),
+        )
+        on_tap.append({
+            "tap": tap,
+            "keg": keg,
+            "fill_pct": fill_pct,
+        })
+
+    return render_template(
+        "display/menu.html",
+        settings=data["settings"],
+        on_tap=on_tap,
     )
 
 

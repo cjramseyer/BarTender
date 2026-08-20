@@ -50,6 +50,9 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - Added printable menu route (`GET /menu`) showing currently assigned taps and keg details.
 - Added runtime QR generation for printable menu (`GET /api/menu/qr`) with health endpoint (`GET /api/menu/qr/health`).
 - Added `menu_qr_mode` setting (`off|display|print|both`) to control QR visibility on screen and print output.
+- Added dashboard tap pour controls with preset selection.
+- Updated pour behavior so each pour also updates `percent_full`, and first pour transitions keg status from `full` to `in_use`.
+- Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
 
 ## Installation
 
@@ -87,6 +90,7 @@ The add-on exposes a JSON REST API at the ingress URL.
 | GET    | `/api/taps`                   | List all taps                                    |
 | POST   | `/api/taps`                   | Add a tap                                        |
 | PUT    | `/api/taps/<id>`              | Update a tap                                     |
+| POST   | `/api/taps/<id>/pour`         | Record a preset/manual pour against assigned keg |
 | DELETE | `/api/taps/<id>`              | Delete a tap                                     |
 | GET    | `/api/export/json`            | Export portable versioned JSON backup            |
 | GET    | `/api/export/archive`         | Export ZIP archive backup                        |

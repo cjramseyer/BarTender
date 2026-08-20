@@ -70,23 +70,26 @@
     <div class="tap-card-footer">
       {% if keg and keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
       {% set pour_options = settings.pour_options if settings.pour_options is defined else [] %}
-      {% if pour_options %}
-      <select id="tapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
-        {% for option in pour_options %}
-        <option
-          value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"
-        >
-          {{ option.name }} ({{ option.amount }} {{ option.unit }})
-        </option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-sm btn-secondary" onclick="pourTap({{ tap.id }})">
-        Pour
-      </button>
-      {% else %}
-      <span class="muted">Configure pour options in Settings.</span>
+      <div class="tap-pour-row">
+        {% if pour_options %}
+        <select id="tapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
+          {% for option in pour_options %}
+          <option
+            value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"
+          >
+            {{ option.name }} ({{ option.amount }} {{ option.unit }})
+          </option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-sm btn-secondary" onclick="pourTap({{ tap.id }})">
+          Pour
+        </button>
+        {% else %}
+        <span class="muted">Configure pour options in Settings.</span>
+        {% endif %}
+      </div>
       {% endif %}
-      {% endif %}
+      <div class="tap-action-row">
       <button
         class="btn btn-sm btn-secondary"
         onclick="editTap({{ tap | tojson | forceescape }})"
@@ -96,6 +99,7 @@
       <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">
         Delete
       </button>
+      </div>
     </div>
   </div>
   {% else %}

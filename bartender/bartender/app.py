@@ -29,6 +29,7 @@ from flask import (
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
 INGRESS_PATH = os.environ.get("INGRESS_PATH", "")
+DISPLAY_PORT = os.environ.get("DISPLAY_PORT", "8100")
 
 app = Flask(__name__)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
@@ -301,10 +302,20 @@ def _apply_pour_to_keg(data: dict, keg: dict, amount: float, pour_unit: str):
     if converted_amount > current_volume:
         return {"error": "Pour amount exceeds remaining volume."}, 409
 
+    previous_status = _normalize_keg_status(keg.get("status", "empty"))
+    previous_percent = _clamp_percent_full(
+        keg.get("percent_full"),
+        _default_percent_for_status(keg.get("status", "empty")),
+    )
     keg["current_volume"] = max(0.0, round(current_volume - converted_amount, 3))
     keg["volume_unit"] = keg_unit
 
-    if keg["current_volume"] <= 0:
+    if keg["current_volume"] > 0 and current_volume > 0:
+        scaled_percent = round(previous_percent * (keg["current_volume"] / current_volume))
+        keg["percent_full"] = _clamp_percent_full(scaled_percent, previous_percent)
+        if previous_status == "full":
+            keg["status"] = "in_use"
+    elif keg["current_volume"] <= 0:
         if keg.get("filled_date"):
             keg["status"] = "cleaning"
         else:
@@ -408,6 +419,36 @@ def _apply_needs_cleaning_transition(
         updated_keg["percent_full"] = 0
 
 
+def _sync_percent_for_volume_change(
+    previous_keg: dict,
+    updated_keg: dict,
+    current_volume_explicit: bool,
+    percent_explicit: bool,
+) -> None:
+    """When volume is edited directly, keep percent_full in sync unless user set percent explicitly."""
+    if not current_volume_explicit or percent_explicit:
+        return
+
+    previous_volume = _coerce_float(previous_keg.get("current_volume"), None)
+    current_volume = _coerce_float(updated_keg.get("current_volume"), None)
+
+    if current_volume is None:
+        return
+    if current_volume <= 0:
+        updated_keg["percent_full"] = 0
+        return
+
+    if previous_volume is None or previous_volume <= 0:
+        return
+
+    previous_percent = _clamp_percent_full(
+        previous_keg.get("percent_full"),
+        _default_percent_for_status(previous_keg.get("status", "empty")),
+    )
+    scaled_percent = round(previous_percent * (current_volume / previous_volume))
+    updated_keg["percent_full"] = _clamp_percent_full(scaled_percent, previous_percent)
+
+
 def _is_cleaning_transition_allowed(previous_status: str, next_status: str) -> bool:
     """When a keg needs cleaning, it can only be marked clean (empty)."""
     prev = _normalize_keg_status(previous_status)
@@ -506,6 +547,7 @@ def settings():
         settings=data["settings"],
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
+        display_port=DISPLAY_PORT,
         ingress=INGRESS_PATH,
     )
 
@@ -917,6 +959,13 @@ def api_update_keg(keg_id: int):
                 keg["current_volume"] = _coerce_float(keg.get("current_volume"), None)
             if "volume_unit" in body:
                 keg["volume_unit"] = _normalize_volume_unit(keg.get("volume_unit"))
+
+            _sync_percent_for_volume_change(
+                previous_keg,
+                keg,
+                current_volume_explicit="current_volume" in body,
+                percent_explicit=has_percent_full,
+            )
 
             if "status" in body:
                 _set_filled_date_for_status_transition(keg, body["status"])
