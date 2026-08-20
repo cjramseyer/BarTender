@@ -8,6 +8,14 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    import qrcode
+
+    QR_IMPORT_ERROR = ""
+except Exception as exc:  # pragma: no cover - environment-specific import failure
+    qrcode = None
+    QR_IMPORT_ERROR = str(exc)
+
 from flask import (
     Flask,
     render_template,
@@ -38,6 +46,11 @@ DEFAULT_DATA = {
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
+        "menu_qr_mode": "both",
+        "pour_options": [
+            {"name": "Half Pint", "amount": 8, "unit": "oz"},
+            {"name": "Pint", "amount": 16, "unit": "oz"},
+        ],
     },
     "bar_stock": [],
     "kegs": [],
@@ -80,6 +93,13 @@ def load_data() -> dict:
         data["settings"]["bar_stock_enabled"] = _coerce_bool(
             data["settings"].get("bar_stock_enabled"),
             True,
+        )
+        data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
+            data["settings"].get("menu_qr_mode")
+        )
+        data["settings"]["pour_options"] = _normalize_pour_options(
+            data["settings"].get("pour_options"),
+            data["settings"].get("measurement", "us"),
         )
         # Backward compatibility for stock size fields.
         for item in data.get("bar_stock", []):
@@ -152,6 +172,17 @@ def _bar_stock_enabled(data: dict) -> bool:
     return _coerce_bool(data.get("settings", {}).get("bar_stock_enabled"), True)
 
 
+def _normalize_menu_qr_mode(value) -> str:
+    mode = str(value or "both").strip().lower()
+    if mode in ("off", "display", "print", "both"):
+        return mode
+    return "both"
+
+
+def _qr_is_available() -> bool:
+    return qrcode is not None
+
+
 def _line_cleaning_keg_conflict(data: dict, candidate_id=None) -> bool:
     for keg in data.get("kegs", []):
         if not _coerce_bool(keg.get("line_cleaning_keg"), False):
@@ -210,6 +241,78 @@ def _coerce_float(value, default=None):
 
 def _default_volume_unit(measurement: str) -> str:
     return "oz" if measurement == "us" else "ml"
+
+
+def _default_pour_options(measurement: str) -> list[dict]:
+    if measurement == "metric":
+        return [
+            {"name": "Half Pint", "amount": 237, "unit": "ml"},
+            {"name": "Pint", "amount": 473, "unit": "ml"},
+        ]
+    return [
+        {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Pint", "amount": 16, "unit": "oz"},
+    ]
+
+
+def _normalize_pour_options(raw_options, measurement: str) -> list[dict]:
+    fallback = _default_pour_options(measurement)
+    if not isinstance(raw_options, list):
+        return fallback
+
+    normalized = []
+    for option in raw_options:
+        if not isinstance(option, dict):
+            continue
+        name = str(option.get("name", "")).strip()
+        amount = _coerce_float(option.get("amount"), None)
+        unit = _normalize_volume_unit(option.get("unit"))
+        if not name or amount is None or amount <= 0 or not unit:
+            continue
+        normalized.append({
+            "name": name,
+            "amount": round(amount, 3),
+            "unit": unit,
+        })
+
+    return normalized or fallback
+
+
+def _apply_pour_to_keg(data: dict, keg: dict, amount: float, pour_unit: str):
+    current_volume = _coerce_float(keg.get("current_volume"), None)
+    if current_volume is None:
+        return {"error": "Current volume is not set for this keg."}, 400
+
+    if current_volume <= 0:
+        return {"error": "No volume remaining in this keg."}, 409
+
+    keg_unit = _normalize_volume_unit(
+        keg.get("volume_unit")
+        or _default_volume_unit(data.get("settings", {}).get("measurement", "us"))
+    )
+    normalized_pour_unit = _normalize_volume_unit(pour_unit or keg_unit)
+
+    converted_amount = _convert_volume(amount, normalized_pour_unit, keg_unit)
+    if converted_amount is None:
+        return {
+            "error": f"Unsupported unit conversion: {normalized_pour_unit} to {keg_unit}.",
+        }, 400
+
+    if converted_amount > current_volume:
+        return {"error": "Pour amount exceeds remaining volume."}, 409
+
+    keg["current_volume"] = max(0.0, round(current_volume - converted_amount, 3))
+    keg["volume_unit"] = keg_unit
+
+    if keg["current_volume"] <= 0:
+        if keg.get("filled_date"):
+            keg["status"] = "cleaning"
+        else:
+            keg["status"] = "empty"
+        keg["percent_full"] = 0
+
+    keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+    return keg, 200
 
 
 def _normalize_volume_unit(unit: str | None) -> str:
@@ -401,6 +504,8 @@ def settings():
     return render_template(
         "settings.html",
         settings=data["settings"],
+        qr_ready=_qr_is_available(),
+        qr_error=QR_IMPORT_ERROR,
         ingress=INGRESS_PATH,
     )
 
@@ -414,6 +519,109 @@ def display_view():
         taps=data["taps"],
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
+    )
+
+
+@app.route("/menu")
+def menu_view():
+    data = load_data()
+    kegs_by_id = {
+        keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
+    }
+
+    on_tap = []
+    for tap in sorted(
+        data.get("taps", []),
+        key=lambda t: (t.get("number") is None, t.get("number", 0), t.get("id", 0)),
+    ):
+        keg_id = tap.get("keg_id")
+        if keg_id is None:
+            continue
+        keg = kegs_by_id.get(keg_id)
+        if not keg:
+            continue
+        fill_pct = _clamp_percent_full(
+            keg.get("percent_full"),
+            _default_percent_for_status(keg.get("status", "empty")),
+        )
+        on_tap.append({
+            "tap": tap,
+            "keg": keg,
+            "fill_pct": fill_pct,
+        })
+
+    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
+    qr_ready = _qr_is_available()
+    return render_template(
+        "menu.html",
+        settings=data["settings"],
+        on_tap=on_tap,
+        menu_path=menu_path,
+        qr_image_path=qr_image_path,
+        menu_qr_mode=menu_qr_mode,
+        qr_ready=qr_ready,
+        qr_error=QR_IMPORT_ERROR,
+        ingress=INGRESS_PATH,
+    )
+
+
+@app.route("/api/menu/qr")
+def api_menu_qr():
+    if not _qr_is_available():
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "QR generation dependencies are not installed.",
+                    "hint": "Install requirements with: pip install -r requirements.txt",
+                    "details": QR_IMPORT_ERROR,
+                }
+            ),
+            503,
+        )
+
+    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    menu_url = f"{request.host_url.rstrip('/')}{menu_path}"
+
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    out.seek(0)
+    return send_file(
+        out,
+        mimetype="image/png",
+        as_attachment=False,
+        download_name="bartender_menu_qr.png",
+    )
+
+
+@app.route("/api/menu/qr/health")
+def api_menu_qr_health():
+    if _qr_is_available():
+        return jsonify(
+            {
+                "ok": True,
+                "qr_ready": True,
+            }
+        )
+
+    return (
+        jsonify(
+            {
+                "ok": False,
+                "qr_ready": False,
+                "error": "QR generation dependencies are not installed.",
+                "hint": "Install requirements with: pip install -r requirements.txt",
+                "details": QR_IMPORT_ERROR,
+            }
+        ),
+        503,
     )
 
 
@@ -438,6 +646,8 @@ def api_save_settings():
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
+        "menu_qr_mode",
+        "pour_options",
     }
     for key in allowed:
         if key in body:
@@ -463,6 +673,13 @@ def api_save_settings():
     data["settings"]["default_keg_type"] = str(
         data["settings"].get("default_keg_type", "")
     ).strip()
+    data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
+        data["settings"].get("menu_qr_mode")
+    )
+    data["settings"]["pour_options"] = _normalize_pour_options(
+        data["settings"].get("pour_options"),
+        data["settings"].get("measurement", "us"),
+    )
 
     save_data(data)
     return jsonify(data["settings"])
@@ -765,42 +982,48 @@ def api_pour_keg(keg_id: int):
     for keg in data["kegs"]:
         if keg["id"] != keg_id:
             continue
-
-        current_volume = _coerce_float(keg.get("current_volume"), None)
-        if current_volume is None:
-            return jsonify({"error": "Current volume is not set for this keg."}), 400
-
-        if current_volume <= 0:
-            return jsonify({"error": "No volume remaining in this keg."}), 409
-
-        keg_unit = _normalize_volume_unit(
-            keg.get("volume_unit")
-            or _default_volume_unit(data.get("settings", {}).get("measurement", "us"))
-        )
-        pour_unit = _normalize_volume_unit(body.get("unit") or keg_unit)
-
-        converted_amount = _convert_volume(amount, pour_unit, keg_unit)
-        if converted_amount is None:
-            return jsonify({"error": f"Unsupported unit conversion: {pour_unit} to {keg_unit}."}), 400
-
-        if converted_amount > current_volume:
-            return jsonify({"error": "Pour amount exceeds remaining volume."}), 409
-
-        keg["current_volume"] = max(0.0, round(current_volume - converted_amount, 3))
-        keg["volume_unit"] = keg_unit
-
-        if keg["current_volume"] <= 0:
-            if keg.get("filled_date"):
-                keg["status"] = "cleaning"
-            else:
-                keg["status"] = "empty"
-            keg["percent_full"] = 0
-
-        keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+        payload, status = _apply_pour_to_keg(data, keg, amount, body.get("unit"))
+        if status != 200:
+            return jsonify(payload), status
         save_data(data)
-        return jsonify(keg)
+        return jsonify(payload)
 
     return jsonify({"error": "Not found"}), 404
+
+
+@app.route("/api/taps/<int:tap_id>/pour", methods=["POST"])
+def api_pour_tap(tap_id: int):
+    data = load_data()
+    body = request.get_json(force=True)
+
+    amount = _coerce_float(body.get("amount"), None)
+    if amount is None or amount <= 0:
+        return jsonify({"error": "Pour amount must be greater than zero."}), 400
+
+    target_tap = None
+    for tap in data.get("taps", []):
+        if tap.get("id") == tap_id:
+            target_tap = tap
+            break
+
+    if target_tap is None:
+        return jsonify({"error": "Tap not found."}), 404
+
+    keg_id = target_tap.get("keg_id")
+    if keg_id is None:
+        return jsonify({"error": "No keg is assigned to this tap."}), 409
+
+    for keg in data.get("kegs", []):
+        if keg.get("id") != keg_id:
+            continue
+
+        payload, status = _apply_pour_to_keg(data, keg, amount, body.get("unit"))
+        if status != 200:
+            return jsonify(payload), status
+        save_data(data)
+        return jsonify(payload)
+
+    return jsonify({"error": "Assigned keg not found."}), 404
 
 
 @app.route("/api/kegs/<int:keg_id>", methods=["DELETE"])

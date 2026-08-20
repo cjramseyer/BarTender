@@ -1,6 +1,6 @@
 # BarTender Core App and Add-on Documentation
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 Doc scope: Home Assistant add-on (web app + display service)
 
 ## Overview
@@ -10,6 +10,7 @@ BarTender is a Home Assistant add-on for bar management. It provides:
 - A management web UI for stock, kegs, taps, and settings.
 - A JSON REST API used by web and mobile clients.
 - A read-only display service for wallboard-style viewing.
+- A printer-friendly menu page that lists currently assigned taps.
 
 Primary runtime components:
 
@@ -23,10 +24,11 @@ Primary runtime components:
 - Bar stock CRUD (create, list, update, delete).
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
-- Settings management (bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position).
+- Settings management (bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position, printable menu QR mode).
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Read-only display page.
+- Runtime QR generation endpoint for printable menu.
 
 ## Architecture and Components
 
@@ -104,7 +106,7 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name, dashboard_manage_button_position, bar_stock_enabled, default_keg_type.
+- Accepted keys: measurement, theme, bar_name, dashboard_manage_button_position, bar_stock_enabled, default_keg_type, menu_qr_mode.
 - Request example:
 
 ```json
@@ -116,6 +118,13 @@ POST /api/settings
 ```
 
 - 200 response: updated settings object.
+
+menu_qr_mode values:
+
+- off
+- display
+- print
+- both
 
 ### Bar Stock
 
@@ -318,6 +327,22 @@ GET /api/export/archive
 
 - Downloads ZIP archive backup as bartender_export.zip.
 - Includes section JSON files, versioned full JSON payload, and convenience CSV files.
+
+### Printable Menu and QR
+
+GET /menu
+
+- Renders printer-friendly "currently on tap" menu content.
+
+GET /api/menu/qr
+
+- Generates a PNG QR code that points to /menu on the current host.
+- 503 response when QR dependencies are unavailable.
+
+GET /api/menu/qr/health
+
+- Returns QR runtime readiness.
+- 200 when ready, 503 with error details when dependencies are missing.
 
 GET /api/export/csv
 

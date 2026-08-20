@@ -1,6 +1,33 @@
 {% extends "base.html" %} {% block title %}Settings{% endblock %} {% block
 content %}
 <h1>⚙ Settings</h1>
+
+<div class="settings-grid">
+<div class="card settings-card">
+  <h2>📺 Display URL</h2>
+  <p class="muted">Use this URL for your read-only display board.</p>
+  <p>
+    <a href="{{ ingress }}/display" target="_blank" rel="noopener noreferrer"
+      >{{ ingress }}/display</a
+    >
+  </p>
+  <h2 style="margin-top: 1.25rem">🧾 Printable Menu URL</h2>
+  <p class="muted">Use this URL for a printable "currently on tap" menu.</p>
+  <p>
+    <a href="{{ ingress }}/menu" target="_blank" rel="noopener noreferrer"
+      >{{ ingress }}/menu</a
+    >
+  </p>
+  <p class="muted" style="margin-top: 0.35rem">
+    QR Status:
+    {% if qr_ready %}
+    <strong style="color: #15803d">Ready</strong>
+    {% else %}
+    <strong style="color: #b45309">Unavailable</strong>
+    {% endif %}
+  </p>
+</div>
+
 <div class="card settings-card">
   <form id="settingsForm" onsubmit="saveSettings(event)">
     <div class="form-group">
@@ -112,6 +139,48 @@ content %}
         Enable Bar Stock Feature
       </label>
     </div>
+    {% if qr_ready %}
+    <div class="form-group">
+      <label>Printable Menu QR Code</label>
+      <select id="menuQrMode" class="form-control">
+        <option value="off" {% if (settings.menu_qr_mode or 'both') == 'off' %}selected{% endif %}>Off</option>
+        <option value="display" {% if (settings.menu_qr_mode or 'both') == 'display' %}selected{% endif %}>Display only</option>
+        <option value="print" {% if (settings.menu_qr_mode or 'both') == 'print' %}selected{% endif %}>Print only</option>
+        <option value="both" {% if (settings.menu_qr_mode or 'both') == 'both' %}selected{% endif %}>Display and print</option>
+      </select>
+      <small class="muted">
+        Controls where the QR code appears on the printable menu page.
+      </small>
+    </div>
+    {% else %}
+    <div class="form-group settings-warning-block">
+      <label>Printable Menu QR Code</label>
+      <p class="muted" style="margin-top: 0.35rem">
+        QR options are unavailable on this system.
+      </p>
+      <p class="muted" style="margin-top: 0.25rem">
+        Install requirements to enable QR generation: <code>pip install -r requirements.txt</code>
+      </p>
+      {% if qr_error %}
+      <p class="muted" style="margin-top: 0.25rem">Details: {{ qr_error }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="form-group">
+      <label>Pour Amount Presets</label>
+      <small class="muted">
+        Configure named pour options shown on each tap card.
+      </small>
+      <div id="pourOptionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        style="margin-top: 8px"
+        onclick="addPourOptionRow()"
+      >
+        + Add Pour Option
+      </button>
+    </div>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save Settings</button>
       <span id="saveMsg" class="save-msg"></span>
@@ -164,9 +233,76 @@ content %}
     </div>
   </form>
 </div>
+ </div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
+
+  function createPourOptionRow(option = {}) {
+    const row = document.createElement("div");
+    row.className = "form-row pour-option-row";
+    row.innerHTML = `
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" class="form-control pour-option-name" value="${
+          (option.name || "").replace(/"/g, "&quot;")
+        }" placeholder="e.g. Pint" />
+      </div>
+      <div class="form-group">
+        <label>Amount</label>
+        <input type="number" class="form-control pour-option-amount" min="0.01" step="0.01" value="${
+          option.amount ?? ""
+        }" placeholder="e.g. 16" />
+      </div>
+      <div class="form-group">
+        <label>Unit</label>
+        <select class="form-control pour-option-unit">
+          <option value="oz">oz</option>
+          <option value="gal">gal</option>
+          <option value="ml">ml</option>
+          <option value="l">L</option>
+        </select>
+      </div>
+      <div class="form-group" style="align-self: end">
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.pour-option-row').remove()">Remove</button>
+      </div>
+    `;
+
+    const unitSelect = row.querySelector(".pour-option-unit");
+    unitSelect.value = (option.unit || "oz").toLowerCase();
+    return row;
+  }
+
+  function addPourOptionRow(option = null) {
+    document.getElementById("pourOptionsList").appendChild(
+      createPourOptionRow(option || {}),
+    );
+  }
+
+  function loadPourOptions() {
+    const options = Array.isArray(DEFAULT_POUR_OPTIONS) ? DEFAULT_POUR_OPTIONS : [];
+    if (!options.length) {
+      addPourOptionRow({ name: "Pint", amount: 16, unit: "oz" });
+      return;
+    }
+    options.forEach((option) => addPourOptionRow(option));
+  }
+
+  function collectPourOptions() {
+    const rows = document.querySelectorAll(".pour-option-row");
+    const options = [];
+    rows.forEach((row) => {
+      const name = row.querySelector(".pour-option-name").value.trim();
+      const amount = parseFloat(row.querySelector(".pour-option-amount").value);
+      const unit = row.querySelector(".pour-option-unit").value;
+      if (!name || Number.isNaN(amount) || amount <= 0 || !unit) return;
+      options.push({ name, amount, unit });
+    });
+    return options;
+  }
+
+  loadPourOptions();
 
   async function saveSettings(e) {
     e.preventDefault();
@@ -187,7 +323,13 @@ content %}
         ? managePosInput.value
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
+      pour_options: collectPourOptions(),
     };
+
+    const menuQrModeInput = document.getElementById("menuQrMode");
+    if (menuQrModeInput) {
+      body.menu_qr_mode = menuQrModeInput.value;
+    }
     try {
       const res = await fetch(`${INGRESS}/api/settings`, {
         method: "POST",
