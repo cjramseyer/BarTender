@@ -284,6 +284,14 @@ textarea.form-control {
   margin-top: 1.5rem;
 }
 
+.form-section-title {
+  margin: 0.4rem 0 0.8rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .radio-group {
   display: flex;
   gap: 1.5rem;
@@ -310,37 +318,46 @@ textarea.form-control {
   margin-bottom: 0;
 }
 
-/* Global manage button positioning across management panels */
+/* Keep + New buttons in page headers at top-right */
 .manage-btn {
   margin-left: auto;
 }
 
-html[data-manage-pos="bottom-left"] .page-header,
-html[data-manage-pos="bottom-right"] .page-header,
-body[data-manage-pos="bottom-left"] .page-header,
-body[data-manage-pos="bottom-right"] .page-header {
+/* Dashboard manage button positioning */
+.dashboard-grid > .card {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-grid > .card > h2 {
+  order: -2;
+}
+
+.dashboard-manage-row {
+  display: flex;
+  margin-top: 1rem;
+}
+
+html[data-manage-pos="top-right"] .dashboard-manage-row,
+body[data-manage-pos="top-right"] .dashboard-manage-row {
+  order: -1;
+  justify-content: flex-end;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+html[data-manage-pos="bottom-left"] .dashboard-manage-row,
+body[data-manage-pos="bottom-left"] .dashboard-manage-row {
+  order: 10;
+  margin-top: auto;
   justify-content: flex-start;
 }
 
-html[data-manage-pos="bottom-left"] .manage-btn,
-html[data-manage-pos="bottom-right"] .manage-btn,
-body[data-manage-pos="bottom-left"] .manage-btn,
-body[data-manage-pos="bottom-right"] .manage-btn {
-  position: fixed;
-  bottom: 1.25rem;
-  z-index: 950;
-  margin-left: 0;
-  box-shadow: var(--shadow);
-}
-
-html[data-manage-pos="bottom-left"] .manage-btn,
-body[data-manage-pos="bottom-left"] .manage-btn {
-  left: 1.25rem;
-}
-
-html[data-manage-pos="bottom-right"] .manage-btn,
-body[data-manage-pos="bottom-right"] .manage-btn {
-  right: 1.25rem;
+html[data-manage-pos="bottom-right"] .dashboard-manage-row,
+body[data-manage-pos="bottom-right"] .dashboard-manage-row {
+  order: 10;
+  margin-top: auto;
+  justify-content: flex-end;
 }
 
 /* Table */
@@ -427,6 +444,34 @@ body[data-manage-pos="bottom-right"] .manage-btn {
   color: var(--text-muted);
   font-size: 0.85rem;
   flex: 1;
+}
+
+.tap-keg-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.keg-level-shell-sm {
+  width: 22px;
+  height: 36px;
+  border-width: 1px;
+  border-radius: 6px 6px 8px 8px;
+}
+
+.keg-level-shell-sm::before {
+  top: -4px;
+  left: 5px;
+  right: 5px;
+  height: 3px;
+  border-radius: 3px;
+}
+
+.tap-keg-percent {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 2.2rem;
 }
 
 .stock-summary {

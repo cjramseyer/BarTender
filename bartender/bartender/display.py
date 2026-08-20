@@ -16,7 +16,12 @@ DATA_FILE = DATA_DIR / "bartender.json"
 display_app = Flask(__name__, template_folder="templates")
 
 DEFAULT_DATA = {
-    "settings": {"measurement": "us", "theme": "light", "bar_name": "My Bar"},
+    "settings": {
+        "measurement": "us",
+        "theme": "light",
+        "bar_name": "My Bar",
+        "bar_stock_enabled": True,
+    },
     "bar_stock": [],
     "kegs": [],
     "taps": [],
@@ -30,6 +35,11 @@ def load_data() -> dict:
         for key, value in DEFAULT_DATA.items():
             if key not in data:
                 data[key] = value
+        if not isinstance(data.get("settings"), dict):
+            data["settings"] = json.loads(json.dumps(DEFAULT_DATA["settings"]))
+        else:
+            for key, value in DEFAULT_DATA["settings"].items():
+                data["settings"].setdefault(key, value)
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 

@@ -21,10 +21,11 @@ Primary runtime components:
 
 - Dashboard overview of taps, kegs, and counts.
 - Bar stock CRUD (create, list, update, delete).
-- Keg CRUD with lifecycle tracking.
+- Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
-- Settings management (bar name, measurement, theme).
-- Export to JSON and CSV (full or section-based).
+- Settings management (bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position).
+- Pour workflow and current keg volume tracking.
+- Export/import backups as versioned JSON and ZIP archives with preview.
 - Read-only display page.
 
 ## Architecture and Components
@@ -103,7 +104,7 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name.
+- Accepted keys: measurement, theme, bar_name, dashboard_manage_button_position, bar_stock_enabled, default_keg_type.
 - Request example:
 
 ```json
@@ -209,11 +210,22 @@ PUT /api/kegs/<id>
 
 DELETE /api/kegs/<id>
 
-- Deletes keg and unassigns it from taps.
+- Deletes keg only when it is not assigned to any tap.
 - 200 response:
 
 ```json
 { "ok": true }
+```
+
+- 409 response example:
+
+```json
+{
+  "error": "This keg is assigned to one or more taps. Disconnect it from all taps (or delete those taps) before deleting the keg.",
+  "code": "KEG_ASSIGNED_TO_TAP",
+  "tap_count": 1,
+  "tap_numbers": [1]
+}
 ```
 
 Valid keg statuses:
@@ -223,6 +235,35 @@ Valid keg statuses:
 - empty
 - cleaning
 - retired
+
+Lifecycle and validation rules:
+
+- Kegs in cleaning state can only transition to empty (clean).
+- Only one keg can be marked as the line-cleaning keg.
+- Kegs that were previously filled and reach empty are moved to cleaning.
+- Kegs marked full must include a keg name and beer details (type or brewer).
+
+POST /api/kegs/<id>/pour
+
+- Records a pour amount and decrements current_volume.
+- Request body:
+
+```json
+{
+  "amount": 12,
+  "unit": "oz"
+}
+```
+
+- Validation:
+  - amount must be greater than zero
+  - current_volume must be set and greater than zero
+  - pour amount cannot exceed current_volume
+  - unsupported unit conversions are rejected
+
+- Behavior:
+  - current_volume is updated atomically
+  - when volume reaches zero, status becomes cleaning if keg was previously filled; otherwise empty
 
 ### Taps
 
@@ -271,14 +312,43 @@ DELETE /api/taps/<id>
 
 GET /api/export/json
 
-- Downloads full dataset as bartender_export.json.
+- Downloads portable versioned JSON backup as bartender_export.json.
+
+GET /api/export/archive
+
+- Downloads ZIP archive backup as bartender_export.zip.
+- Includes section JSON files, versioned full JSON payload, and convenience CSV files.
 
 GET /api/export/csv
 
-- Downloads CSV export (bartender_export.csv).
-- Optional query: section=stock|kegs|taps
-- Example:
-  - /api/export/csv?section=kegs
+- Legacy alias for archive ZIP export (bartender_export.zip).
+
+### Import
+
+POST /api/import/archive/preview
+
+- Previews archive import result without writing data.
+- Accepts multipart file upload and optional mode=replace|merge.
+
+POST /api/import/archive
+
+- Imports ZIP backup.
+- Accepts multipart file upload and optional mode=replace|merge.
+
+POST /api/import/json/preview
+
+- Previews JSON import result without writing data.
+- Accepts multipart file upload and optional mode=replace|merge.
+
+POST /api/import/json
+
+- Imports versioned JSON backup.
+- Accepts multipart file upload and optional mode=replace|merge.
+
+Import mode behavior:
+
+- replace: overwrite current settings, kegs, taps, and bar stock.
+- merge: merge settings keys and upsert kegs/taps/stock by id.
 
 ## Error Behavior
 
@@ -290,8 +360,8 @@ Common API error patterns:
 
 Notes:
 
-- There is minimal request validation in current implementation.
-- Clients should treat non-2xx as failure and retry or display error context.
+- API validates keg lifecycle transitions, pour constraints, and import payloads.
+- Clients should treat non-2xx as failure and display returned error context.
 
 ## Data Model Reference
 
@@ -311,6 +381,9 @@ settings fields:
 - measurement: string (us or metric expected by UI)
 - theme: string (light or dark)
 - bar_name: string
+- dashboard_manage_button_position: string (top-right, bottom-left, bottom-right)
+- bar_stock_enabled: boolean
+- default_keg_type: string
 
 bar_stock item fields:
 
@@ -330,8 +403,15 @@ keg fields:
 - size: string
 - custom_size: string
 - status: string
-- brewery: string
-- abv: string
+- beer_brewer: string
+- beer_abv: string
+- beer_ibu: string
+- beer_brewed_on: date string (YYYY-MM-DD)
+- line_cleaning_keg: boolean
+- current_volume: number or null
+- volume_unit: string (oz, gal, ml, l)
+- brewery: string (legacy compatibility mirror)
+- abv: string (legacy compatibility mirror)
 - notes: string
 - filled_date: date string (YYYY-MM-DD)
 - percent_full: integer (0-100)
@@ -355,18 +435,13 @@ tap fields:
 
 Current support:
 
-- Export only (JSON and CSV).
-- No import endpoint in current codebase.
-
-Export examples:
-
-- Full JSON backup: GET /api/export/json
-- Keg-only CSV: GET /api/export/csv?section=kegs
+- Export portable versioned JSON and ZIP archive backups.
+- Import JSON and ZIP backups with preview and explicit replace/merge mode.
 
 Operational recommendation:
 
-- Use JSON export before upgrades or major data edits.
-- Store backups outside Home Assistant host for recovery.
+- Use preview before import to verify counts and selected mode.
+- Store periodic JSON and ZIP backups outside Home Assistant host for recovery.
 
 ## Deployment and Runtime Notes
 

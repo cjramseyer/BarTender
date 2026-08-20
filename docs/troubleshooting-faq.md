@@ -56,13 +56,22 @@ Checks:
 Checks:
 
 - Try JSON export first: /api/export/json
-- For CSV sections use only stock, kegs, or taps.
+- Try archive export: /api/export/archive
 - Confirm browser pop-up/download policies are not blocking files.
+
+### Import fails or preview is incorrect
+
+Checks:
+
+- Verify backup file is from BarTender export (.json or .zip).
+- Use Preview first and confirm chosen mode (replace or merge).
+- For JSON import, ensure payload is valid UTF-8 JSON.
+- For ZIP import, ensure archive is not corrupted and includes export files.
 
 ## FAQ
 
 Q: Does BarTender support importing data?
-A: Not in current release. Export is supported for JSON/CSV.
+A: Yes. It supports JSON and ZIP imports with preview and replace/merge modes.
 
 Q: Where is data stored?
 A: In /data/bartender.json inside add-on runtime volume.

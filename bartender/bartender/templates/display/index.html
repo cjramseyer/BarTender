@@ -124,6 +124,55 @@
         font-size: 1.05rem !important;
         font-weight: 600;
       }
+      .keg-level {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.6rem;
+      }
+      .keg-level-shell {
+        width: 34px;
+        height: 58px;
+        border-radius: 8px 8px 10px 10px;
+        border: 2px solid var(--border);
+        background: var(--surface2);
+        position: relative;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      .keg-level-shell::before {
+        content: "";
+        position: absolute;
+        top: -7px;
+        left: 7px;
+        right: 7px;
+        height: 5px;
+        border-radius: 4px;
+        background: var(--border);
+      }
+      .keg-level-fill {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background: linear-gradient(180deg, var(--badge-in_use), var(--badge-full));
+      }
+      .keg-level-meta {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+      }
+      .keg-level-label {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .keg-level-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text);
+      }
       .no-keg {
         font-style: italic;
         color: var(--text-muted);
@@ -212,7 +261,12 @@
       <div class="section-title">🍺 Taps on Tap</div>
       <div class="taps-grid">
         {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
-        tap.keg_id) | first %}
+        tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
+        keg.percent_full is defined else (100 if keg and keg.status == 'full'
+        else 50 if keg and keg.status == 'in_use' else 0) %} {% set
+        beer_brewer = keg.beer_brewer if keg else '' %} {% set beer_abv =
+        keg.beer_abv if keg else '' %} {% set beer_ibu = keg.beer_ibu if keg
+        else '' %} {% set beer_brewed_on = keg.beer_brewed_on if keg else '' %}
         <div class="tap-card">
           <div class="tap-card-header">
             <span class="tap-number">Tap #{{ tap.number }}</span>
@@ -223,18 +277,42 @@
           <div class="tap-card-body">
             {% if keg %}
             <p class="keg-on-tap">{{ keg.name }}</p>
+            <div
+              class="keg-level"
+              role="img"
+              aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
+            >
+              <div class="keg-level-shell">
+                <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
+              </div>
+              <div class="keg-level-meta">
+                <span class="keg-level-label">Current Fill</span>
+                <span class="keg-level-value">{{ fill_pct }}%</span>
+              </div>
+            </div>
             <p>
               <span class="badge badge-{{ keg.status }}"
                 >{{ keg.status | replace('_', ' ') | title }}</span
               >
             </p>
             <p class="muted">
-              {{ keg.type or '' }}{% if keg.brewery %} · {{ keg.brewery }}{%
-              endif %}{% if keg.abv %} · {{ keg.abv }}% ABV{% endif %}
+              Type: {{ keg.type or '—' }}
             </p>
+            <p class="muted">
+              Beer: {{ beer_brewer or keg.brewery or '—' }}{% if beer_abv or
+              keg.abv %} · {{ beer_abv or keg.abv }}% ABV{% endif %}{% if
+              beer_ibu %} · {{ beer_ibu }} IBU{% endif %}
+            </p>
+            {% if beer_brewed_on %}
+            <p class="muted">Brewed: {{ beer_brewed_on }}</p>
+            {% endif %}
             <p class="muted">
               {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{
               keg.size or '' }}{% endif %}
+            </p>
+            <p class="muted">
+              Volume: {% if keg.current_volume is not none %}{{ keg.current_volume
+              }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
             </p>
             {% else %}
             <p class="no-keg">— No keg assigned —</p>
@@ -247,7 +325,7 @@
       </div>
 
       <!-- Bar Stock -->
-      {% if bar_stock %}
+      {% if settings.bar_stock_enabled and bar_stock %}
       <div class="section-title">📦 Bar Stock</div>
       <div class="stock-grid">
         {% for item in bar_stock %}

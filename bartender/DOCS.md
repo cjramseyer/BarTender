@@ -6,11 +6,30 @@ Manage your home bar with a web UI built into Home Assistant.
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
-- **Keg Management** — Track kegs by name, brewery, ABV, size, and lifecycle status
+- **Keg Management** — Track kegs by name, type, brewer, ABV/IBU, brewed date, volume, and lifecycle status
 - **Tap Management** — Assign kegs to numbered, labelled tap lines
-- **Data Export** — Export all data as JSON or CSV
+- **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
-- **Settings** — Bar name, measurement system (US / metric), and theme (light / dark)
+- **Settings** — Bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position
+- **Pour Workflow** — Track pours and automatically decrement current keg volume
+
+## Recent Changes
+
+- Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
+- Added backup restore support with import preview and explicit `replace`/`merge` modes.
+- Added portable versioned JSON backup export (`GET /api/export/json`).
+- Added ZIP archive backup export (`GET /api/export/archive`) and kept `GET /api/export/csv` as a legacy alias.
+- Added JSON and ZIP import endpoints:
+  - `POST /api/import/json/preview`
+  - `POST /api/import/json`
+  - `POST /api/import/archive/preview`
+  - `POST /api/import/archive`
+- Added default name auto-increment in UI for new kegs (`Keg N`) and new taps (`Tap N`).
+- Added keg full-status validation: kegs marked `full` must include name and beer details.
+- Added stricter keg lifecycle rules:
+  - only one line-cleaning keg can exist at a time
+  - cleaning status can only transition back to empty (clean)
+  - previously filled kegs that reach empty transition to cleaning
 
 ## Configuration
 
