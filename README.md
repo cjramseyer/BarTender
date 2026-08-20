@@ -36,16 +36,16 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - Added portable versioned JSON backup export (`GET /api/export/json`).
 - Added ZIP archive backup export (`GET /api/export/archive`) and kept `GET /api/export/csv` as a legacy alias.
 - Added JSON and ZIP import endpoints:
-	- `POST /api/import/json/preview`
-	- `POST /api/import/json`
-	- `POST /api/import/archive/preview`
-	- `POST /api/import/archive`
+  - `POST /api/import/json/preview`
+  - `POST /api/import/json`
+  - `POST /api/import/archive/preview`
+  - `POST /api/import/archive`
 - Added default name auto-increment in UI for new kegs (`Keg N`) and new taps (`Tap N`).
 - Added keg full-status validation: kegs marked `full` must include name and beer details.
 - Added stricter keg lifecycle rules:
-	- only one line-cleaning keg can exist at a time
-	- cleaning status can only transition back to empty (clean)
-	- previously filled kegs that reach empty transition to cleaning
+  - only one line-cleaning keg can exist at a time
+  - cleaning status can only transition back to empty (clean)
+  - previously filled kegs that reach empty transition to cleaning
 
 ## Installation
 
@@ -66,31 +66,31 @@ No required configuration. Optional options can be set in the add-on configurati
 
 The add-on exposes a JSON REST API at the ingress URL.
 
-| Method | Endpoint              | Description                           |
-| ------ | --------------------- | ------------------------------------- |
-| GET    | `/api/settings`       | Get current settings                  |
-| POST   | `/api/settings`       | Update settings                       |
-| GET    | `/api/stock`          | List all bar stock items              |
-| POST   | `/api/stock`          | Add a stock item                      |
-| PUT    | `/api/stock/<id>`     | Update a stock item                   |
-| DELETE | `/api/stock/<id>`     | Delete a stock item                   |
-| GET    | `/api/kegs`           | List all kegs                         |
-| POST   | `/api/kegs`           | Add a keg                             |
-| PUT    | `/api/kegs/<id>`      | Update a keg                          |
-| POST   | `/api/kegs/<id>/fill` | Fill/refill a keg                     |
-| POST   | `/api/kegs/<id>/pour` | Record a pour and reduce current volume |
-| DELETE | `/api/kegs/<id>`      | Delete a keg                          |
-| GET    | `/api/taps`           | List all taps                         |
-| POST   | `/api/taps`           | Add a tap                             |
-| PUT    | `/api/taps/<id>`      | Update a tap                          |
-| DELETE | `/api/taps/<id>`      | Delete a tap                          |
-| GET    | `/api/export/json`    | Export portable versioned JSON backup |
-| GET    | `/api/export/archive` | Export ZIP archive backup             |
-| GET    | `/api/export/csv`     | Legacy alias for archive ZIP export   |
+| Method | Endpoint                      | Description                                      |
+| ------ | ----------------------------- | ------------------------------------------------ |
+| GET    | `/api/settings`               | Get current settings                             |
+| POST   | `/api/settings`               | Update settings                                  |
+| GET    | `/api/stock`                  | List all bar stock items                         |
+| POST   | `/api/stock`                  | Add a stock item                                 |
+| PUT    | `/api/stock/<id>`             | Update a stock item                              |
+| DELETE | `/api/stock/<id>`             | Delete a stock item                              |
+| GET    | `/api/kegs`                   | List all kegs                                    |
+| POST   | `/api/kegs`                   | Add a keg                                        |
+| PUT    | `/api/kegs/<id>`              | Update a keg                                     |
+| POST   | `/api/kegs/<id>/fill`         | Fill/refill a keg                                |
+| POST   | `/api/kegs/<id>/pour`         | Record a pour and reduce current volume          |
+| DELETE | `/api/kegs/<id>`              | Delete a keg                                     |
+| GET    | `/api/taps`                   | List all taps                                    |
+| POST   | `/api/taps`                   | Add a tap                                        |
+| PUT    | `/api/taps/<id>`              | Update a tap                                     |
+| DELETE | `/api/taps/<id>`              | Delete a tap                                     |
+| GET    | `/api/export/json`            | Export portable versioned JSON backup            |
+| GET    | `/api/export/archive`         | Export ZIP archive backup                        |
+| GET    | `/api/export/csv`             | Legacy alias for archive ZIP export              |
 | POST   | `/api/import/archive/preview` | Preview archive import result (replace or merge) |
-| POST   | `/api/import/archive` | Import ZIP archive backup (replace or merge) |
-| POST   | `/api/import/json/preview` | Preview JSON import result (replace or merge) |
-| POST   | `/api/import/json`    | Import JSON backup (replace or merge) |
+| POST   | `/api/import/archive`         | Import ZIP archive backup (replace or merge)     |
+| POST   | `/api/import/json/preview`    | Preview JSON import result (replace or merge)    |
+| POST   | `/api/import/json`            | Import JSON backup (replace or merge)            |
 
 Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
 

@@ -118,8 +118,10 @@ Restore workflow:
 1. Open Settings -> Import Data.
 2. Select .json or .zip backup file.
 3. Choose import mode:
-  - replace: overwrite all current data
-  - merge: upsert imported records by id
+
+- replace: overwrite all current data
+- merge: upsert imported records by id
+
 4. Review preview counts, confirm, and import.
 
 ## Quick API Smoke Test

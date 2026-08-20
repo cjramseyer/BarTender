@@ -20,16 +20,16 @@ Manage your home bar with a web UI built into Home Assistant.
 - Added portable versioned JSON backup export (`GET /api/export/json`).
 - Added ZIP archive backup export (`GET /api/export/archive`) and kept `GET /api/export/csv` as a legacy alias.
 - Added JSON and ZIP import endpoints:
-	- `POST /api/import/json/preview`
-	- `POST /api/import/json`
-	- `POST /api/import/archive/preview`
-	- `POST /api/import/archive`
+  - `POST /api/import/json/preview`
+  - `POST /api/import/json`
+  - `POST /api/import/archive/preview`
+  - `POST /api/import/archive`
 - Added default name auto-increment in UI for new kegs (`Keg N`) and new taps (`Tap N`).
 - Added keg full-status validation: kegs marked `full` must include name and beer details.
 - Added stricter keg lifecycle rules:
-	- only one line-cleaning keg can exist at a time
-	- cleaning status can only transition back to empty (clean)
-	- previously filled kegs that reach empty transition to cleaning
+  - only one line-cleaning keg can exist at a time
+  - cleaning status can only transition back to empty (clean)
+  - previously filled kegs that reach empty transition to cleaning
 
 ## Configuration
 
