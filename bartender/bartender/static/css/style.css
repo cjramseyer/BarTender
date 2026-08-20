@@ -715,6 +715,25 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   margin-bottom: 0;
 }
 
+.settings-url-link {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.settings-url-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-url-row .settings-url-link {
+  flex: 1;
+  min-width: 220px;
+}
+
 @media (min-width: 980px) {
   .settings-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

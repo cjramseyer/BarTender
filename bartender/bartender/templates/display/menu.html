@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="60" />
+    <title>{{ settings.bar_name }} - Read-Only Menu</title>
+    <style>
+      :root {
+        --bg: #f5f6fa;
+        --surface: #ffffff;
+        --border: #d0d5e0;
+        --text: #1a1d27;
+        --text-muted: #6b7280;
+        --nav-bg: #1e2333;
+        --badge-full: #22c55e;
+        --badge-in_use: #3b82f6;
+        --badge-empty: #9ca3af;
+        --badge-cleaning: #f59e0b;
+        --badge-retired: #6b7280;
+        --radius: 8px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+      [data-theme="dark"] {
+        --bg: #111318;
+        --surface: #1e2333;
+        --border: #2e3550;
+        --text: #e8eaf2;
+        --text-muted: #9499b0;
+        --nav-bg: #0e1018;
+        --badge-full: #16a34a;
+        --badge-in_use: #2563eb;
+        --badge-empty: #4b5563;
+        --badge-cleaning: #d97706;
+        --badge-retired: #4b5563;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        background: var(--nav-bg);
+        color: #fff;
+        padding: 1rem 1.5rem;
+      }
+      header h1 {
+        font-size: 1.4rem;
+      }
+      header .subtitle {
+        font-size: 0.82rem;
+        opacity: 0.7;
+      }
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 1.5rem 1.25rem 2rem;
+      }
+      .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.9rem;
+      }
+      .menu-item {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem;
+        box-shadow: var(--shadow);
+      }
+      .menu-item-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.45rem;
+      }
+      .menu-item-header h2 {
+        font-size: 1.05rem;
+      }
+      .menu-item-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        text-transform: capitalize;
+        color: #fff;
+      }
+      .badge-full { background: var(--badge-full); }
+      .badge-in_use { background: var(--badge-in_use); }
+      .badge-empty { background: var(--badge-empty); color: #374151; }
+      .badge-cleaning { background: var(--badge-cleaning); }
+      .badge-retired { background: var(--badge-retired); }
+      .muted {
+        color: var(--text-muted);
+        font-size: 0.87rem;
+        margin-bottom: 0.25rem;
+      }
+      .actions {
+        margin-top: 1rem;
+      }
+      .btn {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        border-radius: var(--radius);
+        padding: 0.45rem 0.8rem;
+        cursor: pointer;
+      }
+      @media print {
+        .actions {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>{{ settings.bar_name }}</h1>
+      <div class="subtitle">Read-Only Menu · auto-refreshes every 60 s</div>
+    </header>
+
+    <main class="container">
+      {% if on_tap %}
+      <div class="menu-grid">
+        {% for entry in on_tap %}
+        {% set tap = entry.tap %}
+        {% set keg = entry.keg %}
+        {% set fill_pct = entry.fill_pct %}
+        {% set brewer = keg.beer_brewer or keg.brewery %}
+        {% set abv = keg.beer_abv or keg.abv %}
+        <article class="menu-item">
+          <div class="menu-item-header">
+            <h2>Tap {{ tap.number }}</h2>
+            <span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span>
+          </div>
+          <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
+          <p class="muted">Type: {{ keg.type or '—' }}</p>
+          <p class="muted">Brewer: {{ brewer or '—' }}</p>
+          <p class="muted">ABV: {{ abv or '—' }}{% if abv %}%{% endif %}</p>
+          <p class="muted">IBU: {{ keg.beer_ibu or '—' }}</p>
+          <p class="muted">Fill: {{ fill_pct }}%</p>
+          <p class="muted">Volume: {% if keg.current_volume is not none %}{{ keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No kegs are currently assigned to taps.</p>
+      {% endif %}
+
+      <div class="actions">
+        <button class="btn" onclick="window.print()">Print Menu</button>
+      </div>
+    </main>
+  </body>
+</html>

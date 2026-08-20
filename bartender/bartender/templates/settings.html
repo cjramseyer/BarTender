@@ -4,20 +4,44 @@ content %}
 
 <div class="settings-grid">
 <div class="card settings-card">
-  <h2>📺 Display URL</h2>
-  <p class="muted">Use this URL for your read-only display board.</p>
-  <p>
-    <a href="{{ ingress }}/display" target="_blank" rel="noopener noreferrer"
+  <h2>📺 Read-Only External URLs</h2>
+  <p class="muted">Use these external links for read-only access (served from port {{ display_port }}).</p>
+  <p class="muted" style="margin-top: 0.35rem">Display URL</p>
+  <div class="settings-url-row">
+    <a
+      id="externalDisplayUrl"
+      class="settings-url-link"
+      href="{{ ingress }}/display"
+      target="_blank"
+      rel="noopener noreferrer"
       >{{ ingress }}/display</a
     >
-  </p>
-  <h2 style="margin-top: 1.25rem">🧾 Printable Menu URL</h2>
-  <p class="muted">Use this URL for a printable "currently on tap" menu.</p>
-  <p>
-    <a href="{{ ingress }}/menu" target="_blank" rel="noopener noreferrer"
+    <button
+      type="button"
+      class="btn btn-sm btn-secondary"
+      onclick="copyExternalUrl('externalDisplayUrl', this)"
+    >
+      Copy
+    </button>
+  </div>
+  <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
+  <div class="settings-url-row">
+    <a
+      id="externalMenuUrl"
+      class="settings-url-link"
+      href="{{ ingress }}/menu"
+      target="_blank"
+      rel="noopener noreferrer"
       >{{ ingress }}/menu</a
     >
-  </p>
+    <button
+      type="button"
+      class="btn btn-sm btn-secondary"
+      onclick="copyExternalUrl('externalMenuUrl', this)"
+    >
+      Copy
+    </button>
+  </div>
   <p class="muted" style="margin-top: 0.35rem">
     QR Status:
     {% if qr_ready %}
@@ -237,7 +261,53 @@ content %}
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const DISPLAY_PORT = "{{ display_port }}";
   const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
+
+  function initExternalReadonlyLinks() {
+    try {
+      const url = new URL(window.location.href);
+      url.port = DISPLAY_PORT;
+      url.pathname = "/";
+      url.search = "";
+      url.hash = "";
+
+      const displayHref = url.toString();
+      url.pathname = "/menu";
+      const menuHref = url.toString();
+
+      const displayLink = document.getElementById("externalDisplayUrl");
+      const menuLink = document.getElementById("externalMenuUrl");
+      if (displayLink) {
+        displayLink.href = displayHref;
+        displayLink.textContent = displayHref;
+      }
+      if (menuLink) {
+        menuLink.href = menuHref;
+        menuLink.textContent = menuHref;
+      }
+    } catch (err) {
+      console.warn("Unable to build external read-only URLs", err);
+    }
+  }
+
+  async function copyExternalUrl(linkId, btn) {
+    const link = document.getElementById(linkId);
+    if (!link) return;
+    const text = link.textContent || link.href;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(() => {
+        btn.textContent = original;
+      }, 1200);
+    } catch (err) {
+      console.error("Copy failed", err);
+      alert("Unable to copy URL on this browser.");
+    }
+  }
 
   function createPourOptionRow(option = {}) {
     const row = document.createElement("div");
@@ -303,6 +373,7 @@ content %}
   }
 
   loadPourOptions();
+  initExternalReadonlyLinks();
 
   async function saveSettings(e) {
     e.preventDefault();

@@ -29,6 +29,7 @@ from flask import (
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
 INGRESS_PATH = os.environ.get("INGRESS_PATH", "")
+DISPLAY_PORT = os.environ.get("DISPLAY_PORT", "8100")
 
 app = Flask(__name__)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
@@ -546,6 +547,7 @@ def settings():
         settings=data["settings"],
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
+        display_port=DISPLAY_PORT,
         ingress=INGRESS_PATH,
     )
 
