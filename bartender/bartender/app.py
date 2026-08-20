@@ -8,6 +8,14 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    import qrcode
+
+    QR_IMPORT_ERROR = ""
+except Exception as exc:  # pragma: no cover - environment-specific import failure
+    qrcode = None
+    QR_IMPORT_ERROR = str(exc)
+
 from flask import (
     Flask,
     render_template,
@@ -38,6 +46,7 @@ DEFAULT_DATA = {
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
+        "menu_qr_mode": "both",
         "pour_options": [
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
             {"name": "Pint", "amount": 16, "unit": "oz"},
@@ -84,6 +93,9 @@ def load_data() -> dict:
         data["settings"]["bar_stock_enabled"] = _coerce_bool(
             data["settings"].get("bar_stock_enabled"),
             True,
+        )
+        data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
+            data["settings"].get("menu_qr_mode")
         )
         data["settings"]["pour_options"] = _normalize_pour_options(
             data["settings"].get("pour_options"),
@@ -158,6 +170,17 @@ def _coerce_bool(value, default: bool = True) -> bool:
 
 def _bar_stock_enabled(data: dict) -> bool:
     return _coerce_bool(data.get("settings", {}).get("bar_stock_enabled"), True)
+
+
+def _normalize_menu_qr_mode(value) -> str:
+    mode = str(value or "both").strip().lower()
+    if mode in ("off", "display", "print", "both"):
+        return mode
+    return "both"
+
+
+def _qr_is_available() -> bool:
+    return qrcode is not None
 
 
 def _line_cleaning_keg_conflict(data: dict, candidate_id=None) -> bool:
@@ -481,6 +504,8 @@ def settings():
     return render_template(
         "settings.html",
         settings=data["settings"],
+        qr_ready=_qr_is_available(),
+        qr_error=QR_IMPORT_ERROR,
         ingress=INGRESS_PATH,
     )
 
@@ -494,6 +519,109 @@ def display_view():
         taps=data["taps"],
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
+    )
+
+
+@app.route("/menu")
+def menu_view():
+    data = load_data()
+    kegs_by_id = {
+        keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
+    }
+
+    on_tap = []
+    for tap in sorted(
+        data.get("taps", []),
+        key=lambda t: (t.get("number") is None, t.get("number", 0), t.get("id", 0)),
+    ):
+        keg_id = tap.get("keg_id")
+        if keg_id is None:
+            continue
+        keg = kegs_by_id.get(keg_id)
+        if not keg:
+            continue
+        fill_pct = _clamp_percent_full(
+            keg.get("percent_full"),
+            _default_percent_for_status(keg.get("status", "empty")),
+        )
+        on_tap.append({
+            "tap": tap,
+            "keg": keg,
+            "fill_pct": fill_pct,
+        })
+
+    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
+    qr_ready = _qr_is_available()
+    return render_template(
+        "menu.html",
+        settings=data["settings"],
+        on_tap=on_tap,
+        menu_path=menu_path,
+        qr_image_path=qr_image_path,
+        menu_qr_mode=menu_qr_mode,
+        qr_ready=qr_ready,
+        qr_error=QR_IMPORT_ERROR,
+        ingress=INGRESS_PATH,
+    )
+
+
+@app.route("/api/menu/qr")
+def api_menu_qr():
+    if not _qr_is_available():
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "QR generation dependencies are not installed.",
+                    "hint": "Install requirements with: pip install -r requirements.txt",
+                    "details": QR_IMPORT_ERROR,
+                }
+            ),
+            503,
+        )
+
+    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    menu_url = f"{request.host_url.rstrip('/')}{menu_path}"
+
+    qr = qrcode.QRCode(box_size=8, border=2)
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    out.seek(0)
+    return send_file(
+        out,
+        mimetype="image/png",
+        as_attachment=False,
+        download_name="bartender_menu_qr.png",
+    )
+
+
+@app.route("/api/menu/qr/health")
+def api_menu_qr_health():
+    if _qr_is_available():
+        return jsonify(
+            {
+                "ok": True,
+                "qr_ready": True,
+            }
+        )
+
+    return (
+        jsonify(
+            {
+                "ok": False,
+                "qr_ready": False,
+                "error": "QR generation dependencies are not installed.",
+                "hint": "Install requirements with: pip install -r requirements.txt",
+                "details": QR_IMPORT_ERROR,
+            }
+        ),
+        503,
     )
 
 
@@ -518,6 +646,7 @@ def api_save_settings():
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
+        "menu_qr_mode",
         "pour_options",
     }
     for key in allowed:
@@ -544,6 +673,9 @@ def api_save_settings():
     data["settings"]["default_keg_type"] = str(
         data["settings"].get("default_keg_type", "")
     ).strip()
+    data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
+        data["settings"].get("menu_qr_mode")
+    )
     data["settings"]["pour_options"] = _normalize_pour_options(
         data["settings"].get("pour_options"),
         data["settings"].get("measurement", "us"),

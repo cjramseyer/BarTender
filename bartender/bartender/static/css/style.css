@@ -691,9 +691,24 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 
 /* Settings */
-.settings-card {
-  max-width: 560px;
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
 }
+
+.settings-card {
+  max-width: none;
+  margin-bottom: 0;
+}
+
+@media (min-width: 980px) {
+  .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
 .export-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -713,4 +728,126 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 small.muted {
   font-size: 0.78rem;
+}
+
+/* Printable menu */
+.menu-container {
+  max-width: 920px;
+}
+
+.menu-header {
+  margin-bottom: 1rem;
+}
+
+.menu-header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.9rem;
+}
+
+.menu-item {
+  margin-bottom: 0;
+}
+
+.menu-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.menu-item-header h2 {
+  margin-bottom: 0;
+  font-size: 1.05rem;
+}
+
+.menu-item-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.menu-qr-block {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.menu-qr-image {
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.menu-warning-block {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #d97706;
+  border-radius: var(--radius);
+  background: #fff7ed;
+}
+
+[data-theme="dark"] .menu-warning-block {
+  border-color: #f59e0b;
+  background: #3b2a10;
+}
+
+.settings-warning-block {
+  border: 1px solid #d97706;
+  border-radius: var(--radius);
+  background: #fff7ed;
+  padding: 0.8rem 0.9rem;
+}
+
+[data-theme="dark"] .settings-warning-block {
+  border-color: #f59e0b;
+  background: #3b2a10;
+}
+
+.menu-screen-actions {
+  margin-top: 1.2rem;
+}
+
+.qr-print-only {
+  display: none;
+}
+
+@media print {
+  .navbar,
+  .no-print,
+  .btn {
+    display: none !important;
+  }
+
+  .container,
+  .menu-container {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .card,
+  .menu-qr-block {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .qr-display-only {
+    display: none !important;
+  }
+
+  .qr-print-only {
+    display: flex !important;
+  }
 }

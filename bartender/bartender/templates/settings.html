@@ -1,6 +1,33 @@
 {% extends "base.html" %} {% block title %}Settings{% endblock %} {% block
 content %}
 <h1>⚙ Settings</h1>
+
+<div class="settings-grid">
+<div class="card settings-card">
+  <h2>📺 Display URL</h2>
+  <p class="muted">Use this URL for your read-only display board.</p>
+  <p>
+    <a href="{{ ingress }}/display" target="_blank" rel="noopener noreferrer"
+      >{{ ingress }}/display</a
+    >
+  </p>
+  <h2 style="margin-top: 1.25rem">🧾 Printable Menu URL</h2>
+  <p class="muted">Use this URL for a printable "currently on tap" menu.</p>
+  <p>
+    <a href="{{ ingress }}/menu" target="_blank" rel="noopener noreferrer"
+      >{{ ingress }}/menu</a
+    >
+  </p>
+  <p class="muted" style="margin-top: 0.35rem">
+    QR Status:
+    {% if qr_ready %}
+    <strong style="color: #15803d">Ready</strong>
+    {% else %}
+    <strong style="color: #b45309">Unavailable</strong>
+    {% endif %}
+  </p>
+</div>
+
 <div class="card settings-card">
   <form id="settingsForm" onsubmit="saveSettings(event)">
     <div class="form-group">
@@ -112,6 +139,33 @@ content %}
         Enable Bar Stock Feature
       </label>
     </div>
+    {% if qr_ready %}
+    <div class="form-group">
+      <label>Printable Menu QR Code</label>
+      <select id="menuQrMode" class="form-control">
+        <option value="off" {% if (settings.menu_qr_mode or 'both') == 'off' %}selected{% endif %}>Off</option>
+        <option value="display" {% if (settings.menu_qr_mode or 'both') == 'display' %}selected{% endif %}>Display only</option>
+        <option value="print" {% if (settings.menu_qr_mode or 'both') == 'print' %}selected{% endif %}>Print only</option>
+        <option value="both" {% if (settings.menu_qr_mode or 'both') == 'both' %}selected{% endif %}>Display and print</option>
+      </select>
+      <small class="muted">
+        Controls where the QR code appears on the printable menu page.
+      </small>
+    </div>
+    {% else %}
+    <div class="form-group settings-warning-block">
+      <label>Printable Menu QR Code</label>
+      <p class="muted" style="margin-top: 0.35rem">
+        QR options are unavailable on this system.
+      </p>
+      <p class="muted" style="margin-top: 0.25rem">
+        Install requirements to enable QR generation: <code>pip install -r requirements.txt</code>
+      </p>
+      {% if qr_error %}
+      <p class="muted" style="margin-top: 0.25rem">Details: {{ qr_error }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
     <div class="form-group">
       <label>Pour Amount Presets</label>
       <small class="muted">
@@ -179,6 +233,7 @@ content %}
     </div>
   </form>
 </div>
+ </div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
@@ -270,6 +325,11 @@ content %}
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
       pour_options: collectPourOptions(),
     };
+
+    const menuQrModeInput = document.getElementById("menuQrMode");
+    if (menuQrModeInput) {
+      body.menu_qr_mode = menuQrModeInput.value;
+    }
     try {
       const res = await fetch(`${INGRESS}/api/settings`, {
         method: "POST",
