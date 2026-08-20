@@ -10,7 +10,8 @@ Manage your home bar with a web UI built into Home Assistant.
 - **Tap Management** — Assign kegs to numbered, labelled tap lines
 - **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
-- **Settings** — Bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position
+- **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
+- **Settings** — Bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position, and printable menu QR mode
 - **Pour Workflow** — Track pours and automatically decrement current keg volume
 
 ## Recent Changes
@@ -30,6 +31,8 @@ Manage your home bar with a web UI built into Home Assistant.
   - only one line-cleaning keg can exist at a time
   - cleaning status can only transition back to empty (clean)
   - previously filled kegs that reach empty transition to cleaning
+- Added printable menu route (`GET /menu`) and runtime QR generation endpoint (`GET /api/menu/qr`).
+- Added QR health endpoint (`GET /api/menu/qr/health`) and settings control for display/print behavior.
 
 ## Configuration
 

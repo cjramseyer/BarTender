@@ -1,6 +1,6 @@
 # BarTender Getting Started Guide
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 Audience: first-time users
 
 ## Quick Setup
@@ -19,6 +19,7 @@ Open Settings in BarTender UI and set:
 - Default Keg Type (optional)
 - Measurement (us or metric)
 - Theme (light or dark)
+- Printable Menu QR Mode (off, display, print, or both)
 
 Recommended defaults:
 
@@ -89,6 +90,13 @@ Auto-fill behavior note:
 
 - Check dashboard and taps page for current assignment.
 - Open display service if using a wallboard.
+
+### Step 6: Verify Printable Menu
+
+- Open /menu from the top navigation.
+- Confirm currently assigned taps and keg details are visible.
+- If QR mode is enabled, verify the QR image loads.
+- If QR is unavailable, install dependencies and restart runtime.
 
 ## Common Pitfalls
 

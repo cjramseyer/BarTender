@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ settings.bar_name }} - Printable Menu</title>
+    <link rel="stylesheet" href="{{ ingress }}/static/css/style.css" />
+  </head>
+  <body class="print-menu-page">
+    <main class="container menu-container">
+      <div class="menu-header">
+        <h1>{{ settings.bar_name }}</h1>
+        <p class="muted">Currently on Tap</p>
+      </div>
+
+      {% if menu_qr_mode != 'off' and qr_ready %}
+      <section
+        class="menu-qr-block {% if menu_qr_mode == 'display' %}qr-display-only{% elif menu_qr_mode == 'print' %}qr-print-only{% endif %}"
+      >
+        <img
+          src="{{ qr_image_path }}"
+          alt="QR code for printable menu"
+          class="menu-qr-image"
+        />
+        <div>
+          <strong>Scan for this menu</strong>
+          <p class="muted">
+            <a href="{{ menu_path }}" target="_blank" rel="noopener noreferrer"
+              >{{ menu_path }}</a
+            >
+          </p>
+        </div>
+      </section>
+      {% elif menu_qr_mode != 'off' and not qr_ready %}
+      <section class="menu-warning-block no-print">
+        <strong>QR code unavailable on this system</strong>
+        <p class="muted">
+          Install requirements to enable QR generation: <code>pip install -r requirements.txt</code>
+        </p>
+        {% if qr_error %}
+        <p class="muted">Details: {{ qr_error }}</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if on_tap %}
+      <div class="menu-grid">
+        {% for entry in on_tap %}
+        {% set tap = entry.tap %}
+        {% set keg = entry.keg %}
+        {% set fill_pct = entry.fill_pct %}
+        {% set brewer = keg.beer_brewer or keg.brewery %}
+        {% set abv = keg.beer_abv or keg.abv %}
+        <article class="menu-item card">
+          <div class="menu-item-header">
+            <h2>Tap {{ tap.number }}</h2>
+            <span class="badge badge-{{ keg.status }}"
+              >{{ keg.status | replace('_', ' ') | title }}</span
+            >
+          </div>
+
+          <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
+          <p class="muted">Type: {{ keg.type or '—' }}</p>
+          <p class="muted">Brewer: {{ brewer or '—' }}</p>
+          <p class="muted">ABV: {{ abv or '—' }}{% if abv %}%{% endif %}</p>
+          <p class="muted">IBU: {{ keg.beer_ibu or '—' }}</p>
+          <p class="muted">Fill: {{ fill_pct }}%</p>
+          <p class="muted">
+            Volume: {% if keg.current_volume is not none %}{{ keg.current_volume }} {{
+            keg.volume_unit or '—' }}{% else %}—{% endif %}
+          </p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No kegs are currently assigned to taps.</p>
+      {% endif %}
+
+      <div class="menu-screen-actions no-print">
+        <button class="btn btn-primary" onclick="window.print()">Print Menu</button>
+      </div>
+    </main>
+  </body>
+</html>

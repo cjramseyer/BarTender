@@ -12,7 +12,7 @@ content %}
       else 50 if keg and keg.status == 'in_use' else 0) %}
       <li class="tap-item">
         <span class="tap-number">Tap {{ tap.number }}</span>
-        <span class="tap-label">{{ tap.label or '—' }}</span>
+        <span class="tap-label">{{ keg.name if keg else '—' }}</span>
         {% if keg %}
         {% set dashboard_status = 'in_use' if tap.keg_id else keg.status %}
         <div
@@ -52,6 +52,13 @@ content %}
 
   <div class="card">
     <h2>🛢 Kegs ({{ kegs | length }})</h2>
+    {% set connected_keg_ids = taps | map(attribute='keg_id') | reject('equalto', none) | list %}
+    {% set in_use_count = namespace(value=0) %}
+    {% for keg in kegs %}
+      {% if keg.id in connected_keg_ids or keg.status == 'cleaning' %}
+        {% set in_use_count.value = in_use_count.value + 1 %}
+      {% endif %}
+    {% endfor %}
     <div class="stat-row">
       <div class="stat">
         <span class="stat-value"
@@ -60,9 +67,7 @@ content %}
         ><span class="stat-label">Full</span>
       </div>
       <div class="stat">
-        <span class="stat-value"
-          >{{ kegs | selectattr('status', 'equalto', 'in_use') | list | length
-          }}</span
+        <span class="stat-value">{{ in_use_count.value }}</span
         ><span class="stat-label">In Use</span>
       </div>
       <div class="stat">

@@ -68,6 +68,25 @@
       {% endif %}
     </div>
     <div class="tap-card-footer">
+      {% if keg and keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
+      {% set pour_options = settings.pour_options if settings.pour_options is defined else [] %}
+      {% if pour_options %}
+      <select id="tapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
+        {% for option in pour_options %}
+        <option
+          value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"
+        >
+          {{ option.name }} ({{ option.amount }} {{ option.unit }})
+        </option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm btn-secondary" onclick="pourTap({{ tap.id }})">
+        Pour
+      </button>
+      {% else %}
+      <span class="muted">Configure pour options in Settings.</span>
+      {% endif %}
+      {% endif %}
       <button
         class="btn btn-sm btn-secondary"
         onclick="editTap({{ tap | tojson | forceescape }})"
@@ -145,6 +164,41 @@
 <script>
   const INGRESS = "{{ ingress }}";
   const TAPS = {{ taps | tojson }};
+
+  async function pourTap(tapId) {
+    const select = document.getElementById(`tapPourPreset-${tapId}`);
+    if (!select) {
+      alert("No pour options are configured for this tap.");
+      return;
+    }
+
+    const [amountText, unit, presetName] = String(select.value).split("|");
+    const amount = parseFloat(amountText);
+    if (Number.isNaN(amount) || amount <= 0) {
+      alert("Selected pour amount is invalid.");
+      return;
+    }
+
+    const response = await fetch(`${INGRESS}/api/taps/${tapId}/pour`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, unit, preset_name: presetName || "" }),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to record pour.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) message = errorBody.error;
+      } catch (err) {
+        // Ignore parse errors and keep fallback message.
+      }
+      alert(message);
+      return;
+    }
+
+    location.reload();
+  }
 
   function nextIncrementedTapLabel() {
     const regex = /^tap\s+(\d+)$/i;
