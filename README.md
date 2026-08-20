@@ -27,6 +27,7 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
+- **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
 - **Ingress** — Runs behind the Home Assistant ingress proxy; no port exposure required
 
 ## Recent Changes
@@ -46,6 +47,9 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
   - only one line-cleaning keg can exist at a time
   - cleaning status can only transition back to empty (clean)
   - previously filled kegs that reach empty transition to cleaning
+- Added printable menu route (`GET /menu`) showing currently assigned taps and keg details.
+- Added runtime QR generation for printable menu (`GET /api/menu/qr`) with health endpoint (`GET /api/menu/qr/health`).
+- Added `menu_qr_mode` setting (`off|display|print|both`) to control QR visibility on screen and print output.
 
 ## Installation
 
@@ -91,6 +95,8 @@ The add-on exposes a JSON REST API at the ingress URL.
 | POST   | `/api/import/archive`         | Import ZIP archive backup (replace or merge)     |
 | POST   | `/api/import/json/preview`    | Preview JSON import result (replace or merge)    |
 | POST   | `/api/import/json`            | Import JSON backup (replace or merge)            |
+| GET    | `/api/menu/qr`                | Generate printable menu QR code PNG              |
+| GET    | `/api/menu/qr/health`         | Check runtime QR dependency readiness            |
 
 Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
 

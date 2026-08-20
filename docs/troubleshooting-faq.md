@@ -1,6 +1,6 @@
 # BarTender Troubleshooting and FAQ
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 ## Troubleshooting
 
@@ -59,6 +59,15 @@ Checks:
 - Try archive export: /api/export/archive
 - Confirm browser pop-up/download policies are not blocking files.
 
+### Printable menu QR does not render
+
+Checks:
+
+- Open GET /api/menu/qr/health and verify it returns ok=true.
+- If it returns 503, install runtime dependencies from requirements.txt.
+- Restart the add-on/runtime after dependency install.
+- Reopen /menu and confirm QR mode in Settings is not set to off.
+
 ### Import fails or preview is incorrect
 
 Checks:
@@ -87,6 +96,9 @@ A: full, in_use, empty, cleaning, retired.
 
 Q: Is mobile app read/write?
 A: Current mobile app is read-only.
+
+Q: Why does the printable menu show "QR unavailable"?
+A: QR dependencies are missing in the running environment. Install requirements and restart, then recheck /api/menu/qr/health.
 
 ## Escalation Path
 
