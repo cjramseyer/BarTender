@@ -272,6 +272,8 @@ POST /api/kegs/<id>/pour
 
 - Behavior:
   - current_volume is updated atomically
+  - percent_full is reduced proportionally whenever a pour is recorded
+  - first successful pour on a full keg transitions status to in_use
   - when volume reaches zero, status becomes cleaning if keg was previously filled; otherwise empty
 
 ### Taps
@@ -316,6 +318,31 @@ DELETE /api/taps/<id>
 ```json
 { "ok": true }
 ```
+
+POST /api/taps/<id>/pour
+
+- Records a pour against the keg assigned to a tap.
+- Request body:
+
+```json
+{
+  "amount": 16,
+  "unit": "oz",
+  "preset_name": "Pint"
+}
+```
+
+- Validation:
+  - tap must exist
+  - tap must have an assigned keg
+  - amount must be greater than zero
+  - keg current_volume must be set and greater than zero
+  - unsupported unit conversions are rejected
+
+- Behavior:
+  - delegates to keg pour logic
+  - updates both current_volume and percent_full
+  - applies the same status transitions as keg pour
 
 ### Export
 
@@ -409,6 +436,8 @@ settings fields:
 - dashboard_manage_button_position: string (top-right, bottom-left, bottom-right)
 - bar_stock_enabled: boolean
 - default_keg_type: string
+- menu_qr_mode: string (off, display, print, both)
+- pour_options: array of preset objects (name, amount, unit)
 
 bar_stock item fields:
 
@@ -446,6 +475,7 @@ keg fields:
 Backward compatibility:
 
 - Incoming legacy purchased_date values are mapped to filled_date.
+- When current_volume is edited directly and percent_full is omitted, percent_full is auto-scaled to match the new volume.
 
 tap fields:
 

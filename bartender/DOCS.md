@@ -33,6 +33,9 @@ Manage your home bar with a web UI built into Home Assistant.
   - previously filled kegs that reach empty transition to cleaning
 - Added printable menu route (`GET /menu`) and runtime QR generation endpoint (`GET /api/menu/qr`).
 - Added QR health endpoint (`GET /api/menu/qr/health`) and settings control for display/print behavior.
+- Added dashboard tap pour controls with preset selection.
+- Updated pour behavior so pouring adjusts both `current_volume` and `percent_full`, with automatic `full` to `in_use` transition on first pour.
+- Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
 
 ## Configuration
 
