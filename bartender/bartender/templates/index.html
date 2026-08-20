@@ -12,7 +12,7 @@ content %}
       else 50 if keg and keg.status == 'in_use' else 0) %}
       <li class="tap-item">
         <span class="tap-number">Tap {{ tap.number }}</span>
-        <span class="tap-label">{{ keg.name if keg else '—' }}</span>
+        <span class="tap-label">{{ keg.name if keg else (tap.label or ('Tap ' ~ tap.number)) }}</span>
         {% if keg %}
         {% set dashboard_status = 'in_use' if tap.keg_id else keg.status %}
         <div
@@ -26,7 +26,7 @@ content %}
           <span class="tap-keg-percent">{{ fill_pct }}%</span>
         </div>
         <span class="badge badge-{{ dashboard_status }}"
-          >{{ keg.name }} ({{ dashboard_status | replace('_', ' ') }})</span
+          >{{ dashboard_status | replace('_', ' ') | title }}</span
         >
         <span class="tap-label"
           >{% if keg.current_volume is not none %}{{ keg.current_volume }} {{
