@@ -14,6 +14,17 @@ content %}
       />
     </div>
     <div class="form-group">
+      <label>Default Keg Type</label>
+      <input
+        type="text"
+        id="defaultKegType"
+        class="form-control"
+        value="{{ settings.default_keg_type or '' }}"
+        placeholder="e.g. IPA"
+      />
+      <small class="muted">Used to prefill Type when adding a new keg.</small>
+    </div>
+    <div class="form-group">
       <label>Measurement System</label>
       <div class="radio-group">
         <label class="radio-label">
@@ -60,36 +71,46 @@ content %}
       </div>
     </div>
     <div class="form-group">
-      <label>Manage Button Position</label>
+      <label>Dashboard Manage Button Position</label>
       <div class="radio-group">
         <label class="radio-label">
           <input
             type="radio"
-            name="manage_button_position"
+            name="dashboard_manage_button_position"
             value="top-right"
-            {% if (settings.manage_button_position or 'top-right') == 'top-right' %}checked{% endif %}
+            {% if (settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right') == 'top-right' %}checked{% endif %}
           />
           Top Right
         </label>
         <label class="radio-label">
           <input
             type="radio"
-            name="manage_button_position"
+            name="dashboard_manage_button_position"
             value="bottom-left"
-            {% if (settings.manage_button_position or 'top-right') == 'bottom-left' %}checked{% endif %}
+            {% if (settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right') == 'bottom-left' %}checked{% endif %}
           />
           Bottom Left
         </label>
         <label class="radio-label">
           <input
             type="radio"
-            name="manage_button_position"
+            name="dashboard_manage_button_position"
             value="bottom-right"
-            {% if (settings.manage_button_position or 'top-right') == 'bottom-right' %}checked{% endif %}
+            {% if (settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right') == 'bottom-right' %}checked{% endif %}
           />
           Bottom Right
         </label>
       </div>
+    </div>
+    <div class="form-group">
+      <label class="radio-label">
+        <input
+          type="checkbox"
+          id="barStockEnabled"
+          {% if settings.bar_stock_enabled %}checked{% endif %}
+        />
+        Enable Bar Stock Feature
+      </label>
     </div>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save Settings</button>
@@ -100,30 +121,48 @@ content %}
 
 <div class="card settings-card">
   <h2>📤 Export Data</h2>
-  <p class="muted">Download your bar data for backup or migration.</p>
+  <p class="muted">
+    Download your full bar data as a versioned JSON backup or ZIP archive.
+  </p>
   <div class="export-buttons">
     <a class="btn btn-secondary" href="{{ ingress }}/api/export/json"
-      >Export JSON (full)</a
+      >Export Portable JSON</a
     >
-    <a class="btn btn-secondary" href="{{ ingress }}/api/export/csv"
-      >Export CSV (all)</a
-    >
-    <a
-      class="btn btn-secondary"
-      href="{{ ingress }}/api/export/csv?section=stock"
-      >Export Stock CSV</a
-    >
-    <a
-      class="btn btn-secondary"
-      href="{{ ingress }}/api/export/csv?section=kegs"
-      >Export Kegs CSV</a
-    >
-    <a
-      class="btn btn-secondary"
-      href="{{ ingress }}/api/export/csv?section=taps"
-      >Export Taps CSV</a
+    <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
+      >Export Archive (.zip)</a
     >
   </div>
+</div>
+
+<div class="card settings-card">
+  <h2>📥 Import Data</h2>
+  <p class="muted">Import a previously exported ZIP archive or portable JSON backup.</p>
+  <form id="importForm" onsubmit="importArchive(event)">
+    <div class="form-group">
+      <label for="importArchiveFile">Backup File</label>
+      <input
+        type="file"
+        id="importArchiveFile"
+        accept=".zip,application/zip,.json,application/json"
+        class="form-control"
+        required
+      />
+    </div>
+    <div class="form-group">
+      <label>Import Mode</label>
+      <select id="importMode" class="form-control">
+        <option value="replace" selected>Replace all existing data</option>
+        <option value="merge">Merge with existing data</option>
+      </select>
+      <small class="muted">
+        Replace overwrites all data. Merge keeps existing entries and upserts by ID.
+      </small>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-secondary">Import Backup</button>
+      <span id="importMsg" class="save-msg"></span>
+    </div>
+  </form>
 </div>
 {% endblock %} {% block scripts %}
 <script>
@@ -136,16 +175,18 @@ content %}
     );
     const themeInput = document.querySelector('input[name="theme"]:checked');
     const managePosInput = document.querySelector(
-      'input[name="manage_button_position"]:checked'
+      'input[name="dashboard_manage_button_position"]:checked'
     );
 
     const body = {
       bar_name: document.getElementById("barName").value,
+      default_keg_type: document.getElementById("defaultKegType").value,
       measurement: measurementInput ? measurementInput.value : "us",
       theme: themeInput ? themeInput.value : "light",
-      manage_button_position: managePosInput
+      dashboard_manage_button_position: managePosInput
         ? managePosInput.value
         : "top-right",
+      bar_stock_enabled: document.getElementById("barStockEnabled").checked,
     };
     try {
       const res = await fetch(`${INGRESS}/api/settings`, {
@@ -162,11 +203,103 @@ content %}
         document.getElementById("saveMsg").textContent = "";
       }, 2000);
       document.documentElement.dataset.theme = body.theme;
-      document.documentElement.dataset.managePos = body.manage_button_position;
-      document.body.dataset.managePos = body.manage_button_position;
+      document.documentElement.dataset.managePos =
+        body.dashboard_manage_button_position;
+      document.body.dataset.managePos = body.dashboard_manage_button_position;
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
       document.getElementById("saveMsg").textContent = "Save failed";
+      console.error(err);
+    }
+  }
+
+  async function importArchive(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById("importArchiveFile");
+    const modeInput = document.getElementById("importMode");
+    const msg = document.getElementById("importMsg");
+    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    const mode = modeInput ? modeInput.value : "replace";
+    const isJson = !!(file && file.name && file.name.toLowerCase().endsWith(".json"));
+    const previewUrl = isJson
+      ? `${INGRESS}/api/import/json/preview`
+      : `${INGRESS}/api/import/archive/preview`;
+    const importUrl = isJson
+      ? `${INGRESS}/api/import/json`
+      : `${INGRESS}/api/import/archive`;
+    const fileTypeLabel = isJson ? "JSON backup" : "archive";
+
+    if (!file) {
+      msg.textContent = "Please select a backup file.";
+      return;
+    }
+
+    const previewData = new FormData();
+    previewData.append("file", file);
+    previewData.append("mode", mode);
+
+    try {
+      const previewRes = await fetch(previewUrl, {
+        method: "POST",
+        body: previewData,
+      });
+
+      if (!previewRes.ok) {
+        let message = "Preview failed";
+        try {
+          const body = await previewRes.json();
+          if (body.error) message = body.error;
+        } catch (err) {
+          // Ignore parse errors and keep fallback message.
+        }
+        throw new Error(message);
+      }
+
+      const previewBody = await previewRes.json();
+      const summary = previewBody.summary || {};
+      const previewMode = previewBody.mode || mode;
+      const modeLabel = previewMode === "merge" ? "merge" : "replace";
+      const confirmed = confirm(
+        `Import ${fileTypeLabel} for "${summary.bar_name || "My Bar"}"?\n` +
+          `Mode: ${modeLabel}\n` +
+          `Kegs: ${summary.kegs ?? 0}\n` +
+          `Taps: ${summary.taps ?? 0}\n` +
+          `Bar Stock: ${summary.bar_stock ?? 0}\n\n` +
+          (previewMode === "merge"
+            ? "This will merge imported data into your current data."
+            : "This will replace all current data."),
+      );
+      if (!confirmed) {
+        msg.textContent = "Import canceled.";
+        return;
+      }
+
+      const importData = new FormData();
+      importData.append("file", file);
+      importData.append("mode", mode);
+
+      const res = await fetch(importUrl, {
+        method: "POST",
+        body: importData,
+      });
+
+      if (!res.ok) {
+        let message = "Import failed";
+        try {
+          const body = await res.json();
+          if (body.error) message = body.error;
+        } catch (err) {
+          // Ignore parse errors and keep fallback message.
+        }
+        throw new Error(message);
+      }
+
+      msg.textContent = `✓ Imported (${mode}). Reloading...`;
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    } catch (err) {
+      msg.textContent = err.message || "Import failed";
       console.error(err);
     }
   }

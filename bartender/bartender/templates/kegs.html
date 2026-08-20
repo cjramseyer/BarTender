@@ -26,13 +26,19 @@
 <div class="keg-grid" id="kegGrid">
   {% for keg in kegs %} {% set fill_pct = keg.percent_full if keg.percent_full
   is defined else (100 if keg.status == 'full' else 50 if keg.status == 'in_use'
-  else 0) %}
+  else 0) %} {% set beer_brewer = keg.beer_brewer or keg.brewery %} {% set
+  beer_abv = keg.beer_abv or keg.abv %}
   <div class="keg-card" data-status="{{ keg.status }}" data-id="{{ keg.id }}">
     <div class="keg-card-header">
       <span class="keg-name">{{ keg.name or 'Unnamed Keg' }}</span>
-      <span class="badge badge-{{ keg.status }}"
-        >{{ keg.status | replace('_', ' ') | title }}</span
-      >
+      <div>
+        {% if keg.line_cleaning_keg %}
+        <span class="badge badge-cleaning">Line Cleaning</span>
+        {% endif %}
+        <span class="badge badge-{{ keg.status }}"
+          >{{ keg.status | replace('_', ' ') | title }}</span
+        >
+      </div>
     </div>
     <div class="keg-card-body">
       <div
@@ -53,8 +59,14 @@
         <strong>Size:</strong> {% if keg.size == 'Custom' %}{{ keg.custom_size
         }}{% else %}{{ keg.size or '—' }}{% endif %}
       </p>
-      <p><strong>Brewery:</strong> {{ keg.brewery or '—' }}</p>
-      <p><strong>ABV:</strong> {{ keg.abv or '—' }}</p>
+      <p><strong>Brewer:</strong> {{ beer_brewer or '—' }}</p>
+      <p><strong>ABV:</strong> {{ beer_abv or '—' }}{% if beer_abv %}%{% endif %}</p>
+      <p><strong>IBU:</strong> {{ keg.beer_ibu or '—' }}</p>
+      <p><strong>Brewed On:</strong> {{ keg.beer_brewed_on or '—' }}</p>
+      <p>
+        <strong>Current Volume:</strong> {% if keg.current_volume is not none %}{{
+        keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
+      </p>
       <p><strong>Percent Full:</strong> {{ fill_pct }}%</p>
       {% if keg.filled_date %}
       <p><strong>Filled:</strong> {{ keg.filled_date }}</p>
@@ -63,6 +75,14 @@
       {% endif %}
     </div>
     <div class="keg-card-footer">
+      {% if keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
+      <button
+        class="btn btn-sm btn-secondary"
+        onclick="pourKeg({{ keg.id }}, '{{ keg.volume_unit or '' }}')"
+      >
+        Pour
+      </button>
+      {% endif %}
       {% if keg.status == 'empty' %}
       <button
         class="btn btn-sm btn-primary"
@@ -97,14 +117,16 @@
     <form id="kegForm" onsubmit="submitKeg(event)">
       <input type="hidden" id="kegId" />
       <div class="form-group">
-        <label>Name / Beer *</label>
+        <label>Name / Beer</label>
         <input
           type="text"
           id="kegName"
-          required
           class="form-control"
           placeholder="e.g. Hazy IPA"
         />
+        <small class="muted">
+          Required only when status is Full.
+        </small>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -131,12 +153,13 @@
         <div class="form-group">
           <label>Status</label>
           <select id="kegStatus" class="form-control">
-            <option value="full">Full</option>
-            <option value="in_use">In Use</option>
-            <option value="empty" selected>Empty</option>
-            <option value="cleaning">Cleaning</option>
-            <option value="retired">Retired</option>
+            <option value="full" data-default-label="Full">Full</option>
+            <option value="in_use" data-default-label="In Use">In Use</option>
+            <option value="empty" selected data-default-label="Empty">Empty</option>
+            <option value="cleaning" data-default-label="Cleaning">Cleaning</option>
+            <option value="retired" data-default-label="Retired">Retired</option>
           </select>
+          <small id="statusHint" class="muted" style="display: none"></small>
         </div>
       </div>
       <div class="form-row">
@@ -172,19 +195,39 @@
           />
         </div>
       </div>
+      <h4 class="form-section-title">Beer Information</h4>
       <div class="form-row">
         <div class="form-group">
-          <label>Brewery</label>
-          <input type="text" id="kegBrewery" class="form-control" />
+          <label>Brewer</label>
+          <input type="text" id="beerBrewer" class="form-control" />
         </div>
         <div class="form-group">
           <label>ABV (%)</label>
           <input
-            type="text"
-            id="kegAbv"
+            type="number"
+            id="beerAbv"
             class="form-control"
+            min="0"
+            step="0.1"
             placeholder="e.g. 5.2"
           />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>IBU</label>
+          <input
+            type="number"
+            id="beerIbu"
+            class="form-control"
+            min="0"
+            step="1"
+            placeholder="e.g. 45"
+          />
+        </div>
+        <div class="form-group">
+          <label>When Brewed</label>
+          <input type="date" id="beerBrewedOn" class="form-control" />
         </div>
       </div>
       <div class="form-row">
@@ -196,6 +239,35 @@
           <label>Tapped Date</label>
           <input type="date" id="kegTapped" class="form-control" />
         </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Current Volume</label>
+          <input
+            type="number"
+            id="kegCurrentVolume"
+            class="form-control"
+            min="0"
+            step="0.01"
+            placeholder="e.g. 124"
+          />
+        </div>
+        <div class="form-group">
+          <label>Volume Unit</label>
+          <select id="kegVolumeUnit" class="form-control">
+            <option value="oz">oz</option>
+            <option value="gal">gal</option>
+            <option value="ml">ml</option>
+            <option value="l">L</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="radio-label">
+          <input type="checkbox" id="kegLineCleaning" />
+          Mark as line cleaning keg
+        </label>
+        <small id="lineCleaningHint" class="muted" style="display: none"></small>
       </div>
       <div class="form-group">
         <label>Percent Full (0-100)</label>
@@ -225,6 +297,93 @@
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const DEFAULT_KEG_TYPE = {{ (settings.default_keg_type or '') | tojson }};
+  const DEFAULT_VOLUME_UNIT = {{ ('oz' if (settings.measurement or 'us') == 'us' else 'ml') | tojson }};
+  const KEGS = {{ kegs | tojson }};
+
+  function nextIncrementedName(items, basePrefix) {
+    const regex = new RegExp(`^${basePrefix}\\s+(\\d+)$`, "i");
+    let maxValue = 0;
+    for (const item of items) {
+      const text = (item && item.name ? String(item.name) : "").trim();
+      const match = text.match(regex);
+      if (!match) continue;
+      const value = parseInt(match[1], 10);
+      if (!Number.isNaN(value)) {
+        maxValue = Math.max(maxValue, value);
+      }
+    }
+    return `${basePrefix} ${maxValue + 1}`;
+  }
+
+  function applyLineCleaningConstraint(activeKegId = null) {
+    const checkbox = document.getElementById("kegLineCleaning");
+    const hint = document.getElementById("lineCleaningHint");
+    const existing = KEGS.find((k) => !!k.line_cleaning_keg);
+    const lockedByOther = !!existing && existing.id !== activeKegId;
+
+    checkbox.disabled = lockedByOther;
+    if (lockedByOther) {
+      checkbox.checked = false;
+      hint.textContent =
+        "Another keg is already marked as the line cleaning keg. Unmark it first.";
+      hint.style.display = "block";
+    } else {
+      hint.textContent = "";
+      hint.style.display = "none";
+    }
+  }
+
+  function ensureDefaultTypeSuggestion() {
+    const defaultType = (DEFAULT_KEG_TYPE || "").trim();
+    if (!defaultType) return;
+
+    const list = document.getElementById("beerTypes");
+    if (!list) return;
+
+    const exists = Array.from(list.options).some(
+      (option) => option.value.trim().toLowerCase() === defaultType.toLowerCase(),
+    );
+    if (!exists) {
+      const option = document.createElement("option");
+      option.value = defaultType;
+      list.appendChild(option);
+    }
+  }
+
+  ensureDefaultTypeSuggestion();
+
+  function applyStatusConstraintForCleaning(originalStatus) {
+    const statusSelect = document.getElementById("kegStatus");
+    const statusHint = document.getElementById("statusHint");
+    const isNeedsCleaning = originalStatus === "cleaning";
+
+    Array.from(statusSelect.options).forEach((option) => {
+      const defaultLabel = option.dataset.defaultLabel || option.textContent;
+      option.textContent = defaultLabel;
+      option.disabled = false;
+    });
+
+    if (!isNeedsCleaning) {
+      statusHint.textContent = "";
+      statusHint.style.display = "none";
+      return;
+    }
+
+    Array.from(statusSelect.options).forEach((option) => {
+      option.disabled = option.value !== "empty";
+    });
+    const emptyOption = Array.from(statusSelect.options).find(
+      (option) => option.value === "empty",
+    );
+    if (emptyOption) {
+      emptyOption.textContent = "Clean";
+    }
+    statusSelect.value = "empty";
+    statusHint.textContent =
+      "This keg needs cleaning. The only allowed status change is Clean.";
+    statusHint.style.display = "block";
+  }
 
   function toggleCustomSize() {
     const v = document.getElementById("kegSize").value;
@@ -236,8 +395,15 @@
     document.getElementById("kegModalTitle").textContent = "Add Keg";
     document.getElementById("kegForm").reset();
     document.getElementById("kegId").value = "";
+    document.getElementById("kegName").value = nextIncrementedName(KEGS, "Keg");
+    document.getElementById("kegType").value = DEFAULT_KEG_TYPE;
     document.getElementById("kegStatus").value = "empty";
+    applyStatusConstraintForCleaning("");
     document.getElementById("kegPercentFull").value = "0";
+    document.getElementById("kegCurrentVolume").value = "";
+    document.getElementById("kegVolumeUnit").value = DEFAULT_VOLUME_UNIT;
+    document.getElementById("kegLineCleaning").checked = false;
+    applyLineCleaningConstraint();
     document.getElementById("customSizeGroup").style.display = "none";
     openModal("kegModal");
   }
@@ -248,14 +414,24 @@
     document.getElementById("kegName").value = keg.name;
     document.getElementById("kegType").value = keg.type;
     document.getElementById("kegStatus").value = keg.status;
+    applyStatusConstraintForCleaning(keg.status);
     document.getElementById("kegSize").value = keg.size;
     document.getElementById("kegCustomSize").value = keg.custom_size;
-    document.getElementById("kegBrewery").value = keg.brewery;
-    document.getElementById("kegAbv").value = keg.abv;
+    document.getElementById("beerBrewer").value =
+      keg.beer_brewer || keg.brewery || "";
+    document.getElementById("beerAbv").value = keg.beer_abv || keg.abv || "";
+    document.getElementById("beerIbu").value = keg.beer_ibu || "";
+    document.getElementById("beerBrewedOn").value = keg.beer_brewed_on || "";
+    document.getElementById("kegLineCleaning").checked = !!keg.line_cleaning_keg;
+    applyLineCleaningConstraint(keg.id);
     document.getElementById("kegNotes").value = keg.notes;
     document.getElementById("kegTapped").value = keg.tapped_date;
     document.getElementById("kegFilled").value =
       keg.filled_date || keg.purchased_date || "";
+    document.getElementById("kegCurrentVolume").value =
+      keg.current_volume ?? "";
+    document.getElementById("kegVolumeUnit").value =
+      keg.volume_unit || DEFAULT_VOLUME_UNIT;
     document.getElementById("kegPercentFull").value = (
       keg.percent_full ??
       (keg.status === "full" ? 100 : keg.status === "in_use" ? 50 : 0)
@@ -271,14 +447,33 @@
     const parsedPercent = Number.isNaN(parseInt(percentRaw, 10))
       ? null
       : Math.max(0, Math.min(100, parseInt(percentRaw, 10)));
+    const currentVolumeRaw = document.getElementById("kegCurrentVolume").value;
+    const parsedCurrentVolume = Number.isNaN(parseFloat(currentVolumeRaw))
+      ? null
+      : Math.max(0, parseFloat(currentVolumeRaw));
+    const status = document.getElementById("kegStatus").value;
+    const kegName = document.getElementById("kegName").value.trim();
+    const kegType = document.getElementById("kegType").value.trim();
+    const brewer = document.getElementById("beerBrewer").value.trim();
+
+    if (status === "full" && (!kegName || (!kegType && !brewer))) {
+      alert("Kegs marked Full must include a name and beer details (type or brewer).");
+      return;
+    }
+
     const body = {
-      name: document.getElementById("kegName").value,
-      type: document.getElementById("kegType").value,
-      status: document.getElementById("kegStatus").value,
+      name: kegName,
+      type: kegType,
+      status,
       size: document.getElementById("kegSize").value,
       custom_size: document.getElementById("kegCustomSize").value,
-      brewery: document.getElementById("kegBrewery").value,
-      abv: document.getElementById("kegAbv").value,
+      beer_brewer: document.getElementById("beerBrewer").value,
+      beer_abv: document.getElementById("beerAbv").value,
+      beer_ibu: document.getElementById("beerIbu").value,
+      beer_brewed_on: document.getElementById("beerBrewedOn").value,
+      line_cleaning_keg: document.getElementById("kegLineCleaning").checked,
+      current_volume: parsedCurrentVolume,
+      volume_unit: document.getElementById("kegVolumeUnit").value,
       notes: document.getElementById("kegNotes").value,
       tapped_date: document.getElementById("kegTapped").value,
       filled_date: document.getElementById("kegFilled").value,
@@ -286,11 +481,59 @@
     };
     const method = id ? "PUT" : "POST";
     const url = id ? `${INGRESS}/api/kegs/${id}` : `${INGRESS}/api/kegs`;
-    await fetch(url, {
+    const response = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+
+    if (!response.ok) {
+      let message = "Unable to save keg.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) {
+          message = errorBody.error;
+        }
+      } catch (err) {
+        // Ignore parse errors and keep generic fallback message.
+      }
+      alert(message);
+      return;
+    }
+
+    location.reload();
+  }
+
+  async function pourKeg(id, defaultUnit) {
+    const amountText = prompt("Pour amount:", "12");
+    if (amountText === null) return;
+    const amount = parseFloat(amountText);
+    if (Number.isNaN(amount) || amount <= 0) {
+      alert("Pour amount must be greater than zero.");
+      return;
+    }
+
+    const unitText = prompt("Unit (oz, gal, ml, l):", defaultUnit || DEFAULT_VOLUME_UNIT);
+    if (unitText === null) return;
+
+    const response = await fetch(`${INGRESS}/api/kegs/${id}/pour`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, unit: unitText }),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to record pour.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) message = errorBody.error;
+      } catch (err) {
+        // Ignore parse errors and keep fallback message.
+      }
+      alert(message);
+      return;
+    }
+
     location.reload();
   }
 
