@@ -628,9 +628,22 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 .tap-card-footer {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   padding: 0.6rem 1rem;
   border-top: 1px solid var(--border);
+}
+
+.tap-pour-row,
+.tap-action-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tap-pour-row .form-control {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Filter bar */
