@@ -1,10 +1,14 @@
 {% extends "base.html" %} {% block title %}Settings{% endblock %} {% block
 content %}
 <h1>⚙ Settings</h1>
+<div class="settings-header-actions">
+  <button type="button" class="btn btn-sm btn-secondary" onclick="expandAllSettings()">Expand All</button>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="collapseAllSettings()">Collapse All</button>
+</div>
 
 <div class="settings-grid">
 <div class="card settings-card">
-  <details class="settings-collapsible">
+  <details class="settings-collapsible" open>
     <summary>📺 Read-Only External URLs</summary>
     <div class="settings-collapsible-body">
       <p class="muted">Use these external links for read-only access (served from port {{ display_port }}).</p>
@@ -69,7 +73,7 @@ content %}
 
 <div class="card settings-card">
   <form id="settingsForm" onsubmit="saveSettings(event)">
-    <details class="settings-collapsible">
+    <details class="settings-collapsible" open>
       <summary>General</summary>
       <div class="settings-collapsible-body">
         <div class="form-group">
@@ -279,7 +283,45 @@ content %}
       </div>
     </details>
 
-    <details class="settings-collapsible" open>
+    <details class="settings-collapsible">
+      <summary>Analytics Forecasting</summary>
+      <div class="settings-collapsible-body">
+        <div class="form-group">
+          <label>Low Keg Threshold (%)</label>
+          <input
+            type="number"
+            id="analyticsLowThreshold"
+            class="form-control"
+            min="1"
+            max="100"
+            step="1"
+            value="{{ settings.analytics_low_keg_threshold_percent or 25 }}"
+          />
+          <small class="muted">Kegs at or below this percent are considered low.</small>
+        </div>
+        <div class="form-group">
+          <label>Days Left Calculation Method</label>
+          <select id="analyticsDaysMethod" class="form-control">
+            <option value="trailing_window" {% if (settings.analytics_days_left_method or 'trailing_window') == 'trailing_window' %}selected{% endif %}>Trailing pour-rate window</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Days Left Trailing Window (days)</label>
+          <input
+            type="number"
+            id="analyticsDaysWindow"
+            class="form-control"
+            min="3"
+            max="90"
+            step="1"
+            value="{{ settings.analytics_days_left_window_days or 14 }}"
+          />
+          <small class="muted">Used to estimate daily pour rate for depletion forecasting.</small>
+        </div>
+      </div>
+    </details>
+
+    <details class="settings-collapsible">
       <summary>Pour Presets</summary>
       <div class="settings-collapsible-body">
         <div class="form-group">
@@ -380,6 +422,18 @@ content %}
   const DEFAULT_POUR_PRESET = {{ (settings.default_pour_preset or '') | tojson }};
   const DEFAULT_POUR_MODE = {{ (settings.pour_mode or 'manual') | tojson }};
 
+  function expandAllSettings() {
+    document
+      .querySelectorAll("details.settings-collapsible")
+      .forEach((element) => (element.open = true));
+  }
+
+  function collapseAllSettings() {
+    document
+      .querySelectorAll("details.settings-collapsible")
+      .forEach((element) => (element.open = false));
+  }
+
   function initExternalReadonlyLinks() {
     const displayLink = document.getElementById("externalDisplayUrl");
     const menuLink = document.getElementById("externalMenuUrl");
@@ -466,11 +520,14 @@ content %}
     return row;
   }
 
-  function addPourOptionRow(option = null) {
+  function addPourOptionRow(option = null, opts = {}) {
+    const { refresh = true } = opts;
     document.getElementById("pourOptionsList").appendChild(
       createPourOptionRow(option || {}),
     );
-    refreshDefaultPourPresetOptions();
+    if (refresh) {
+      refreshDefaultPourPresetOptions();
+    }
   }
 
   function addKegTypeChoiceRow(value = "") {
@@ -565,7 +622,8 @@ content %}
       addPourOptionRow({ name: "Pint", amount: 16, unit: "oz" });
       return;
     }
-    options.forEach((option) => addPourOptionRow(option));
+    options.forEach((option) => addPourOptionRow(option, { refresh: false }));
+    refreshDefaultPourPresetOptions();
   }
 
   function collectPourOptions() {
@@ -590,7 +648,11 @@ content %}
     const select = document.getElementById("defaultPourPreset");
     if (!select) return;
 
-    const previous = select.value || DEFAULT_POUR_PRESET;
+    const selectedBefore = select.value;
+    const preferred =
+      select.dataset.userSelected === "true"
+        ? selectedBefore
+        : select.dataset.initialDefault || DEFAULT_POUR_PRESET;
     const options = collectPourOptions();
     select.innerHTML = "";
 
@@ -612,9 +674,9 @@ content %}
     });
 
     const hasPrevious = Array.from(select.options).some(
-      (optionElement) => optionElement.value === previous,
+      (optionElement) => optionElement.value === preferred,
     );
-    select.value = hasPrevious ? previous : select.options[0].value;
+    select.value = hasPrevious ? preferred : select.options[0].value;
   }
 
   loadKegTypeChoices();
@@ -633,6 +695,14 @@ content %}
   if (pourOptionsList) {
     pourOptionsList.addEventListener("input", refreshDefaultPourPresetOptions);
     pourOptionsList.addEventListener("change", refreshDefaultPourPresetOptions);
+  }
+
+  const defaultPourPresetSelect = document.getElementById("defaultPourPreset");
+  if (defaultPourPresetSelect) {
+    defaultPourPresetSelect.dataset.initialDefault = DEFAULT_POUR_PRESET;
+    defaultPourPresetSelect.addEventListener("change", () => {
+      defaultPourPresetSelect.dataset.userSelected = "true";
+    });
   }
 
   async function saveSettings(e) {
@@ -660,6 +730,15 @@ content %}
       pour_mode: document.getElementById("pourMode")
         ? document.getElementById("pourMode").value
         : DEFAULT_POUR_MODE,
+      analytics_low_keg_threshold_percent: parseInt(
+        document.getElementById("analyticsLowThreshold").value,
+        10,
+      ),
+      analytics_days_left_method: document.getElementById("analyticsDaysMethod").value,
+      analytics_days_left_window_days: parseInt(
+        document.getElementById("analyticsDaysWindow").value,
+        10,
+      ),
       pour_options: collectPourOptions(),
       default_pour_preset: document.getElementById("defaultPourPreset").value,
     };

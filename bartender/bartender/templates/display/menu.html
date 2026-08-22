@@ -169,7 +169,7 @@
         <article class="menu-item">
           <div class="menu-item-header">
             <h2>Tap {{ tap.number }}</h2>
-            <span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span>
+            <span class="badge badge-{{ keg.status }}">{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span>
           </div>
           <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
           <p class="muted">{{ brewer or '—' }}</p>

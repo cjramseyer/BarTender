@@ -445,7 +445,7 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 .tap-item {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.6rem;
   padding: 0.4rem 0;
   border-bottom: 1px solid var(--border);
@@ -468,6 +468,11 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.tap-volume-remaining {
+  flex-basis: 100%;
 }
 
 .keg-level-shell-sm {
@@ -781,6 +786,13 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   gap: 1.25rem;
 }
 
+.settings-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: -0.5rem 0 1rem;
+}
+
 .settings-card {
   max-width: none;
   margin-bottom: 0;
@@ -809,6 +821,20 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 
 .settings-collapsible-body {
   padding: 0.9rem 1rem 1rem;
+}
+
+.analytics-panel > summary {
+  list-style: none;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.analytics-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.analytics-panel-body {
+  margin-top: 0.75rem;
 }
 
 .settings-url-link {
