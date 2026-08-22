@@ -1,0 +1,191 @@
+{% extends "base.html" %} {% block title %}API Reference{% endblock %} {% block content %}
+<div class="page-header">
+  <h1>🔎 API Reference</h1>
+</div>
+
+<div class="card">
+  <p class="muted">
+    This reference lists API endpoints for BarTender. Paths are shown relative to ingress.
+  </p>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Endpoint</th>
+          <th>Description</th>
+          <th>Try</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for method, path, description in endpoints %}
+        <tr>
+          <td><strong>{{ method }}</strong></td>
+          <td><code>{{ path }}</code></td>
+          <td>{{ description }}</td>
+          <td>
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick='useEndpoint({{ method | tojson }}, {{ path | tojson }})'
+            >
+              Use
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 1rem">
+  <h2>API Tester</h2>
+  <p class="muted">
+    Send test requests to BarTender endpoints. Requests run with your current browser session and ingress context.
+  </p>
+
+  <form id="apiTestForm" onsubmit="sendApiRequest(event)">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Method</label>
+        <select id="apiMethod" class="form-control" onchange="updateBodyState()">
+          <option value="GET" selected>GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Endpoint Path</label>
+        <input
+          type="text"
+          id="apiPath"
+          class="form-control"
+          placeholder="/api/kegs"
+          required
+          list="apiPathSuggestions"
+        />
+        <datalist id="apiPathSuggestions">
+          {% for method, path, description in endpoints %}
+          <option value="{{ path }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>JSON Body</label>
+      <textarea
+        id="apiBody"
+        class="form-control"
+        rows="7"
+        placeholder='{"name": "Example"}'
+      ></textarea>
+      <small id="apiBodyHint" class="muted">
+        Required for most POST/PUT endpoints. Leave empty for GET requests.
+      </small>
+    </div>
+
+    <div class="form-actions">
+      <button id="apiSendBtn" type="submit" class="btn btn-primary">Send Request</button>
+      <span id="apiStatus" class="save-msg"></span>
+    </div>
+  </form>
+
+  <div class="form-group" style="margin-top: 1rem">
+    <label>Response</label>
+    <pre id="apiResponse" class="form-control" style="min-height: 180px; white-space: pre-wrap"></pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const INGRESS = "{{ ingress }}";
+
+  function updateBodyState() {
+    const method = document.getElementById("apiMethod").value;
+    const bodyInput = document.getElementById("apiBody");
+    const bodyHint = document.getElementById("apiBodyHint");
+    const isBodyMethod = method === "POST" || method === "PUT";
+
+    bodyInput.disabled = !isBodyMethod;
+    bodyInput.placeholder = isBodyMethod
+      ? '{"name": "Example"}'
+      : "Body disabled for this method.";
+    bodyHint.textContent = isBodyMethod
+      ? "Provide valid JSON for this request body."
+      : "Body is ignored for this method.";
+  }
+
+  function useEndpoint(method, path) {
+    document.getElementById("apiMethod").value = method;
+    document.getElementById("apiPath").value = path;
+    updateBodyState();
+    document.getElementById("apiBody").focus();
+  }
+
+  async function sendApiRequest(event) {
+    event.preventDefault();
+    const method = document.getElementById("apiMethod").value;
+    const pathInput = document.getElementById("apiPath").value.trim();
+    const bodyText = document.getElementById("apiBody").value.trim();
+    const statusEl = document.getElementById("apiStatus");
+    const responseEl = document.getElementById("apiResponse");
+    const sendBtn = document.getElementById("apiSendBtn");
+
+    if (!pathInput.startsWith("/")) {
+      alert("Endpoint path must start with '/'.");
+      return;
+    }
+
+    const url = `${INGRESS}${pathInput}`;
+    const options = {
+      method,
+      headers: {},
+    };
+
+    if (method === "POST" || method === "PUT") {
+      if (!bodyText) {
+        alert("JSON body is required for this method.");
+        return;
+      }
+      try {
+        options.body = JSON.stringify(JSON.parse(bodyText));
+      } catch (err) {
+        alert("Body must be valid JSON.");
+        return;
+      }
+      options.headers["Content-Type"] = "application/json";
+    }
+
+    sendBtn.disabled = true;
+    statusEl.textContent = "Sending...";
+    responseEl.textContent = "";
+
+    try {
+      const response = await fetch(url, options);
+      const contentType = response.headers.get("content-type") || "";
+      let formatted = "";
+
+      if (contentType.includes("application/json")) {
+        const json = await response.json();
+        formatted = JSON.stringify(json, null, 2);
+      } else {
+        formatted = await response.text();
+      }
+
+      statusEl.textContent = `${response.status} ${response.statusText}`;
+      responseEl.textContent = formatted || "(No response body)";
+    } catch (err) {
+      statusEl.textContent = "Request failed";
+      responseEl.textContent = String(err);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  updateBodyState();
+</script>
+{% endblock %}

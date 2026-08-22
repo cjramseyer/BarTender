@@ -52,8 +52,10 @@ DEFAULT_DATA = {
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
             {"name": "Pint", "amount": 16, "unit": "oz"},
         ],
+        "default_pour_preset": "8|oz|Half Pint",
     },
     "bar_stock": [],
+    "beers": [],
     "kegs": [],
     "taps": [],
 }
@@ -102,6 +104,14 @@ def load_data() -> dict:
             data["settings"].get("pour_options"),
             data["settings"].get("measurement", "us"),
         )
+        data["settings"]["default_pour_preset"] = _normalize_default_pour_preset(
+            data["settings"].get("default_pour_preset", ""),
+            data["settings"].get("pour_options", []),
+        )
+        data["beers"] = _normalize_beers(data.get("beers", []))
+        beers_by_id = {
+            beer.get("id"): beer for beer in data.get("beers", []) if isinstance(beer.get("id"), int)
+        }
         # Backward compatibility for stock size fields.
         for item in data.get("bar_stock", []):
             if "size_label" not in item:
@@ -119,6 +129,14 @@ def load_data() -> dict:
                 keg["beer_abv"] = keg.get("abv", "")
             keg.setdefault("beer_ibu", "")
             keg.setdefault("beer_brewed_on", "")
+            keg["beer_id"] = _coerce_int(keg.get("beer_id"), None)
+            keg.setdefault("beer_name", "")
+            if keg.get("beer_id") is not None:
+                beer = beers_by_id.get(keg.get("beer_id"))
+                if beer:
+                    _apply_beer_to_keg(keg, beer)
+                else:
+                    keg["beer_id"] = None
             keg["line_cleaning_keg"] = _coerce_bool(
                 keg.get("line_cleaning_keg"),
                 False,
@@ -240,6 +258,15 @@ def _coerce_float(value, default=None):
         return default
 
 
+def _coerce_int(value, default=None):
+    try:
+        if value is None or value == "":
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _default_volume_unit(measurement: str) -> str:
     return "oz" if measurement == "us" else "ml"
 
@@ -277,6 +304,114 @@ def _normalize_pour_options(raw_options, measurement: str) -> list[dict]:
         })
 
     return normalized or fallback
+
+
+def _pour_option_value(option: dict) -> str:
+    name = str(option.get("name", "")).replace("|", "/")
+    amount = _coerce_float(option.get("amount"), None)
+    unit = _normalize_volume_unit(option.get("unit"))
+    if amount is None or not unit:
+        return ""
+    return f"{amount}|{unit}|{name}"
+
+
+def _parse_pour_preset_value(value: str):
+    parts = str(value or "").split("|", 2)
+    if len(parts) != 3:
+        return None
+    amount = _coerce_float(parts[0], None)
+    unit = _normalize_volume_unit(parts[1])
+    name = str(parts[2]).replace("|", "/")
+    if amount is None or not unit:
+        return None
+    return amount, unit, name
+
+
+def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str:
+    if not pour_options:
+        return ""
+
+    parsed_default = _parse_pour_preset_value(str(raw_default or "").strip())
+    if parsed_default:
+        default_amount, default_unit, default_name = parsed_default
+        for option in pour_options:
+            option_amount = _coerce_float(option.get("amount"), None)
+            option_unit = _normalize_volume_unit(option.get("unit"))
+            option_name = str(option.get("name", "")).replace("|", "/")
+            if option_amount is None:
+                continue
+            if (
+                abs(option_amount - default_amount) < 1e-9
+                and option_unit == default_unit
+                and option_name == default_name
+            ):
+                return _pour_option_value(option)
+
+    return _pour_option_value(pour_options[0])
+
+
+def _normalize_beers(raw_beers) -> list[dict]:
+    if not isinstance(raw_beers, list):
+        return []
+
+    normalized = []
+    seen_ids = set()
+    next_generated_id = 1
+
+    for entry in raw_beers:
+        if not isinstance(entry, dict):
+            continue
+
+        candidate_id = _coerce_int(entry.get("id"), None)
+        if (
+            candidate_id is None
+            or candidate_id <= 0
+            or candidate_id in seen_ids
+        ):
+            while next_generated_id in seen_ids:
+                next_generated_id += 1
+            candidate_id = next_generated_id
+            next_generated_id += 1
+
+        seen_ids.add(candidate_id)
+        if candidate_id >= next_generated_id:
+            next_generated_id = candidate_id + 1
+
+        normalized.append({
+            "id": candidate_id,
+            "name": str(entry.get("name", "")).strip(),
+            "type": str(entry.get("type", entry.get("style", ""))).strip(),
+            "brewer": str(entry.get("brewer", "")).strip(),
+            "abv": str(entry.get("abv", "")).strip(),
+            "ibu": str(entry.get("ibu", "")).strip(),
+            "brewed_on": str(entry.get("brewed_on", "")).strip(),
+            "notes": str(entry.get("notes", "")).strip(),
+            "updated_at": entry.get("updated_at") or datetime.now(timezone.utc).isoformat(),
+        })
+
+    return normalized
+
+
+def _get_beer_by_id(data: dict, beer_id: int | None):
+    if beer_id is None:
+        return None
+    for beer in data.get("beers", []):
+        if beer.get("id") == beer_id:
+            return beer
+    return None
+
+
+def _apply_beer_to_keg(keg: dict, beer: dict) -> None:
+    keg["beer_id"] = beer.get("id")
+    keg["beer_name"] = beer.get("name", "")
+    keg["type"] = beer.get("type", "")
+    keg["beer_brewer"] = beer.get("brewer", "")
+    keg["beer_abv"] = beer.get("abv", "")
+    keg["beer_ibu"] = beer.get("ibu", "")
+    keg["beer_brewed_on"] = beer.get("brewed_on", "")
+    # Keep legacy keys synchronized for older clients/views.
+    keg["brewery"] = keg.get("beer_brewer", "")
+    keg["abv"] = keg.get("beer_abv", "")
 
 
 def _apply_pour_to_keg(data: dict, keg: dict, amount: float, pour_unit: str):
@@ -466,7 +601,9 @@ def _validate_full_keg_requirements(keg_like: dict):
 
     name = str(keg_like.get("name", "")).strip()
     beer_value = (
-        str(keg_like.get("type", "")).strip()
+        str(keg_like.get("beer_id", "")).strip()
+        or str(keg_like.get("beer_name", "")).strip()
+        or str(keg_like.get("type", "")).strip()
         or str(keg_like.get("beer_brewer", "")).strip()
         or str(keg_like.get("brewery", "")).strip()
     )
@@ -523,6 +660,18 @@ def kegs():
         "kegs.html",
         settings=data["settings"],
         kegs=data["kegs"],
+        beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
+        ingress=INGRESS_PATH,
+    )
+
+
+@app.route("/beers")
+def beers():
+    data = load_data()
+    return render_template(
+        "beers.html",
+        settings=data["settings"],
+        beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
         ingress=INGRESS_PATH,
     )
 
@@ -548,6 +697,17 @@ def settings():
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         display_port=DISPLAY_PORT,
+        ingress=INGRESS_PATH,
+    )
+
+
+@app.route("/api-reference")
+def api_reference():
+    data = load_data()
+    return render_template(
+        "api_reference.html",
+        settings=data["settings"],
+        endpoints=API_REFERENCE_ENDPOINTS,
         ingress=INGRESS_PATH,
     )
 
@@ -690,6 +850,7 @@ def api_save_settings():
         "default_keg_type",
         "menu_qr_mode",
         "pour_options",
+        "default_pour_preset",
     }
     for key in allowed:
         if key in body:
@@ -721,6 +882,10 @@ def api_save_settings():
     data["settings"]["pour_options"] = _normalize_pour_options(
         data["settings"].get("pour_options"),
         data["settings"].get("measurement", "us"),
+    )
+    data["settings"]["default_pour_preset"] = _normalize_default_pour_preset(
+        data["settings"].get("default_pour_preset", ""),
+        data["settings"].get("pour_options", []),
     )
 
     save_data(data)
@@ -799,12 +964,132 @@ def api_delete_stock(item_id: int):
 
 
 # ---------------------------------------------------------------------------
+# API – Beers
+# ---------------------------------------------------------------------------
+
+@app.route("/api/beers", methods=["GET"])
+def api_list_beers():
+    data = load_data()
+    beers = sorted(
+        data.get("beers", []),
+        key=lambda beer: str(beer.get("name", "")).lower(),
+    )
+    return jsonify(beers)
+
+
+@app.route("/api/beers", methods=["POST"])
+def api_add_beer():
+    data = load_data()
+    body = request.get_json(force=True)
+    name = str(body.get("name", "")).strip()
+    if not name:
+        return jsonify({"error": "Beer name is required."}), 400
+
+    beer = {
+        "id": _next_id(data.get("beers", [])),
+        "name": name,
+        "type": str(body.get("type", "")).strip(),
+        "brewer": str(body.get("brewer", "")).strip(),
+        "abv": str(body.get("abv", "")).strip(),
+        "ibu": str(body.get("ibu", "")).strip(),
+        "brewed_on": str(body.get("brewed_on", "")).strip(),
+        "notes": str(body.get("notes", "")).strip(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    data.setdefault("beers", []).append(beer)
+    save_data(data)
+    return jsonify(beer), 201
+
+
+@app.route("/api/beers/<int:beer_id>", methods=["PUT"])
+def api_update_beer(beer_id: int):
+    data = load_data()
+    body = request.get_json(force=True)
+
+    for beer in data.get("beers", []):
+        if beer.get("id") != beer_id:
+            continue
+
+        for field in ("name", "type", "brewer", "abv", "ibu", "brewed_on", "notes"):
+            if field in body:
+                beer[field] = str(body.get(field, "")).strip()
+
+        if not str(beer.get("name", "")).strip():
+            return jsonify({"error": "Beer name is required."}), 400
+
+        beer["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        for keg in data.get("kegs", []):
+            if keg.get("beer_id") == beer_id:
+                _apply_beer_to_keg(keg, beer)
+                keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        save_data(data)
+        return jsonify(beer)
+
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.route("/api/beers/<int:beer_id>", methods=["DELETE"])
+def api_delete_beer(beer_id: int):
+    data = load_data()
+
+    linked_kegs = [
+        keg for keg in data.get("kegs", []) if keg.get("beer_id") == beer_id
+    ]
+    if linked_kegs:
+        return jsonify({
+            "error": "This beer is currently assigned to one or more kegs.",
+            "code": "BEER_ASSIGNED_TO_KEG",
+            "keg_count": len(linked_kegs),
+            "keg_names": [keg.get("name", "") for keg in linked_kegs],
+        }), 409
+
+    data["beers"] = [beer for beer in data.get("beers", []) if beer.get("id") != beer_id]
+    save_data(data)
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
 # API – Kegs
 # ---------------------------------------------------------------------------
 
 KEG_SIZES_US = ["1/6 bbl (5.2 gal)", "1/4 bbl (7.75 gal)", "1/2 bbl (15.5 gal)", "Corny (5 gal)", "Custom"]
 KEG_SIZES_METRIC = ["20 L", "30 L", "50 L", "Custom"]
 KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
+API_REFERENCE_ENDPOINTS = [
+    ("GET", "/api/settings", "Get current settings"),
+    ("POST", "/api/settings", "Update settings"),
+    ("GET", "/api/stock", "List all bar stock items"),
+    ("POST", "/api/stock", "Add a stock item"),
+    ("PUT", "/api/stock/<id>", "Update a stock item"),
+    ("DELETE", "/api/stock/<id>", "Delete a stock item"),
+    ("GET", "/api/beers", "List all beers"),
+    ("POST", "/api/beers", "Add a beer"),
+    ("PUT", "/api/beers/<id>", "Update a beer"),
+    ("DELETE", "/api/beers/<id>", "Delete a beer"),
+    ("GET", "/api/kegs", "List all kegs"),
+    ("POST", "/api/kegs", "Add a keg"),
+    ("PUT", "/api/kegs/<id>", "Update a keg"),
+    ("POST", "/api/kegs/<id>/fill", "Fill/refill a keg"),
+    ("POST", "/api/kegs/<id>/pour", "Record a pour and reduce volume"),
+    ("DELETE", "/api/kegs/<id>", "Delete a keg"),
+    ("GET", "/api/taps", "List all taps"),
+    ("POST", "/api/taps", "Add a tap"),
+    ("PUT", "/api/taps/<id>", "Update a tap"),
+    ("POST", "/api/taps/<id>/pour", "Record a pour for the assigned keg"),
+    ("DELETE", "/api/taps/<id>", "Delete a tap"),
+    ("GET", "/api/export/json", "Export portable versioned JSON backup"),
+    ("GET", "/api/export/archive", "Export ZIP archive backup"),
+    ("GET", "/api/export/csv", "Legacy alias for ZIP archive export"),
+    ("POST", "/api/import/archive/preview", "Preview archive import results"),
+    ("POST", "/api/import/archive", "Import ZIP archive backup"),
+    ("POST", "/api/import/json/preview", "Preview JSON import results"),
+    ("POST", "/api/import/json", "Import JSON backup"),
+    ("GET", "/api/menu/qr", "Generate printable menu QR code PNG"),
+    ("GET", "/api/menu/qr/health", "Check runtime QR dependency readiness"),
+]
 
 
 def _today_utc_date() -> str:
@@ -824,12 +1109,22 @@ def api_add_keg():
     initial_status = _normalize_keg_status(body.get("status", "empty"))
     incoming_filled_date = body.get("filled_date", body.get("purchased_date", ""))
     has_percent_full = "percent_full" in body
+    beer_id = _coerce_int(body.get("beer_id"), None)
+    if body.get("beer_id") not in (None, "") and beer_id is None:
+        return jsonify({"error": "Invalid beer selection."}), 400
+
+    selected_beer = _get_beer_by_id(data, beer_id)
+    if beer_id is not None and not selected_beer:
+        return jsonify({"error": "Selected beer was not found."}), 404
+
     keg_type = str(body.get("type", "")).strip() or str(
         data.get("settings", {}).get("default_keg_type", "")
     ).strip()
     keg = {
         "id": _next_id(data["kegs"]),
         "name": body.get("name", ""),
+        "beer_id": beer_id,
+        "beer_name": str(body.get("beer_name", "")).strip(),
         "type": keg_type,
         "size": body.get("size", ""),
         "custom_size": body.get("custom_size", ""),
@@ -853,6 +1148,9 @@ def api_add_keg():
         "percent_full": _clamp_percent_full(body.get("percent_full"), _default_percent_for_status(initial_status)),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    if selected_beer:
+        _apply_beer_to_keg(keg, selected_beer)
 
     if keg.get("line_cleaning_keg") and _line_cleaning_keg_conflict(data):
         return jsonify({
@@ -915,6 +1213,17 @@ def api_update_keg(keg_id: int):
                         "code": "LINE_CLEANING_KEG_EXISTS",
                     }), 409
 
+            selected_beer = None
+            if "beer_id" in body:
+                parsed_beer_id = _coerce_int(body.get("beer_id"), None)
+                if body.get("beer_id") not in (None, "") and parsed_beer_id is None:
+                    return jsonify({"error": "Invalid beer selection."}), 400
+                body["beer_id"] = parsed_beer_id
+                if parsed_beer_id is not None:
+                    selected_beer = _get_beer_by_id(data, parsed_beer_id)
+                    if not selected_beer:
+                        return jsonify({"error": "Selected beer was not found."}), 404
+
             has_percent_full = "percent_full" in body
             if has_percent_full:
                 incoming_percent = body.get("percent_full")
@@ -934,6 +1243,8 @@ def api_update_keg(keg_id: int):
 
             for field in (
                 "name",
+                "beer_id",
+                "beer_name",
                 "type",
                 "size",
                 "custom_size",
@@ -954,6 +1265,22 @@ def api_update_keg(keg_id: int):
             ):
                 if field in body:
                     keg[field] = body[field]
+
+            if "beer_id" in body:
+                if selected_beer:
+                    _apply_beer_to_keg(keg, selected_beer)
+                elif body.get("beer_id") is None:
+                    keg["beer_name"] = ""
+                    for field in (
+                        "type",
+                        "beer_brewer",
+                        "beer_abv",
+                        "beer_ibu",
+                        "beer_brewed_on",
+                        "brewery",
+                        "abv",
+                    ):
+                        keg[field] = ""
 
             if "current_volume" in body:
                 keg["current_volume"] = _coerce_float(keg.get("current_volume"), None)
@@ -1002,6 +1329,29 @@ def api_fill_keg(keg_id: int):
         if keg["id"] == keg_id:
             if keg.get("status") != "empty" and not body.get("force", False):
                 return jsonify({"error": "Keg is not empty", "status": keg.get("status")}), 409
+
+            if "beer_id" in body:
+                parsed_beer_id = _coerce_int(body.get("beer_id"), None)
+                if body.get("beer_id") not in (None, "") and parsed_beer_id is None:
+                    return jsonify({"error": "Invalid beer selection."}), 400
+                if parsed_beer_id is None:
+                    keg["beer_id"] = None
+                    keg["beer_name"] = ""
+                    for field in (
+                        "type",
+                        "beer_brewer",
+                        "beer_abv",
+                        "beer_ibu",
+                        "beer_brewed_on",
+                        "brewery",
+                        "abv",
+                    ):
+                        keg[field] = ""
+                else:
+                    selected_beer = _get_beer_by_id(data, parsed_beer_id)
+                    if not selected_beer:
+                        return jsonify({"error": "Selected beer was not found."}), 404
+                    _apply_beer_to_keg(keg, selected_beer)
 
             target_status = _normalize_keg_status(body.get("status", "full"))
             if target_status not in KEG_STATUSES:
@@ -1153,6 +1503,8 @@ def _keg_csv_rows(kegs: list[dict]) -> list[list]:
     header = [
         "id",
         "name",
+        "beer_id",
+        "beer_name",
         "type",
         "size",
         "custom_size",
@@ -1192,6 +1544,24 @@ def _stock_csv_rows(stock: list[dict]) -> list[list]:
     return rows
 
 
+def _beer_csv_rows(beers: list[dict]) -> list[list]:
+    header = [
+        "id",
+        "name",
+        "type",
+        "brewer",
+        "abv",
+        "ibu",
+        "brewed_on",
+        "notes",
+        "updated_at",
+    ]
+    rows = [header]
+    for beer in beers:
+        rows.append([beer.get(field, "") for field in header])
+    return rows
+
+
 def _rows_to_csv_bytes(rows: list[list]) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -1217,12 +1587,14 @@ def _build_export_archive(data: dict) -> bytes:
         zf.writestr("settings.json", json.dumps(data.get("settings", {}), indent=2))
         zf.writestr("kegs.json", json.dumps(data.get("kegs", []), indent=2))
         zf.writestr("taps.json", json.dumps(data.get("taps", []), indent=2))
+        zf.writestr("beers.json", json.dumps(data.get("beers", []), indent=2))
         zf.writestr("bar_stock.json", json.dumps(data.get("bar_stock", []), indent=2))
         zf.writestr("bartender_export.json", json.dumps(payload, indent=2))
 
         # CSV exports for convenience.
         zf.writestr("kegs.csv", _rows_to_csv_bytes(_keg_csv_rows(data.get("kegs", []))))
         zf.writestr("taps.csv", _rows_to_csv_bytes(_tap_csv_rows(data.get("taps", []))))
+        zf.writestr("beers.csv", _rows_to_csv_bytes(_beer_csv_rows(data.get("beers", []))))
         zf.writestr("bar_stock.csv", _rows_to_csv_bytes(_stock_csv_rows(data.get("bar_stock", []))))
 
     out.seek(0)
@@ -1259,11 +1631,13 @@ def _import_archive_payload(file_bytes: bytes):
             settings = _read_archive_json(zf, "settings.json", {})
             kegs = _read_archive_json(zf, "kegs.json", [])
             taps = _read_archive_json(zf, "taps.json", [])
+            beers = _read_archive_json(zf, "beers.json", [])
             bar_stock = _read_archive_json(zf, "bar_stock.json", [])
             return {
                 "settings": settings if isinstance(settings, dict) else {},
                 "kegs": kegs if isinstance(kegs, list) else [],
                 "taps": taps if isinstance(taps, list) else [],
+                "beers": beers if isinstance(beers, list) else [],
                 "bar_stock": bar_stock if isinstance(bar_stock, list) else [],
             }
     except zipfile.BadZipFile:
@@ -1276,6 +1650,7 @@ def _sanitize_import_payload(raw_data: dict) -> dict:
         "settings": raw_data.get("settings", {}) if isinstance(raw_data.get("settings", {}), dict) else {},
         "kegs": [x for x in raw_data.get("kegs", []) if isinstance(x, dict)] if isinstance(raw_data.get("kegs", []), list) else [],
         "taps": [x for x in raw_data.get("taps", []) if isinstance(raw_data.get("taps", []), list) and isinstance(x, dict)] if isinstance(raw_data.get("taps", []), list) else [],
+        "beers": [x for x in raw_data.get("beers", []) if isinstance(x, dict)] if isinstance(raw_data.get("beers", []), list) else [],
         "bar_stock": [x for x in raw_data.get("bar_stock", []) if isinstance(x, dict)] if isinstance(raw_data.get("bar_stock", []), list) else [],
     }
 
@@ -1348,6 +1723,10 @@ def _apply_import_payload(existing_data: dict, payload: dict, mode: str) -> dict
         merged.get("taps", []),
         incoming.get("taps", []),
     )
+    merged["beers"] = _merge_collection(
+        merged.get("beers", []),
+        incoming.get("beers", []),
+    )
     merged["bar_stock"] = _merge_collection(
         merged.get("bar_stock", []),
         incoming.get("bar_stock", []),
@@ -1359,12 +1738,14 @@ def _import_summary(payload: dict) -> dict:
     settings = payload.get("settings", {}) if isinstance(payload.get("settings", {}), dict) else {}
     kegs = payload.get("kegs", []) if isinstance(payload.get("kegs", []), list) else []
     taps = payload.get("taps", []) if isinstance(payload.get("taps", []), list) else []
+    beers = payload.get("beers", []) if isinstance(payload.get("beers", []), list) else []
     bar_stock = payload.get("bar_stock", []) if isinstance(payload.get("bar_stock", []), list) else []
 
     return {
         "bar_name": settings.get("bar_name") or "My Bar",
         "kegs": len(kegs),
         "taps": len(taps),
+        "beers": len(beers),
         "bar_stock": len(bar_stock),
     }
 
