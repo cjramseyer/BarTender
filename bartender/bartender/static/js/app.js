@@ -23,6 +23,9 @@ document.addEventListener("click", (e) => {
     if (e.target.dataset.lock === "true") {
       return;
     }
+    if (e.target.dataset.overlayClose !== "true") {
+      return;
+    }
     if (e.target.id === "updateNoticeModal") {
       dismissUpdateNotice();
       return;

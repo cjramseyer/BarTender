@@ -44,7 +44,7 @@
       </div>
       <p>
         <span class="badge badge-{{ keg.status }}"
-          >{{ keg.status | replace('_', ' ') | title }}</span
+          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span
         >
       </p>
       <p class="muted">Type: {{ keg.type or '—' }}</p>
@@ -61,7 +61,7 @@
         keg.size or '—' }}{% endif %}
       </p>
       <p class="muted">
-        Volume: {% if keg.current_volume is not none %}{{ keg.current_volume }}
+        Volume Remaining: {% if keg.current_volume is not none %}{{ keg.current_volume }}
         {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
       </p>
       {% if keg.tapped_date %}
@@ -153,7 +153,7 @@
           <option value="">— None —</option>
           {% for keg in kegs %} {% if keg.status in ('full', 'in_use') %}
           <option value="{{ keg.id }}">
-            {{ keg.name }} ({{ keg.status | replace('_', ' ') }}{% if keg.size
+            {{ keg.name }} ({{ 'on-tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ')) }}{% if keg.size
             %}, {{ keg.size }}{% endif %})
           </option>
           {% endif %} {% endfor %}

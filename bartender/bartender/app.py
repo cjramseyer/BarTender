@@ -5,6 +5,7 @@ import os
 import io
 import csv
 import zipfile
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -94,6 +95,9 @@ DEFAULT_DATA = {
             {"name": "Pint", "amount": 16, "unit": "oz"},
         ],
         "default_pour_preset": "8|oz|Half Pint",
+        "analytics_low_keg_threshold_percent": 25,
+        "analytics_days_left_method": "trailing_window",
+        "analytics_days_left_window_days": 14,
     },
     "bar_stock": [],
     "beers": [],
@@ -155,6 +159,15 @@ def load_data() -> dict:
         data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
             data["settings"].get("menu_qr_mode")
         )
+        data["settings"]["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
+            data["settings"].get("analytics_low_keg_threshold_percent")
+        )
+        data["settings"]["analytics_days_left_method"] = _normalize_days_left_method(
+            data["settings"].get("analytics_days_left_method")
+        )
+        data["settings"]["analytics_days_left_window_days"] = _normalize_days_left_window_days(
+            data["settings"].get("analytics_days_left_window_days")
+        )
         data["settings"]["pour_options"] = _normalize_pour_options(
             data["settings"].get("pour_options"),
             data["settings"].get("measurement", "us"),
@@ -175,6 +188,24 @@ def load_data() -> dict:
             data["settings"].get("default_keg_type", ""),
             data["settings"].get("keg_type_choices", []),
         )
+        beer_types = {
+            str(beer.get("type", "")).strip().lower()
+            for beer in data.get("beers", [])
+            if str(beer.get("type", "")).strip()
+        }
+        normalized_choices = [
+            str(choice).strip()
+            for choice in data["settings"].get("keg_type_choices", [])
+            if str(choice).strip()
+        ]
+        if normalized_choices and beer_types:
+            choice_keys = {choice.lower() for choice in normalized_choices}
+            if choice_keys.issubset(beer_types):
+                data["settings"]["keg_type_choices"] = STANDARD_KEG_TYPE_CHOICES.copy()
+                data["settings"]["default_keg_type"] = _normalize_default_keg_type(
+                    data["settings"].get("default_keg_type", ""),
+                    data["settings"].get("keg_type_choices", []),
+                )
         data["pour_events"] = [event for event in data.get("pour_events", []) if isinstance(event, dict)]
         beers_by_id = {
             beer.get("id"): beer for beer in data.get("beers", []) if isinstance(beer.get("id"), int)
@@ -196,9 +227,11 @@ def load_data() -> dict:
                 keg["beer_abv"] = keg.get("abv", "")
             keg.setdefault("beer_ibu", "")
             keg.setdefault("beer_brewed_on", "")
+            keg.setdefault("beer_type", "")
             keg["beer_id"] = _coerce_int(keg.get("beer_id"), None)
             keg.setdefault("beer_name", "")
             keg.setdefault("on_deck", False)
+            keg.setdefault("keg_age_days", 0)
             if keg.get("beer_id") is not None:
                 beer = beers_by_id.get(keg.get("beer_id"))
                 if beer:
@@ -230,6 +263,8 @@ def load_data() -> dict:
                 or keg.get("updated_at")
                 or datetime.now(timezone.utc).isoformat()
             )
+            if _coerce_bool(keg.get("on_deck"), False) and not _can_mark_on_deck(keg):
+                keg["on_deck"] = False
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 
@@ -278,6 +313,27 @@ def _normalize_pour_mode(value) -> str:
     return "manual"
 
 
+def _normalize_days_left_method(value) -> str:
+    method = str(value or "trailing_window").strip().lower()
+    if method in ("trailing_window",):
+        return method
+    return "trailing_window"
+
+
+def _normalize_days_left_window_days(value) -> int:
+    window_days = _coerce_int(value, 14)
+    if window_days is None:
+        return 14
+    return max(3, min(90, window_days))
+
+
+def _normalize_low_keg_threshold(value) -> int:
+    threshold = _coerce_int(value, 25)
+    if threshold is None:
+        return 25
+    return max(1, min(100, threshold))
+
+
 def _normalize_logo_url(value) -> str:
     url = str(value or "").strip()
     if len(url) > 2048:
@@ -322,9 +378,18 @@ def _build_dashboard_analytics(data: dict) -> dict:
     settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
     measurement = settings.get("measurement", "us")
     display_unit = _default_volume_unit(measurement)
+    low_threshold_pct = _normalize_low_keg_threshold(
+        settings.get("analytics_low_keg_threshold_percent")
+    )
+    days_left_method = _normalize_days_left_method(
+        settings.get("analytics_days_left_method")
+    )
+    days_left_window_days = _normalize_days_left_window_days(
+        settings.get("analytics_days_left_window_days")
+    )
     now = datetime.now(timezone.utc)
     recent_window = now - timedelta(days=7)
-    forecast_window = now - timedelta(days=14)
+    forecast_window = now - timedelta(days=days_left_window_days)
 
     events = [event for event in data.get("pour_events", []) if isinstance(event, dict)]
     recent_events = []
@@ -349,7 +414,7 @@ def _build_dashboard_analytics(data: dict) -> dict:
             keg.get("percent_full"),
             _default_percent_for_status(keg.get("status", "empty")),
         )
-        if fill_pct <= 25:
+        if fill_pct <= low_threshold_pct:
             low_volume_kegs.append({
                 "id": keg.get("id"),
                 "name": keg.get("name") or "Unnamed Keg",
@@ -376,7 +441,7 @@ def _build_dashboard_analytics(data: dict) -> dict:
         if not recent_keg_events:
             continue
 
-        daily_rate = sum(recent_keg_events) / 14.0
+        daily_rate = sum(recent_keg_events) / float(days_left_window_days)
         if daily_rate <= 0:
             continue
 
@@ -394,6 +459,9 @@ def _build_dashboard_analytics(data: dict) -> dict:
         "recent_pour_count": len(recent_events),
         "recent_pour_volume": round(total_recent_display, 2),
         "recent_pour_unit": display_unit,
+        "low_keg_threshold_percent": low_threshold_pct,
+        "days_left_method": days_left_method,
+        "days_left_window_days": days_left_window_days,
         "low_volume_kegs": low_volume_kegs,
         "forecast_items": forecast_items[:3],
     }
@@ -538,7 +606,8 @@ def _pour_option_value(option: dict) -> str:
     unit = _normalize_volume_unit(option.get("unit"))
     if amount is None or not unit:
         return ""
-    return f"{amount}|{unit}|{name}"
+    amount_token = format(amount, "g")
+    return f"{amount_token}|{unit}|{name}"
 
 
 def _parse_pour_preset_value(value: str):
@@ -682,7 +751,7 @@ def _get_beer_by_id(data: dict, beer_id: int | None):
 def _apply_beer_to_keg(keg: dict, beer: dict) -> None:
     keg["beer_id"] = beer.get("id")
     keg["beer_name"] = beer.get("name", "")
-    keg["type"] = beer.get("type", "")
+    keg["beer_type"] = beer.get("type", "")
     keg["beer_brewer"] = beer.get("brewer", "")
     keg["beer_brewery"] = beer.get("brewery", "")
     keg["beer_abv"] = beer.get("abv", "")
@@ -863,6 +932,83 @@ def _sync_percent_for_volume_change(
     updated_keg["percent_full"] = _clamp_percent_full(scaled_percent, previous_percent)
 
 
+def _parse_measurement_token(raw_value: str):
+    token = str(raw_value or "").strip()
+    if not token:
+        return None
+    fraction_match = re.fullmatch(r"(\d+)\s*/\s*(\d+)", token)
+    if fraction_match:
+        numerator = int(fraction_match.group(1))
+        denominator = int(fraction_match.group(2))
+        if denominator == 0:
+            return None
+        return numerator / denominator
+    return _coerce_float(token, None)
+
+
+def _extract_keg_capacity(keg: dict):
+    candidates = []
+    if keg.get("size") == "Custom":
+        candidates.append(keg.get("custom_size", ""))
+    else:
+        candidates.append(keg.get("size", ""))
+        candidates.append(keg.get("custom_size", ""))
+
+    pattern = re.compile(
+        r"(\d+(?:\.\d+)?|\d+\s*/\s*\d+)\s*(gal|gallons?|oz|ounces?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)",
+        re.IGNORECASE,
+    )
+
+    for candidate in candidates:
+        text = str(candidate or "").strip()
+        if not text:
+            continue
+
+        preferred_source = text
+        paren_match = re.search(r"\(([^)]*)\)", text)
+        if paren_match:
+            preferred_source = paren_match.group(1)
+
+        matches = pattern.findall(preferred_source) or pattern.findall(text)
+        if not matches:
+            continue
+
+        amount_raw, unit_raw = matches[-1]
+        amount = _parse_measurement_token(amount_raw)
+        unit = _normalize_volume_unit(unit_raw)
+        if amount is None or amount <= 0 or not unit:
+            continue
+        return amount, unit
+
+    return None
+
+
+def _sync_percent_from_current_volume(keg: dict) -> bool:
+    current_volume = _coerce_float(keg.get("current_volume"), None)
+    if current_volume is None:
+        return False
+    if current_volume <= 0:
+        keg["percent_full"] = 0
+        return True
+
+    capacity = _extract_keg_capacity(keg)
+    if capacity is None:
+        return False
+
+    capacity_amount, capacity_unit = capacity
+    volume_unit = _normalize_volume_unit(keg.get("volume_unit"))
+    if not volume_unit:
+        return False
+
+    converted_current = _convert_volume(current_volume, volume_unit, capacity_unit)
+    if converted_current is None:
+        return False
+
+    computed_percent = round((converted_current / capacity_amount) * 100)
+    keg["percent_full"] = _clamp_percent_full(computed_percent, 0)
+    return True
+
+
 def _is_cleaning_transition_allowed(previous_status: str, next_status: str) -> bool:
     """When a keg needs cleaning, it can only be marked clean (empty)."""
     prev = _normalize_keg_status(previous_status)
@@ -870,6 +1016,34 @@ def _is_cleaning_transition_allowed(previous_status: str, next_status: str) -> b
     if prev != "cleaning":
         return True
     return nxt == "empty"
+
+
+def _can_mark_on_deck(keg: dict) -> bool:
+    status = _normalize_keg_status(keg.get("status", "empty"))
+    if status in ("full", "in_use"):
+        return True
+    return bool(str(keg.get("filled_date", "")).strip())
+
+
+def _reset_keg_to_clean_ready(keg: dict) -> None:
+    keg["status"] = "empty"
+    keg["percent_full"] = 0
+    keg["filled_date"] = ""
+    keg["current_volume"] = 0
+    keg["beer_id"] = None
+    keg["beer_name"] = ""
+    keg["beer_type"] = ""
+    keg["type"] = keg.get("type", "")
+    keg["beer_brewer"] = ""
+    keg["beer_brewery"] = ""
+    keg["beer_abv"] = ""
+    keg["beer_ibu"] = ""
+    keg["beer_brewed_on"] = ""
+    keg["brewery"] = ""
+    keg["abv"] = ""
+    keg["tapped_date"] = ""
+    keg["on_deck"] = False
+    keg["keg_age_days"] = 0
 
 
 def _validate_full_keg_requirements(keg_like: dict):
@@ -1192,6 +1366,9 @@ def api_save_settings():
         "menu_qr_mode",
         "pour_options",
         "default_pour_preset",
+        "analytics_low_keg_threshold_percent",
+        "analytics_days_left_method",
+        "analytics_days_left_window_days",
     }
     for key in allowed:
         if key in body:
@@ -1238,6 +1415,15 @@ def api_save_settings():
     )
     data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
         data["settings"].get("menu_qr_mode")
+    )
+    data["settings"]["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
+        data["settings"].get("analytics_low_keg_threshold_percent")
+    )
+    data["settings"]["analytics_days_left_method"] = _normalize_days_left_method(
+        data["settings"].get("analytics_days_left_method")
+    )
+    data["settings"]["analytics_days_left_window_days"] = _normalize_days_left_window_days(
+        data["settings"].get("analytics_days_left_window_days")
     )
     data["settings"]["pour_options"] = _normalize_pour_options(
         data["settings"].get("pour_options"),
@@ -1441,6 +1627,7 @@ API_REFERENCE_ENDPOINTS = [
     ("POST", "/api/kegs/bulk", "Bulk add kegs"),
     ("PUT", "/api/kegs/<id>", "Update a keg"),
     ("POST", "/api/kegs/<id>/fill", "Fill/refill a keg"),
+    ("POST", "/api/kegs/<id>/clean", "Mark a cleaning keg clean and reset to ready defaults"),
     ("POST", "/api/kegs/<id>/pour", "Record a pour and reduce volume"),
     ("DELETE", "/api/kegs/<id>", "Delete a keg"),
     ("GET", "/api/taps", "List all taps"),
@@ -1497,6 +1684,7 @@ def api_add_keg():
         "name": body.get("name", ""),
         "beer_id": beer_id,
         "beer_name": str(body.get("beer_name", "")).strip(),
+        "beer_type": str(body.get("beer_type", "")).strip(),
         "type": keg_type,
         "size": body.get("size", ""),
         "custom_size": body.get("custom_size", ""),
@@ -1538,6 +1726,13 @@ def api_add_keg():
 
     _set_filled_date_for_status_transition(keg, initial_status)
     _sync_percent_for_status(keg, initial_status, has_percent_full)
+    if "current_volume" in body:
+        _sync_percent_from_current_volume(keg)
+    if _coerce_bool(keg.get("on_deck"), False) and not _can_mark_on_deck(keg):
+        return jsonify({
+            "error": "Keg must be filled before it can be marked On Deck.",
+            "code": "ON_DECK_REQUIRES_FILLED_KEG",
+        }), 409
     data["kegs"].append(keg)
     save_data(data)
     return jsonify(keg), 201
@@ -1584,6 +1779,7 @@ def api_add_kegs_bulk():
             "name": item.get("name", ""),
             "beer_id": beer_id,
             "beer_name": str(item.get("beer_name", "")).strip(),
+            "beer_type": str(item.get("beer_type", "")).strip(),
             "type": keg_type,
             "size": item.get("size", ""),
             "custom_size": item.get("custom_size", ""),
@@ -1629,6 +1825,14 @@ def api_add_kegs_bulk():
 
         _set_filled_date_for_status_transition(keg, initial_status)
         _sync_percent_for_status(keg, initial_status, has_percent_full)
+        if "current_volume" in item:
+            _sync_percent_from_current_volume(keg)
+        if _coerce_bool(keg.get("on_deck"), False) and not _can_mark_on_deck(keg):
+            return jsonify({
+                "error": "Keg must be filled before it can be marked On Deck.",
+                "code": "ON_DECK_REQUIRES_FILLED_KEG",
+                "index": index,
+            }), 409
         simulated_data["kegs"].append(keg)
         created.append(keg)
 
@@ -1743,6 +1947,7 @@ def api_update_keg(keg_id: int):
                     keg["beer_name"] = ""
                     for field in (
                         "type",
+                        "beer_type",
                         "beer_brewer",
                         "beer_brewery",
                         "beer_abv",
@@ -1759,12 +1964,31 @@ def api_update_keg(keg_id: int):
             if "volume_unit" in body:
                 keg["volume_unit"] = _normalize_volume_unit(keg.get("volume_unit"))
 
-            _sync_percent_for_volume_change(
-                previous_keg,
-                keg,
-                current_volume_explicit="current_volume" in body,
-                percent_explicit=has_percent_full,
-            )
+            if "current_volume" in body:
+                previous_volume = _coerce_float(previous_keg.get("current_volume"), None)
+                updated_volume = _coerce_float(keg.get("current_volume"), None)
+                volume_changed = not (
+                    previous_volume is None and updated_volume is None
+                ) and not (
+                    previous_volume is not None
+                    and updated_volume is not None
+                    and abs(previous_volume - updated_volume) < 1e-9
+                )
+
+                if volume_changed:
+                    if updated_volume is None:
+                        _sync_percent_for_status(
+                            keg,
+                            keg.get("status", "empty"),
+                            False,
+                        )
+                    elif not _sync_percent_from_current_volume(keg):
+                        _sync_percent_for_volume_change(
+                            previous_keg,
+                            keg,
+                            current_volume_explicit=True,
+                            percent_explicit=has_percent_full,
+                        )
 
             if "status" in body:
                 _set_filled_date_for_status_transition(keg, body["status"])
@@ -1781,6 +2005,18 @@ def api_update_keg(keg_id: int):
                 status_explicit="status" in body,
                 percent_explicit=has_percent_full,
             )
+
+            if (
+                _normalize_keg_status(previous_keg.get("status", "empty")) == "cleaning"
+                and _normalize_keg_status(keg.get("status", "empty")) == "empty"
+            ):
+                _reset_keg_to_clean_ready(keg)
+
+            if _coerce_bool(keg.get("on_deck"), False) and not _can_mark_on_deck(keg):
+                return jsonify({
+                    "error": "Keg must be filled before it can be marked On Deck.",
+                    "code": "ON_DECK_REQUIRES_FILLED_KEG",
+                }), 409
 
             validation_error = _validate_full_keg_requirements(keg)
             if validation_error:
@@ -1811,6 +2047,7 @@ def api_fill_keg(keg_id: int):
                     keg["beer_name"] = ""
                     for field in (
                         "type",
+                        "beer_type",
                         "beer_brewer",
                         "beer_brewery",
                         "beer_abv",
@@ -1843,6 +2080,27 @@ def api_fill_keg(keg_id: int):
             keg["updated_at"] = datetime.now(timezone.utc).isoformat()
             save_data(data)
             return jsonify(keg)
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.route("/api/kegs/<int:keg_id>/clean", methods=["POST"])
+def api_clean_keg(keg_id: int):
+    data = load_data()
+    for keg in data["kegs"]:
+        if keg["id"] != keg_id:
+            continue
+
+        if _normalize_keg_status(keg.get("status", "empty")) != "cleaning":
+            return jsonify({
+                "error": "Only kegs that need cleaning can be marked clean.",
+                "code": "CLEAN_ACTION_REQUIRES_CLEANING_STATUS",
+            }), 409
+
+        _reset_keg_to_clean_ready(keg)
+        keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+        save_data(data)
+        return jsonify(keg)
+
     return jsonify({"error": "Not found"}), 404
 
 

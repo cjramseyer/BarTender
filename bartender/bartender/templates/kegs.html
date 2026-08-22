@@ -21,7 +21,7 @@
   >
     <option value="">All</option>
     <option value="full">Full</option>
-    <option value="in_use">In Use</option>
+    <option value="in_use">On-Tap</option>
     <option value="empty">Empty</option>
     <option value="cleaning">Cleaning</option>
     <option value="retired">Retired</option>
@@ -43,7 +43,7 @@
         <span class="badge badge-cleaning">Line Cleaning</span>
         {% endif %}
         <span class="badge badge-{{ keg.status }}"
-          >{{ keg.status | replace('_', ' ') | title }}</span
+          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span
         >
       </div>
     </div>
@@ -61,12 +61,12 @@
           <span class="keg-level-value">{{ fill_pct }}%</span>
         </div>
       </div>
-      <p><strong>Type:</strong> {{ keg.type or '—' }}</p>
-      <p><strong>Beer:</strong> {{ beer_name }}</p>
       <p>
-        <strong>Size:</strong> {% if keg.size == 'Custom' %}{{ keg.custom_size
-        }}{% else %}{{ keg.size or '—' }}{% endif %}
+        <strong>Keg Type:</strong> {% if keg.size == 'Custom' %}{{
+        keg.custom_size or '—' }}{% else %}{{ keg.size or keg.type or '—' }}{%
+        endif %}
       </p>
+      <p><strong>Beer:</strong> {{ beer_name }}</p>
       <p><strong>Brewer:</strong> {{ beer_brewer or '—' }}</p>
       <p><strong>ABV:</strong> {{ beer_abv or '—' }}{% if beer_abv %}%{% endif %}</p>
       <p><strong>IBU:</strong> {{ keg.beer_ibu or '—' }}</p>
@@ -82,16 +82,17 @@
       <p><strong>Notes:</strong> {{ notes_display }}</p>
     </div>
     <div class="keg-card-footer">
-      {% if keg.status == 'empty' %}
+      {% if keg.status == 'empty' and not keg.filled_date %}
       <button
         class="btn btn-sm btn-primary"
         onclick='openFillKeg({{ keg.id }}, {{ (keg.filled_date or "") | tojson }}, {{ (keg.beer_id or "") | tojson }})'
       >
         Fill Keg
       </button>
-      {% else %}
-      <button class="btn btn-sm btn-primary" type="button" disabled>
-        Fill Keg
+      {% endif %}
+      {% if keg.status == 'cleaning' %}
+      <button class="btn btn-sm btn-secondary" onclick="cleanKeg({{ keg.id }})">
+        Clean Keg
       </button>
       {% endif %}
       <button
@@ -143,7 +144,7 @@
           <label>Status</label>
           <select id="kegStatus" class="form-control">
             <option value="full" data-default-label="Full">Full</option>
-            <option value="in_use" data-default-label="In Use">In Use</option>
+            <option value="in_use" data-default-label="On-Tap">On-Tap</option>
             <option value="empty" selected data-default-label="Empty">Empty</option>
             <option value="cleaning" data-default-label="Cleaning">Cleaning</option>
             <option value="retired" data-default-label="Retired">Retired</option>
@@ -556,6 +557,22 @@
       v === "Custom" ? "" : "none";
   }
 
+  function canMarkOnDeckInForm() {
+    const status = document.getElementById("kegStatus").value;
+    const filledDate = document.getElementById("kegFilled").value;
+    return status === "full" || status === "in_use" || !!String(filledDate || "").trim();
+  }
+
+  function syncOnDeckEligibility() {
+    const checkbox = document.getElementById("kegOnDeck");
+    if (!checkbox) return;
+    const allowed = canMarkOnDeckInForm();
+    checkbox.disabled = !allowed;
+    if (!allowed) {
+      checkbox.checked = false;
+    }
+  }
+
   function populateKegSizeOptions(selectedValue = "") {
     const select = document.getElementById("kegSize");
     if (!select) return;
@@ -615,6 +632,7 @@
     document.getElementById("kegVolumeUnit").value = DEFAULT_VOLUME_UNIT;
     document.getElementById("kegLineCleaning").checked = false;
     document.getElementById("kegOnDeck").checked = false;
+    syncOnDeckEligibility();
     applyLineCleaningConstraint();
     populateKegSizeOptions("");
     openModal("kegModal");
@@ -708,6 +726,7 @@
       keg.percent_full ??
       (keg.status === "full" ? 100 : keg.status === "in_use" ? 50 : 0)
     ).toString();
+    syncOnDeckEligibility();
     toggleCustomSize();
     openModal("kegModal");
   }
@@ -790,6 +809,28 @@
         }
       } catch (err) {
         // Ignore parse errors and keep generic fallback message.
+      }
+      alert(message);
+      return;
+    }
+    location.reload();
+  }
+
+  async function cleanKeg(id) {
+    if (!confirm("Mark this keg clean and reset it to ready defaults?")) return;
+    const response = await fetch(`${INGRESS}/api/kegs/${id}/clean`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      let message = "Unable to clean keg.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) {
+          message = errorBody.error;
+        }
+      } catch (err) {
+        // Keep generic error message.
       }
       alert(message);
       return;
@@ -943,5 +984,15 @@
   wireBeerSelectForAddNew("kegBeer");
   wireBeerSelectForAddNew("fillKegBeer");
   renderKegAges();
+
+  const kegStatusInput = document.getElementById("kegStatus");
+  const kegFilledInput = document.getElementById("kegFilled");
+  if (kegStatusInput) {
+    kegStatusInput.addEventListener("change", syncOnDeckEligibility);
+  }
+  if (kegFilledInput) {
+    kegFilledInput.addEventListener("change", syncOnDeckEligibility);
+    kegFilledInput.addEventListener("input", syncOnDeckEligibility);
+  }
 </script>
 {% endblock %}
