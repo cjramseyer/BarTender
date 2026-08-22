@@ -6,41 +6,52 @@
   </button>
 </div>
 
-<div class="keg-grid" id="beerGrid">
-  {% for beer in beers %}
-  <div class="keg-card" data-id="{{ beer.id }}">
-    <div class="keg-card-header">
-      <span class="keg-name">{{ beer.name }}</span>
-      <span class="badge badge-in_use">Beer</span>
-    </div>
-    <div class="keg-card-body">
-      <p><strong>Packaging:</strong> {{ 'Kegged' if (beer.packaging or 'kegged') == 'kegged' else 'Bottled/Can' }}</p>
-      <p><strong>Type:</strong> {{ beer.type or '—' }}</p>
-      <p><strong>Brewer:</strong> {{ beer.brewer or '—' }}</p>
-      <p><strong>Brewery:</strong> {{ beer.brewery or '—' }}</p>
-      <p><strong>ABV:</strong> {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</p>
-      <p><strong>IBU:</strong> {{ beer.ibu or '—' }}</p>
-      <p><strong>Brewed On:</strong> {{ beer.brewed_on or '—' }}</p>
-      {% if beer.notes %}
-      <p class="muted">{{ beer.notes }}</p>
-      {% endif %}
-    </div>
-    <div class="keg-card-footer">
-      <button
-        class="btn btn-sm btn-secondary"
-        onclick="editBeer({{ beer | tojson | forceescape }})"
-      >
-        Edit
-      </button>
-      <button class="btn btn-sm btn-danger" onclick="deleteBeer({{ beer.id }})">
-        Delete
-      </button>
-    </div>
-  </div>
-  {% else %}
-  <p class="muted">No beers added yet. Add one to use it when filling kegs.</p>
-  {% endfor %}
-</div>
+<table class="table" id="beersTable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Packaging</th>
+      <th>Type</th>
+      <th>Brewer</th>
+      <th>Brewery</th>
+      <th>ABV</th>
+      <th>IBU</th>
+      <th>Brewed On</th>
+      <th>Notes</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for beer in beers %}
+    <tr data-id="{{ beer.id }}">
+      <td>{{ beer.name or '—' }}</td>
+      <td>{{ 'Kegged' if (beer.packaging or 'kegged') == 'kegged' else 'Bottled/Can' }}</td>
+      <td>{{ beer.type or '—' }}</td>
+      <td>{{ beer.brewer or '—' }}</td>
+      <td>{{ beer.brewery or '—' }}</td>
+      <td>{{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</td>
+      <td>{{ beer.ibu or '—' }}</td>
+      <td>{{ beer.brewed_on or '—' }}</td>
+      <td>{{ beer.notes or '—' }}</td>
+      <td>
+        <button
+          class="btn btn-sm btn-secondary"
+          onclick="editBeer({{ beer | tojson | forceescape }})"
+        >
+          Edit
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="deleteBeer({{ beer.id }})">
+          Delete
+        </button>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="10" class="muted text-center">No beers added yet. Add one to use it when filling kegs.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
 <div class="modal" id="beerModal">
   <div class="modal-dialog">

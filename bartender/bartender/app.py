@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 try:
-    import qrcode
+    import qrcode  # type: ignore[reportMissingModuleSource]
 
     QR_IMPORT_ERROR = ""
 except Exception as exc:  # pragma: no cover - environment-specific import failure
@@ -57,6 +57,7 @@ DEFAULT_DATA = {
         "theme": "light",
         "bar_name": "My Bar",
         "bar_logo_url": "",
+        "api_reference_enabled": True,
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
@@ -109,6 +110,10 @@ def load_data() -> dict:
 
         data["settings"]["bar_stock_enabled"] = _coerce_bool(
             data["settings"].get("bar_stock_enabled"),
+            True,
+        )
+        data["settings"]["api_reference_enabled"] = _coerce_bool(
+            data["settings"].get("api_reference_enabled"),
             True,
         )
         data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
@@ -932,15 +937,29 @@ def api_menu_qr():
             503,
         )
 
+    qr_module = qrcode
+    if qr_module is None:
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "QR generation dependencies are not installed.",
+                    "hint": "Install requirements with: pip install -r requirements.txt",
+                    "details": QR_IMPORT_ERROR,
+                }
+            ),
+            503,
+        )
+
     menu_url = _external_menu_url()
 
-    qr = qrcode.QRCode(box_size=8, border=2)
+    qr = qr_module.QRCode(box_size=8, border=2)
     qr.add_data(menu_url)
     qr.make(fit=True)
 
     img = qr.make_image(fill_color="black", back_color="white")
     out = io.BytesIO()
-    img.save(out, format="PNG")
+    img.save(out, "PNG")
     out.seek(0)
     return send_file(
         out,
@@ -993,6 +1012,7 @@ def api_save_settings():
         "theme",
         "bar_name",
         "bar_logo_url",
+        "api_reference_enabled",
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
@@ -1020,6 +1040,10 @@ def api_save_settings():
 
     data["settings"]["bar_stock_enabled"] = _coerce_bool(
         data["settings"].get("bar_stock_enabled"),
+        True,
+    )
+    data["settings"]["api_reference_enabled"] = _coerce_bool(
+        data["settings"].get("api_reference_enabled"),
         True,
     )
     data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
