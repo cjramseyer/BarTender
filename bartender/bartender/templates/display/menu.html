@@ -64,6 +64,11 @@
         margin: 0 auto;
         padding: 1.5rem 1.25rem 2rem;
       }
+      .section-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin: 0 0 0.75rem;
+      }
       .menu-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -134,6 +139,7 @@
     </header>
 
     <main class="container">
+      <h2 class="section-title">What's on tap</h2>
       {% if on_tap %}
       <div class="menu-grid">
         {% for entry in on_tap %}
@@ -157,6 +163,27 @@
       </div>
       {% else %}
       <p class="muted">No kegs are currently assigned to taps.</p>
+      {% endif %}
+
+      <h2 class="section-title" style="margin-top: 1.5rem">Bottled/Can Beers</h2>
+      {% if packaged_beers %}
+      <div class="menu-grid">
+        {% for beer in packaged_beers %}
+        <article class="menu-item">
+          <div class="menu-item-header">
+            <h2>{{ beer.name or 'Unnamed Beer' }}</h2>
+            <span class="badge badge-empty">Packaged</span>
+          </div>
+          <p class="muted">{{ beer.type or '—' }}</p>
+          <p class="muted">Brewer: {{ beer.brewer or '—' }}</p>
+          <p class="muted">Brewery: {{ beer.brewery or '—' }}</p>
+          <p class="muted">ABV: {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</p>
+          <p class="muted">IBU: {{ beer.ibu or '—' }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No bottled/can beers in the catalog.</p>
       {% endif %}
 
       <div class="actions">

@@ -1,6 +1,6 @@
 # BarTender Troubleshooting and FAQ
 
-Last updated: 2026-08-20
+Last updated: 2026-08-22
 
 ## Troubleshooting
 
@@ -25,6 +25,7 @@ Checks:
 Checks:
 
 - Test GET /api/settings first to confirm base connectivity.
+- Use /api-reference in the app to run requests in the current ingress context.
 - Ensure request Content-Type is application/json for POST/PUT.
 - Verify IDs exist before PUT/DELETE.
 
@@ -77,6 +78,14 @@ Checks:
 - For JSON import, ensure payload is valid UTF-8 JSON.
 - For ZIP import, ensure archive is not corrupted and includes export files.
 
+### Beer cannot be deleted
+
+Checks:
+
+- A beer linked to one or more kegs cannot be deleted.
+- Edit affected kegs and clear/reassign the beer first.
+- Retry delete from Beers page after unlinking.
+
 ## FAQ
 
 Q: Does BarTender support importing data?
@@ -93,6 +102,12 @@ A: Yes, if tapped date is empty. Existing tapped dates are preserved.
 
 Q: What statuses are expected for kegs?
 A: full, in_use, empty, cleaning, retired.
+
+Q: Where can I test API calls from the app UI?
+A: Use the API Reference page (`/api-reference`) from Settings or the top navigation.
+
+Q: Why can deleting a beer return 409?
+A: The beer is still assigned to one or more kegs and must be unlinked first.
 
 Q: Is mobile app read/write?
 A: Current mobile app is read-only.

@@ -2,9 +2,14 @@
 %}
 <div class="page-header">
   <h1>🍺 Taps</h1>
-  <button class="btn btn-primary manage-btn" onclick="openAddTap()">
-    + New Tap
-  </button>
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap">
+    <button class="btn btn-primary manage-btn" onclick="openAddTap()">
+      + New Tap
+    </button>
+    <button class="btn btn-secondary" onclick="openBulkTapModal()">
+      + Bulk Create
+    </button>
+  </div>
 </div>
 
 <div class="taps-grid" id="tapsGrid">
@@ -166,10 +171,40 @@
     </form>
   </div>
 </div>
+
+<div class="modal" id="bulkTapModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Bulk Create Taps</h3>
+      <button class="btn btn-icon" onclick="closeModal('bulkTapModal')">✕</button>
+    </div>
+    <form id="bulkTapForm" onsubmit="submitBulkTaps(event)">
+      <div class="form-group">
+        <label>JSON Array</label>
+        <textarea
+          id="bulkTapPayload"
+          class="form-control"
+          rows="12"
+          placeholder='[{"number":1,"label":"Tap 1","keg_id":null}]'
+        ></textarea>
+        <small class="muted">
+          Each item should include: number (required), label (optional), keg_id (optional), notes (optional).
+        </small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('bulkTapModal')">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">Create Taps</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
   const TAPS = {{ taps | tojson }};
+  const KEGS = {{ kegs | tojson }};
 
   async function pourTap(tapId) {
     const select = document.getElementById(`tapPourPreset-${tapId}`);
@@ -229,6 +264,81 @@
       document.querySelectorAll(".tap-card").length + 1;
     document.getElementById("tapLabel").value = nextIncrementedTapLabel();
     openModal("tapModal");
+  }
+
+  function openBulkTapModal() {
+    const usedNumbers = new Set(
+      TAPS.map((tap) => parseInt(tap.number, 10)).filter((n) => !Number.isNaN(n)),
+    );
+    let nextNumber = 1;
+    while (usedNumbers.has(nextNumber)) {
+      nextNumber += 1;
+    }
+    const sampleKeg = KEGS.find((keg) => keg.status === "full" || keg.status === "in_use");
+    const sample = [
+      {
+        number: nextNumber,
+        label: `Tap ${nextNumber}`,
+        keg_id: sampleKeg ? sampleKeg.id : null,
+        notes: "Bulk created"
+      },
+      {
+        number: nextNumber + 1,
+        label: `Tap ${nextNumber + 1}`,
+        keg_id: null,
+        notes: "Ready for assignment"
+      }
+    ];
+    document.getElementById("bulkTapPayload").value = JSON.stringify(sample, null, 2);
+    openModal("bulkTapModal");
+  }
+
+  async function submitBulkTaps(event) {
+    event.preventDefault();
+    const payloadText = document.getElementById("bulkTapPayload").value.trim();
+    if (!payloadText) {
+      alert("Please provide a JSON array of tap objects.");
+      return;
+    }
+
+    let items;
+    try {
+      items = JSON.parse(payloadText);
+    } catch (err) {
+      alert("Bulk payload must be valid JSON.");
+      return;
+    }
+
+    if (!Array.isArray(items) || !items.length) {
+      alert("Bulk payload must be a non-empty JSON array.");
+      return;
+    }
+
+    const response = await fetch(`${INGRESS}/api/taps/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to bulk create taps.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) {
+          message = typeof errorBody.index === "number"
+            ? `${errorBody.error} (item ${errorBody.index + 1})`
+            : errorBody.error;
+        }
+      } catch (err) {
+        // Keep fallback error message.
+      }
+      alert(message);
+      return;
+    }
+
+    const result = await response.json();
+    alert(`Created ${result.count || 0} taps.`);
+    location.reload();
   }
 
   function editTap(tap) {

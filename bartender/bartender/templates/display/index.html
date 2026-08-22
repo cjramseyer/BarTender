@@ -81,6 +81,45 @@
         font-weight: 700;
         margin-bottom: 1rem;
       }
+      .display-top-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .display-top-row .section-title {
+        margin-bottom: 0;
+      }
+      .qr-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 0.65rem;
+        width: 140px;
+        flex: 0 0 auto;
+      }
+      .qr-panel-title {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        margin-bottom: 0.45rem;
+      }
+      .qr-panel img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 4px;
+        background: #fff;
+      }
+      .qr-panel-note {
+        margin-top: 0.35rem;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
       /* Taps */
       .taps-grid {
         display: grid;
@@ -244,6 +283,16 @@
         font-size: 0.78rem;
         color: var(--text-muted);
       }
+      @media (max-width: 720px) {
+        .display-top-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .qr-panel {
+          width: 120px;
+          align-self: flex-end;
+        }
+      }
     </style>
   </head>
   <body>
@@ -258,7 +307,16 @@
 
     <div class="container">
       <!-- Taps -->
-      <div class="section-title">🍺 Taps on Tap</div>
+      <div class="display-top-row">
+        <div class="section-title">🍺 Taps on Tap</div>
+        {% if qr_image_path and qr_ready and menu_qr_mode in ('display', 'both') %}
+        <div class="qr-panel" role="complementary" aria-label="Menu QR code">
+          <div class="qr-panel-title">Menu QR</div>
+          <img src="{{ qr_image_path }}" alt="QR code for the tap menu" loading="lazy" />
+          <div class="qr-panel-note">Scan for menu</div>
+        </div>
+        {% endif %}
+      </div>
       <div class="taps-grid">
         {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
         tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and

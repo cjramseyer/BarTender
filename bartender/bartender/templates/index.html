@@ -37,7 +37,7 @@ content %}
         {% set default_pour_preset = settings.default_pour_preset if settings.default_pour_preset is defined else '' %}
         <div class="tap-pour-row">
         {% if pour_options %}
-        <select id="dashboardTapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
+        <select id="dashboardTapPourPreset-{{ tap.id }}" class="form-control form-control-sm dashboard-pour-select">
           {% for option in pour_options %}
           <option
             value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"

@@ -44,6 +44,9 @@
   <p class="muted">
     Send test requests to BarTender endpoints. Requests run with your current browser session and ingress context.
   </p>
+  <p class="muted">
+    Selecting an endpoint auto-loads sample request data in the expected format.
+  </p>
 
   <form id="apiTestForm" onsubmit="sendApiRequest(event)">
     <div class="form-row">
@@ -65,6 +68,7 @@
           placeholder="/api/kegs"
           required
           list="apiPathSuggestions"
+          oninput="updateBodyState()"
         />
         <datalist id="apiPathSuggestions">
           {% for method, path, description in endpoints %}
@@ -80,7 +84,7 @@
         id="apiBody"
         class="form-control"
         rows="7"
-        placeholder='{"name": "Example"}'
+        placeholder="Select an endpoint to auto-fill sample JSON."
       ></textarea>
       <small id="apiBodyHint" class="muted">
         Required for most POST/PUT endpoints. Leave empty for GET requests.
@@ -94,6 +98,11 @@
   </form>
 
   <div class="form-group" style="margin-top: 1rem">
+    <label>Sample Response</label>
+    <pre id="apiSampleResponse" class="form-control" style="min-height: 180px; white-space: pre-wrap"></pre>
+  </div>
+
+  <div class="form-group" style="margin-top: 1rem">
     <label>Response</label>
     <pre id="apiResponse" class="form-control" style="min-height: 180px; white-space: pre-wrap"></pre>
   </div>
@@ -103,20 +112,533 @@
 {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const SAMPLE_REQUEST_BODIES = {
+    "POST /api/settings": {
+      measurement: "us",
+      theme: "light",
+      bar_name: "Sample Taproom",
+      dashboard_manage_button_position: "top-right",
+      bar_stock_enabled: true,
+      default_keg_type: "IPA",
+      keg_type_choices: ["IPA", "Lager", "Stout"],
+      menu_qr_mode: "url",
+      pour_options: [
+        { name: "Pint", amount: 16, unit: "oz" },
+        { name: "Half Pint", amount: 8, unit: "oz" }
+      ],
+      default_pour_preset: "16|oz|Pint"
+    },
+    "POST /api/stock": {
+      name: "Orange Juice",
+      category: "Mixer",
+      quantity: 6,
+      size_label: "750 ml",
+      size_value: 750,
+      size_unit: "ml",
+      notes: "Keep chilled"
+    },
+    "PUT /api/stock/<id>": {
+      quantity: 5,
+      notes: "Restocked this morning"
+    },
+    "POST /api/beers": {
+      name: "Hazy Trail IPA",
+      type: "IPA",
+      packaging: "kegged",
+      brewer: "Alex Brewer",
+      brewery: "Cedar Valley Brewing",
+      abv: "6.4",
+      ibu: "42",
+      brewed_on: "2026-08-01",
+      notes: "Citrus-forward"
+    },
+    "PUT /api/beers/<id>": {
+      name: "Hazy Trail IPA",
+      packaging: "bottled_can",
+      brewer: "Alex Brewer",
+      brewery: "Cedar Valley Brewing",
+      notes: "Updated tasting notes"
+    },
+    "POST /api/kegs": {
+      name: "Taproom Keg #12",
+      beer_id: 1,
+      size: "1/6 bbl (5.2 gal)",
+      status: "full",
+      current_volume: 5.2,
+      volume_unit: "gal",
+      percent_full: 100,
+      filled_date: "2026-08-22",
+      notes: "Front bar"
+    },
+    "POST /api/kegs/bulk": {
+      items: [
+        {
+          name: "Keg 21",
+          beer_id: 1,
+          size: "1/6 bbl (5.2 gal)",
+          status: "full",
+          current_volume: 5.2,
+          volume_unit: "gal",
+          percent_full: 100
+        },
+        {
+          name: "Keg 22",
+          status: "empty",
+          size: "1/6 bbl (5.2 gal)",
+          percent_full: 0
+        }
+      ]
+    },
+    "PUT /api/kegs/<id>": {
+      status: "in_use",
+      percent_full: 84,
+      notes: "Moved to patio tap"
+    },
+    "POST /api/kegs/<id>/fill": {
+      beer_id: 1,
+      status: "full",
+      filled_date: "2026-08-22",
+      percent_full: 100,
+      force: false
+    },
+    "POST /api/kegs/<id>/pour": {
+      amount: 16,
+      unit: "oz"
+    },
+    "POST /api/taps": {
+      number: 1,
+      label: "Main Bar 1",
+      keg_id: 1,
+      notes: "Most popular"
+    },
+    "POST /api/taps/bulk": {
+      items: [
+        {
+          number: 7,
+          label: "Tap 7",
+          keg_id: 1,
+          notes: "Bulk created"
+        },
+        {
+          number: 8,
+          label: "Tap 8",
+          keg_id: null,
+          notes: "Ready for assignment"
+        }
+      ]
+    },
+    "PUT /api/taps/<id>": {
+      label: "Main Bar Left",
+      keg_id: 2,
+      notes: "Rotated keg"
+    },
+    "POST /api/taps/<id>/pour": {
+      amount: 12,
+      unit: "oz"
+    },
+    "POST /api/import/json": {
+      format: "bartender-export",
+      version: 1,
+      exported_at: "2026-08-22T12:00:00Z",
+      data: {
+        settings: {
+          measurement: "us",
+          theme: "light",
+          bar_name: "Sample Taproom"
+        },
+        beers: [],
+        kegs: [],
+        taps: [],
+        bar_stock: []
+      }
+    },
+    "POST /api/import/json/preview": {
+      format: "bartender-export",
+      version: 1,
+      exported_at: "2026-08-22T12:00:00Z",
+      data: {
+        settings: {
+          measurement: "us",
+          theme: "light",
+          bar_name: "Sample Taproom"
+        },
+        beers: [],
+        kegs: [],
+        taps: [],
+        bar_stock: []
+      }
+    }
+  };
+
+  const SAMPLE_RESPONSES = {
+    "GET /api/settings": {
+      status: "200 OK",
+      body: {
+        measurement: "us",
+        theme: "light",
+        bar_name: "Sample Taproom",
+        dashboard_manage_button_position: "top-right",
+        bar_stock_enabled: true,
+        default_keg_type: "IPA",
+        keg_type_choices: ["IPA", "Lager", "Stout"],
+        menu_qr_mode: "url",
+        pour_options: [
+          { name: "Pint", amount: 16, unit: "oz" },
+          { name: "Half Pint", amount: 8, unit: "oz" }
+        ],
+        default_pour_preset: "16|oz|Pint"
+      }
+    },
+    "POST /api/settings": {
+      status: "200 OK",
+      body: {
+        measurement: "us",
+        theme: "light",
+        bar_name: "Sample Taproom"
+      }
+    },
+    "GET /api/beers": {
+      status: "200 OK",
+      body: [
+        {
+          id: 1,
+          name: "Hazy Trail IPA",
+          type: "IPA",
+          packaging: "kegged",
+          brewer: "Alex Brewer",
+          brewery: "Cedar Valley Brewing",
+          abv: "6.4",
+          ibu: "42",
+          brewed_on: "2026-08-01",
+          notes: "Citrus-forward",
+          updated_at: "2026-08-22T12:00:00Z"
+        }
+      ]
+    },
+    "POST /api/beers": {
+      status: "201 Created",
+      body: {
+        id: 2,
+        name: "Hazy Trail IPA",
+        type: "IPA",
+        packaging: "kegged",
+        brewer: "Alex Brewer",
+        brewery: "Cedar Valley Brewing",
+        abv: "6.4",
+        ibu: "42",
+        brewed_on: "2026-08-01",
+        notes: "Citrus-forward",
+        updated_at: "2026-08-22T12:01:00Z"
+      }
+    },
+    "PUT /api/beers/<id>": {
+      status: "200 OK",
+      body: {
+        id: 1,
+        name: "Hazy Trail IPA",
+        type: "IPA",
+        packaging: "bottled_can",
+        brewer: "Alex Brewer",
+        brewery: "Cedar Valley Brewing",
+        abv: "6.4",
+        ibu: "42",
+        brewed_on: "2026-08-01",
+        notes: "Updated tasting notes",
+        updated_at: "2026-08-22T12:02:00Z"
+      }
+    },
+    "DELETE /api/beers/<id>": {
+      status: "200 OK",
+      body: { ok: true }
+    },
+    "GET /api/kegs": {
+      status: "200 OK",
+      body: [
+        {
+          id: 1,
+          name: "Taproom Keg #12",
+          beer_id: 1,
+          beer_name: "Hazy Trail IPA",
+          type: "IPA",
+          size: "1/6 bbl (5.2 gal)",
+          status: "in_use",
+          beer_brewer: "Alex Brewer",
+          beer_brewery: "Cedar Valley Brewing",
+          beer_abv: "6.4",
+          current_volume: 4.6,
+          volume_unit: "gal",
+          percent_full: 88,
+          updated_at: "2026-08-22T12:03:00Z"
+        }
+      ]
+    },
+    "POST /api/kegs": {
+      status: "201 Created",
+      body: {
+        id: 3,
+        name: "Taproom Keg #12",
+        beer_id: 1,
+        beer_name: "Hazy Trail IPA",
+        status: "full",
+        percent_full: 100,
+        updated_at: "2026-08-22T12:04:00Z"
+      }
+    },
+    "POST /api/kegs/bulk": {
+      status: "201 Created",
+      body: {
+        ok: true,
+        count: 2,
+        created: [
+          { id: 21, name: "Keg 21", status: "full" },
+          { id: 22, name: "Keg 22", status: "empty" }
+        ]
+      }
+    },
+    "PUT /api/kegs/<id>": {
+      status: "200 OK",
+      body: {
+        id: 1,
+        status: "in_use",
+        percent_full: 84,
+        notes: "Moved to patio tap",
+        updated_at: "2026-08-22T12:05:00Z"
+      }
+    },
+    "POST /api/kegs/<id>/fill": {
+      status: "200 OK",
+      body: {
+        id: 1,
+        status: "full",
+        percent_full: 100,
+        filled_date: "2026-08-22",
+        updated_at: "2026-08-22T12:06:00Z"
+      }
+    },
+    "POST /api/kegs/<id>/pour": {
+      status: "200 OK",
+      body: {
+        ok: true,
+        poured: {
+          requested_amount: 16,
+          requested_unit: "oz",
+          converted_amount: 0.125,
+          keg_unit: "gal"
+        },
+        keg: {
+          id: 1,
+          current_volume: 4.475,
+          percent_full: 86,
+          status: "in_use"
+        }
+      }
+    },
+    "DELETE /api/kegs/<id>": {
+      status: "200 OK",
+      body: { ok: true }
+    },
+    "GET /api/taps": {
+      status: "200 OK",
+      body: [
+        {
+          id: 1,
+          number: 1,
+          label: "Main Bar 1",
+          keg_id: 1,
+          notes: "Most popular",
+          updated_at: "2026-08-22T12:07:00Z"
+        }
+      ]
+    },
+    "POST /api/taps": {
+      status: "201 Created",
+      body: {
+        id: 2,
+        number: 2,
+        label: "Main Bar 2",
+        keg_id: 3,
+        notes: "New line",
+        updated_at: "2026-08-22T12:08:00Z"
+      }
+    },
+    "POST /api/taps/bulk": {
+      status: "201 Created",
+      body: {
+        ok: true,
+        count: 2,
+        created: [
+          { id: 7, number: 7, label: "Tap 7", keg_id: 1 },
+          { id: 8, number: 8, label: "Tap 8", keg_id: null }
+        ]
+      }
+    },
+    "PUT /api/taps/<id>": {
+      status: "200 OK",
+      body: {
+        id: 1,
+        number: 1,
+        label: "Main Bar Left",
+        keg_id: 2,
+        notes: "Rotated keg",
+        updated_at: "2026-08-22T12:09:00Z"
+      }
+    },
+    "POST /api/taps/<id>/pour": {
+      status: "200 OK",
+      body: {
+        ok: true,
+        poured: {
+          requested_amount: 12,
+          requested_unit: "oz"
+        },
+        keg: {
+          id: 2,
+          status: "in_use",
+          current_volume: 4.2,
+          percent_full: 81
+        }
+      }
+    },
+    "DELETE /api/taps/<id>": {
+      status: "200 OK",
+      body: { ok: true }
+    },
+    "POST /api/import/json": {
+      status: "200 OK",
+      body: { ok: true, mode: "replace" }
+    },
+    "POST /api/import/json/preview": {
+      status: "200 OK",
+      body: {
+        ok: true,
+        mode: "replace",
+        summary: {
+          settings: 1,
+          beers: 0,
+          kegs: 0,
+          taps: 0,
+          bar_stock: 0
+        }
+      }
+    },
+    "GET /api/menu/qr/health": {
+      status: "200 OK",
+      body: {
+        ok: true,
+        dependency_ready: true
+      }
+    },
+    "GET /api/export/json": {
+      status: "200 OK",
+      body: {
+        note: "Returns downloadable application/json file: bartender_export.json"
+      }
+    },
+    "GET /api/export/archive": {
+      status: "200 OK",
+      body: {
+        note: "Returns downloadable application/zip file: bartender_export.zip"
+      }
+    },
+    "GET /api/export/csv": {
+      status: "200 OK",
+      body: {
+        note: "Legacy alias. Returns downloadable application/zip file: bartender_export.zip"
+      }
+    },
+    "POST /api/import/archive": {
+      status: "200 OK",
+      body: { ok: true, mode: "replace" }
+    },
+    "POST /api/import/archive/preview": {
+      status: "200 OK",
+      body: {
+        ok: true,
+        mode: "replace",
+        summary: {
+          settings: 1,
+          beers: 3,
+          kegs: 2,
+          taps: 2,
+          bar_stock: 4
+        }
+      }
+    }
+  };
+
+  function getSampleResponse(method, path) {
+    const key = `${method} ${normalizePathForSample(path)}`;
+    return SAMPLE_RESPONSES[key] || null;
+  }
+
+  function renderSampleResponse(method, path) {
+    const output = document.getElementById("apiSampleResponse");
+    const sample = getSampleResponse(method, path);
+    if (!sample) {
+      output.textContent = "No sample response available for this endpoint yet.";
+      return;
+    }
+
+    output.textContent = `${sample.status}\n\n${JSON.stringify(sample.body, null, 2)}`;
+  }
+
+  function normalizePathForSample(path) {
+    return String(path || "").replace(/\/\d+/g, "/<id>");
+  }
+
+  function isMultipartEndpoint(path) {
+    const normalizedPath = normalizePathForSample(path);
+    return (
+      normalizedPath === "/api/import/archive" ||
+      normalizedPath === "/api/import/archive/preview"
+    );
+  }
+
+  function getSampleBody(method, path) {
+    const key = `${method} ${normalizePathForSample(path)}`;
+    return SAMPLE_REQUEST_BODIES[key] || null;
+  }
+
+  function loadSampleBody(method, path) {
+    const sample = getSampleBody(method, path);
+    if (!sample) {
+      return false;
+    }
+    document.getElementById("apiBody").value = JSON.stringify(sample, null, 2);
+    return true;
+  }
 
   function updateBodyState() {
     const method = document.getElementById("apiMethod").value;
+    const path = document.getElementById("apiPath").value.trim();
     const bodyInput = document.getElementById("apiBody");
     const bodyHint = document.getElementById("apiBodyHint");
     const isBodyMethod = method === "POST" || method === "PUT";
+    const expectsMultipart = isMultipartEndpoint(path);
+    const supportsJsonBody = isBodyMethod && !expectsMultipart;
 
-    bodyInput.disabled = !isBodyMethod;
-    bodyInput.placeholder = isBodyMethod
-      ? '{"name": "Example"}'
+    bodyInput.disabled = !supportsJsonBody;
+    bodyInput.placeholder = supportsJsonBody
+      ? "Sample JSON is loaded automatically for known endpoints."
       : "Body disabled for this method.";
-    bodyHint.textContent = isBodyMethod
-      ? "Provide valid JSON for this request body."
-      : "Body is ignored for this method.";
+
+    if (expectsMultipart) {
+      bodyHint.textContent = "This endpoint expects multipart/form-data with a file upload and is not supported by this JSON tester.";
+      bodyInput.value = "";
+      return;
+    }
+
+    if (supportsJsonBody) {
+      const loadedSample = loadSampleBody(method, path);
+      bodyHint.textContent = loadedSample
+        ? "Sample JSON loaded. Edit values as needed before sending."
+        : "Provide valid JSON for this request body.";
+      renderSampleResponse(method, path);
+      return;
+    }
+
+    bodyHint.textContent = "Body is ignored for this method.";
+    renderSampleResponse(method, path);
   }
 
   function useEndpoint(method, path) {

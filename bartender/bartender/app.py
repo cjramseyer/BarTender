@@ -47,6 +47,17 @@ DEFAULT_DATA = {
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
+        "keg_type_choices": [
+            "IPA",
+            "Pale Ale",
+            "Lager",
+            "Stout",
+            "Porter",
+            "Wheat",
+            "Sour",
+            "Cider",
+            "Other",
+        ],
         "menu_qr_mode": "both",
         "pour_options": [
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
@@ -109,6 +120,15 @@ def load_data() -> dict:
             data["settings"].get("pour_options", []),
         )
         data["beers"] = _normalize_beers(data.get("beers", []))
+        data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
+            data["settings"].get("keg_type_choices", []),
+            data.get("beers", []),
+            data["settings"].get("default_keg_type", ""),
+        )
+        data["settings"]["default_keg_type"] = _normalize_default_keg_type(
+            data["settings"].get("default_keg_type", ""),
+            data["settings"].get("keg_type_choices", []),
+        )
         beers_by_id = {
             beer.get("id"): beer for beer in data.get("beers", []) if isinstance(beer.get("id"), int)
         }
@@ -157,6 +177,11 @@ def load_data() -> dict:
                 keg["percent_full"] = _default_percent_for_status(keg.get("status", "empty"))
             else:
                 keg["percent_full"] = _clamp_percent_full(keg.get("percent_full"), _default_percent_for_status(keg.get("status", "empty")))
+            keg["created_at"] = (
+                keg.get("created_at")
+                or keg.get("updated_at")
+                or datetime.now(timezone.utc).isoformat()
+            )
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 
@@ -350,6 +375,55 @@ def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str
     return _pour_option_value(pour_options[0])
 
 
+def _normalize_keg_type_choices(raw_choices, beers: list[dict], default_type: str) -> list[str]:
+    choices = []
+    seen = set()
+
+    if isinstance(raw_choices, list):
+        for item in raw_choices:
+            value = str(item or "").strip()
+            key = value.lower()
+            if not value or key in seen:
+                continue
+            seen.add(key)
+            choices.append(value)
+
+    for beer in beers:
+        if not isinstance(beer, dict):
+            continue
+        value = str(beer.get("type", "")).strip()
+        key = value.lower()
+        if not value or key in seen:
+            continue
+        seen.add(key)
+        choices.append(value)
+
+    fallback = str(default_type or "").strip()
+    fallback_key = fallback.lower()
+    if fallback and fallback_key not in seen:
+        choices.append(fallback)
+
+    if choices:
+        return choices
+
+    return ["IPA", "Lager", "Stout", "Other"]
+
+
+def _normalize_default_keg_type(raw_default: str, choices: list[str]) -> str:
+    default_value = str(raw_default or "").strip()
+    if not choices:
+        return default_value
+
+    if not default_value:
+        return choices[0]
+
+    for item in choices:
+        if item.lower() == default_value.lower():
+            return item
+
+    return choices[0]
+
+
 def _normalize_beers(raw_beers) -> list[dict]:
     if not isinstance(raw_beers, list):
         return []
@@ -381,7 +455,9 @@ def _normalize_beers(raw_beers) -> list[dict]:
             "id": candidate_id,
             "name": str(entry.get("name", "")).strip(),
             "type": str(entry.get("type", entry.get("style", ""))).strip(),
+            "packaging": _normalize_beer_packaging(entry.get("packaging", "kegged")),
             "brewer": str(entry.get("brewer", "")).strip(),
+            "brewery": str(entry.get("brewery", "")).strip(),
             "abv": str(entry.get("abv", "")).strip(),
             "ibu": str(entry.get("ibu", "")).strip(),
             "brewed_on": str(entry.get("brewed_on", "")).strip(),
@@ -390,6 +466,17 @@ def _normalize_beers(raw_beers) -> list[dict]:
         })
 
     return normalized
+
+
+def _normalize_beer_packaging(value) -> str:
+    packaging = str(value or "kegged").strip().lower().replace("/", "_")
+    if packaging in ("bottled", "bottle", "can", "canned", "bottled_can"):
+        return "bottled_can"
+    return "kegged"
+
+
+def _is_beer_kegged(beer: dict) -> bool:
+    return _normalize_beer_packaging(beer.get("packaging")) == "kegged"
 
 
 def _get_beer_by_id(data: dict, beer_id: int | None):
@@ -406,6 +493,7 @@ def _apply_beer_to_keg(keg: dict, beer: dict) -> None:
     keg["beer_name"] = beer.get("name", "")
     keg["type"] = beer.get("type", "")
     keg["beer_brewer"] = beer.get("brewer", "")
+    keg["beer_brewery"] = beer.get("brewery", "")
     keg["beer_abv"] = beer.get("abv", "")
     keg["beer_ibu"] = beer.get("ibu", "")
     keg["beer_brewed_on"] = beer.get("brewed_on", "")
@@ -715,12 +803,18 @@ def api_reference():
 @app.route("/display")
 def display_view():
     data = load_data()
+    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
+    qr_ready = _qr_is_available()
     return render_template(
         "display/index.html",
         settings=data["settings"],
         taps=data["taps"],
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
+        qr_image_path=qr_image_path,
+        menu_qr_mode=menu_qr_mode,
+        qr_ready=qr_ready,
     )
 
 
@@ -730,6 +824,14 @@ def menu_view():
     kegs_by_id = {
         keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
     }
+    packaged_beers = sorted(
+        [
+            beer
+            for beer in data.get("beers", [])
+            if _normalize_beer_packaging(beer.get("packaging", "kegged")) != "kegged"
+        ],
+        key=lambda beer: str(beer.get("name", "")).lower(),
+    )
 
     on_tap = []
     for tap in sorted(
@@ -760,10 +862,27 @@ def menu_view():
         "menu.html",
         settings=data["settings"],
         on_tap=on_tap,
+        packaged_beers=packaged_beers,
         menu_path=menu_path,
         qr_image_path=qr_image_path,
         menu_qr_mode=menu_qr_mode,
         qr_ready=qr_ready,
+        qr_error=QR_IMPORT_ERROR,
+        ingress=INGRESS_PATH,
+    )
+
+
+@app.route("/menu/qr-print")
+def menu_qr_print_view():
+    data = load_data()
+    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    return render_template(
+        "menu_qr_print.html",
+        settings=data["settings"],
+        menu_path=menu_path,
+        qr_image_path=qr_image_path,
+        qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         ingress=INGRESS_PATH,
     )
@@ -848,6 +967,7 @@ def api_save_settings():
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
+        "keg_type_choices",
         "menu_qr_mode",
         "pour_options",
         "default_pour_preset",
@@ -873,9 +993,15 @@ def api_save_settings():
         data["settings"].get("bar_stock_enabled"),
         True,
     )
-    data["settings"]["default_keg_type"] = str(
-        data["settings"].get("default_keg_type", "")
-    ).strip()
+    data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
+        data["settings"].get("keg_type_choices", []),
+        data.get("beers", []),
+        data["settings"].get("default_keg_type", ""),
+    )
+    data["settings"]["default_keg_type"] = _normalize_default_keg_type(
+        data["settings"].get("default_keg_type", ""),
+        data["settings"].get("keg_type_choices", []),
+    )
     data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
         data["settings"].get("menu_qr_mode")
     )
@@ -989,7 +1115,9 @@ def api_add_beer():
         "id": _next_id(data.get("beers", [])),
         "name": name,
         "type": str(body.get("type", "")).strip(),
+        "packaging": _normalize_beer_packaging(body.get("packaging", "kegged")),
         "brewer": str(body.get("brewer", "")).strip(),
+        "brewery": str(body.get("brewery", "")).strip(),
         "abv": str(body.get("abv", "")).strip(),
         "ibu": str(body.get("ibu", "")).strip(),
         "brewed_on": str(body.get("brewed_on", "")).strip(),
@@ -1011,9 +1139,11 @@ def api_update_beer(beer_id: int):
         if beer.get("id") != beer_id:
             continue
 
-        for field in ("name", "type", "brewer", "abv", "ibu", "brewed_on", "notes"):
+        for field in ("name", "type", "brewer", "brewery", "abv", "ibu", "brewed_on", "notes"):
             if field in body:
                 beer[field] = str(body.get(field, "")).strip()
+        if "packaging" in body:
+            beer["packaging"] = _normalize_beer_packaging(body.get("packaging"))
 
         if not str(beer.get("name", "")).strip():
             return jsonify({"error": "Beer name is required."}), 400
@@ -1071,12 +1201,14 @@ API_REFERENCE_ENDPOINTS = [
     ("DELETE", "/api/beers/<id>", "Delete a beer"),
     ("GET", "/api/kegs", "List all kegs"),
     ("POST", "/api/kegs", "Add a keg"),
+    ("POST", "/api/kegs/bulk", "Bulk add kegs"),
     ("PUT", "/api/kegs/<id>", "Update a keg"),
     ("POST", "/api/kegs/<id>/fill", "Fill/refill a keg"),
     ("POST", "/api/kegs/<id>/pour", "Record a pour and reduce volume"),
     ("DELETE", "/api/kegs/<id>", "Delete a keg"),
     ("GET", "/api/taps", "List all taps"),
     ("POST", "/api/taps", "Add a tap"),
+    ("POST", "/api/taps/bulk", "Bulk add taps"),
     ("PUT", "/api/taps/<id>", "Update a tap"),
     ("POST", "/api/taps/<id>/pour", "Record a pour for the assigned keg"),
     ("DELETE", "/api/taps/<id>", "Delete a tap"),
@@ -1116,10 +1248,13 @@ def api_add_keg():
     selected_beer = _get_beer_by_id(data, beer_id)
     if beer_id is not None and not selected_beer:
         return jsonify({"error": "Selected beer was not found."}), 404
+    if selected_beer and not _is_beer_kegged(selected_beer):
+        return jsonify({"error": "Only kegged beers can be assigned to kegs."}), 409
 
     keg_type = str(body.get("type", "")).strip() or str(
         data.get("settings", {}).get("default_keg_type", "")
     ).strip()
+    timestamp = datetime.now(timezone.utc).isoformat()
     keg = {
         "id": _next_id(data["kegs"]),
         "name": body.get("name", ""),
@@ -1146,7 +1281,8 @@ def api_add_keg():
         "tapped_date": body.get("tapped_date", ""),
         "filled_date": incoming_filled_date,
         "percent_full": _clamp_percent_full(body.get("percent_full"), _default_percent_for_status(initial_status)),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": timestamp,
+        "updated_at": timestamp,
     }
 
     if selected_beer:
@@ -1167,6 +1303,98 @@ def api_add_keg():
     data["kegs"].append(keg)
     save_data(data)
     return jsonify(keg), 201
+
+
+@app.route("/api/kegs/bulk", methods=["POST"])
+def api_add_kegs_bulk():
+    data = load_data()
+    body = request.get_json(force=True)
+    items = body if isinstance(body, list) else body.get("items", [])
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "Body must include a non-empty items array."}), 400
+
+    simulated_data = json.loads(json.dumps(data))
+    created = []
+
+    for index, raw_item in enumerate(items):
+        if not isinstance(raw_item, dict):
+            return jsonify({
+                "error": "Each bulk item must be an object.",
+                "index": index,
+            }), 400
+
+        item = dict(raw_item)
+        initial_status = _normalize_keg_status(item.get("status", "empty"))
+        incoming_filled_date = item.get("filled_date", item.get("purchased_date", ""))
+        has_percent_full = "percent_full" in item
+        beer_id = _coerce_int(item.get("beer_id"), None)
+        if item.get("beer_id") not in (None, "") and beer_id is None:
+            return jsonify({"error": "Invalid beer selection.", "index": index}), 400
+
+        selected_beer = _get_beer_by_id(simulated_data, beer_id)
+        if beer_id is not None and not selected_beer:
+            return jsonify({"error": "Selected beer was not found.", "index": index}), 404
+        if selected_beer and not _is_beer_kegged(selected_beer):
+            return jsonify({"error": "Only kegged beers can be assigned to kegs.", "index": index}), 409
+
+        keg_type = str(item.get("type", "")).strip() or str(
+            simulated_data.get("settings", {}).get("default_keg_type", "")
+        ).strip()
+        timestamp = datetime.now(timezone.utc).isoformat()
+        keg = {
+            "id": _next_id(simulated_data["kegs"]),
+            "name": item.get("name", ""),
+            "beer_id": beer_id,
+            "beer_name": str(item.get("beer_name", "")).strip(),
+            "type": keg_type,
+            "size": item.get("size", ""),
+            "custom_size": item.get("custom_size", ""),
+            "status": initial_status,
+            "beer_brewer": item.get("beer_brewer", item.get("brewery", "")),
+            "beer_abv": item.get("beer_abv", item.get("abv", "")),
+            "beer_ibu": item.get("beer_ibu", ""),
+            "beer_brewed_on": item.get("beer_brewed_on", ""),
+            "line_cleaning_keg": _coerce_bool(item.get("line_cleaning_keg"), False),
+            "current_volume": _coerce_float(item.get("current_volume"), None),
+            "volume_unit": _normalize_volume_unit(
+                item.get("volume_unit")
+                or _default_volume_unit(simulated_data.get("settings", {}).get("measurement", "us"))
+            ),
+            "brewery": item.get("brewery", item.get("beer_brewer", "")),
+            "abv": item.get("abv", item.get("beer_abv", "")),
+            "notes": item.get("notes", ""),
+            "tapped_date": item.get("tapped_date", ""),
+            "filled_date": incoming_filled_date,
+            "percent_full": _clamp_percent_full(item.get("percent_full"), _default_percent_for_status(initial_status)),
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+
+        if selected_beer:
+            _apply_beer_to_keg(keg, selected_beer)
+
+        if keg.get("line_cleaning_keg") and any(
+            _coerce_bool(existing.get("line_cleaning_keg"), False)
+            for existing in simulated_data.get("kegs", [])
+        ):
+            return jsonify({
+                "error": "Only one keg can be marked as the line cleaning keg.",
+                "code": "LINE_CLEANING_KEG_EXISTS",
+                "index": index,
+            }), 409
+
+        validation_error = _validate_full_keg_requirements(keg)
+        if validation_error:
+            validation_error["index"] = index
+            return jsonify(validation_error), 409
+
+        _set_filled_date_for_status_transition(keg, initial_status)
+        _sync_percent_for_status(keg, initial_status, has_percent_full)
+        simulated_data["kegs"].append(keg)
+        created.append(keg)
+
+    save_data(simulated_data)
+    return jsonify({"ok": True, "created": created, "count": len(created)}), 201
 
 
 @app.route("/api/kegs/<int:keg_id>", methods=["PUT"])
@@ -1223,6 +1451,8 @@ def api_update_keg(keg_id: int):
                     selected_beer = _get_beer_by_id(data, parsed_beer_id)
                     if not selected_beer:
                         return jsonify({"error": "Selected beer was not found."}), 404
+                    if not _is_beer_kegged(selected_beer):
+                        return jsonify({"error": "Only kegged beers can be assigned to kegs."}), 409
 
             has_percent_full = "percent_full" in body
             if has_percent_full:
@@ -1274,9 +1504,11 @@ def api_update_keg(keg_id: int):
                     for field in (
                         "type",
                         "beer_brewer",
+                        "beer_brewery",
                         "beer_abv",
                         "beer_ibu",
                         "beer_brewed_on",
+                        "beer_packaging",
                         "brewery",
                         "abv",
                     ):
@@ -1340,9 +1572,11 @@ def api_fill_keg(keg_id: int):
                     for field in (
                         "type",
                         "beer_brewer",
+                        "beer_brewery",
                         "beer_abv",
                         "beer_ibu",
                         "beer_brewed_on",
+                        "beer_packaging",
                         "brewery",
                         "abv",
                     ):
@@ -1351,6 +1585,8 @@ def api_fill_keg(keg_id: int):
                     selected_beer = _get_beer_by_id(data, parsed_beer_id)
                     if not selected_beer:
                         return jsonify({"error": "Selected beer was not found."}), 404
+                    if not _is_beer_kegged(selected_beer):
+                        return jsonify({"error": "Only kegged beers can be assigned to kegs."}), 409
                     _apply_beer_to_keg(keg, selected_beer)
 
             target_status = _normalize_keg_status(body.get("status", "full"))
@@ -1471,6 +1707,56 @@ def api_add_tap():
     return jsonify(tap), 201
 
 
+@app.route("/api/taps/bulk", methods=["POST"])
+def api_add_taps_bulk():
+    data = load_data()
+    body = request.get_json(force=True)
+    items = body if isinstance(body, list) else body.get("items", [])
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "Body must include a non-empty items array."}), 400
+
+    simulated_data = json.loads(json.dumps(data))
+    created = []
+
+    for index, raw_item in enumerate(items):
+        if not isinstance(raw_item, dict):
+            return jsonify({
+                "error": "Each bulk item must be an object.",
+                "index": index,
+            }), 400
+
+        item = dict(raw_item)
+        keg_id = item.get("keg_id")
+        if keg_id in ("", None):
+            keg_id = None
+        else:
+            keg_id = _coerce_int(keg_id, None)
+            if keg_id is None:
+                return jsonify({"error": "Invalid keg_id.", "index": index}), 400
+
+        if keg_id is not None and not any(k.get("id") == keg_id for k in simulated_data.get("kegs", [])):
+            return jsonify({"error": "Assigned keg not found.", "index": index}), 404
+
+        number = _coerce_int(item.get("number"), None)
+        if number is None or number <= 0:
+            return jsonify({"error": "Tap number must be a positive integer.", "index": index}), 400
+
+        tap = {
+            "id": _next_id(simulated_data["taps"]),
+            "number": number,
+            "label": item.get("label", ""),
+            "keg_id": keg_id,
+            "notes": item.get("notes", ""),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _set_keg_tapped_date_if_missing(simulated_data, tap.get("keg_id"))
+        simulated_data["taps"].append(tap)
+        created.append(tap)
+
+    save_data(simulated_data)
+    return jsonify({"ok": True, "created": created, "count": len(created)}), 201
+
+
 @app.route("/api/taps/<int:tap_id>", methods=["PUT"])
 def api_update_tap(tap_id: int):
     data = load_data()
@@ -1502,6 +1788,7 @@ def api_delete_tap(tap_id: int):
 def _keg_csv_rows(kegs: list[dict]) -> list[list]:
     header = [
         "id",
+        "created_at",
         "name",
         "beer_id",
         "beer_name",
@@ -1549,7 +1836,9 @@ def _beer_csv_rows(beers: list[dict]) -> list[list]:
         "id",
         "name",
         "type",
+        "packaging",
         "brewer",
+        "brewery",
         "abv",
         "ibu",
         "brewed_on",

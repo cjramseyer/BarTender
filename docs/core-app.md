@@ -1,6 +1,6 @@
 # BarTender Core App and Add-on Documentation
 
-Last updated: 2026-08-20
+Last updated: 2026-08-22
 Doc scope: Home Assistant add-on (web app + display service)
 
 ## Overview
@@ -21,13 +21,15 @@ Primary runtime components:
 ## Feature Set
 
 - Dashboard overview of taps, kegs, and counts.
+- Beer catalog CRUD (create, list, update, delete).
 - Bar stock CRUD (create, list, update, delete).
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
-- Settings management (bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position, printable menu QR mode).
+- Settings management (bar name, measurement, theme, bar stock toggle, default keg type, default pour preset, dashboard manage button position, printable menu QR mode).
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Read-only display page.
+- In-app API reference and API tester page.
 - Runtime QR generation endpoint for printable menu.
 
 ## Architecture and Components
@@ -106,7 +108,7 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name, dashboard_manage_button_position, bar_stock_enabled, default_keg_type, menu_qr_mode.
+- Accepted keys: measurement, theme, bar_name, dashboard_manage_button_position, bar_stock_enabled, default_keg_type, menu_qr_mode, pour_options, default_pour_preset.
 - Request example:
 
 ```json
@@ -180,6 +182,40 @@ DELETE /api/stock/<id>
 { "ok": true }
 ```
 
+### Beers
+
+GET /api/beers
+
+- Returns list of beer catalog entries.
+
+POST /api/beers
+
+- Creates a beer catalog entry.
+- Required field: name.
+- Request example:
+
+```json
+{
+  "name": "House IPA",
+  "type": "IPA",
+  "brewer": "Local Brewing",
+  "abv": "6.2",
+  "ibu": "45",
+  "brewed_on": "2026-08-15",
+  "notes": "Seasonal batch"
+}
+```
+
+PUT /api/beers/<id>
+
+- Updates provided beer fields.
+- Behavior: linked kegs are refreshed with the updated beer details.
+
+DELETE /api/beers/<id>
+
+- Deletes beer entry if not linked to a keg.
+- 409 response includes linked keg names when deletion is blocked.
+
 ### Kegs
 
 GET /api/kegs
@@ -194,12 +230,10 @@ POST /api/kegs
 
 ```json
 {
-  "name": "House IPA",
-  "type": "IPA",
+  "name": "Keg 12",
+  "beer_id": 3,
   "size": "1/6 bbl (5.2 gal)",
   "status": "in_use",
-  "brewery": "Local Brewing",
-  "abv": "6.2",
   "notes": "Fresh hop batch",
   "filled_date": "2026-08-10"
 }
@@ -250,7 +284,22 @@ Lifecycle and validation rules:
 - Kegs in cleaning state can only transition to empty (clean).
 - Only one keg can be marked as the line-cleaning keg.
 - Kegs that were previously filled and reach empty are moved to cleaning.
-- Kegs marked full must include a keg name and beer details (type or brewer).
+- Kegs marked full must include a keg name and beer selection/details.
+
+POST /api/kegs/<id>/fill
+
+- Marks keg as full (or provided target status).
+- Supports setting `beer_id` during fill workflow.
+
+Request example:
+
+```json
+{
+  "beer_id": 3,
+  "filled_date": "2026-08-22",
+  "percent_full": 100
+}
+```
 
 POST /api/kegs/<id>/pour
 
@@ -357,6 +406,11 @@ GET /api/export/archive
 
 ### Printable Menu and QR
 
+GET /api-reference
+
+- Renders in-app API documentation and test runner UI.
+- Supports trying GET/POST/PUT/DELETE requests against ingress-relative endpoints.
+
 GET /menu
 
 - Renders printer-friendly "currently on tap" menu content.
@@ -399,8 +453,8 @@ POST /api/import/json
 
 Import mode behavior:
 
-- replace: overwrite current settings, kegs, taps, and bar stock.
-- merge: merge settings keys and upsert kegs/taps/stock by id.
+- replace: overwrite current settings, beers, kegs, taps, and bar stock.
+- merge: merge settings keys and upsert beers/kegs/taps/stock by id.
 
 ## Error Behavior
 
@@ -423,6 +477,7 @@ Top-level document structure:
 {
   "settings": {},
   "bar_stock": [],
+  "beers": [],
   "kegs": [],
   "taps": []
 }
@@ -438,6 +493,19 @@ settings fields:
 - default_keg_type: string
 - menu_qr_mode: string (off, display, print, both)
 - pour_options: array of preset objects (name, amount, unit)
+- default_pour_preset: string encoded as amount|unit|name
+
+beer catalog fields:
+
+- id: integer
+- name: string
+- type: string
+- brewer: string
+- abv: string
+- ibu: string
+- brewed_on: date string (YYYY-MM-DD)
+- notes: string
+- updated_at: ISO datetime string (UTC)
 
 bar_stock item fields:
 
@@ -453,6 +521,8 @@ keg fields:
 
 - id: integer
 - name: string
+- beer_id: integer or null
+- beer_name: string
 - type: string
 - size: string
 - custom_size: string

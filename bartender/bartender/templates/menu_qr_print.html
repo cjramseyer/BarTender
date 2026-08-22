@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ settings.bar_name }} - Menu QR Print</title>
+    <link rel="stylesheet" href="{{ ingress }}/static/css/style.css" />
+    <style>
+      .qr-print-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+      }
+      .qr-print-card {
+        width: 100%;
+        max-width: 560px;
+        text-align: center;
+      }
+      .qr-print-image {
+        width: min(80vw, 420px);
+        height: auto;
+        aspect-ratio: 1 / 1;
+        margin: 0.75rem auto;
+        display: block;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: #fff;
+        padding: 0.5rem;
+      }
+      .qr-print-actions {
+        display: flex;
+        justify-content: center;
+        gap: 0.6rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+      @media print {
+        .navbar,
+        .qr-print-actions,
+        .no-print {
+          display: none !important;
+        }
+        .container {
+          max-width: none;
+          margin: 0;
+          padding: 0;
+        }
+        .card {
+          box-shadow: none;
+          border: none;
+        }
+      }
+    </style>
+  </head>
+  <body class="qr-print-page">
+    <main class="container qr-print-card card">
+      <h1>{{ settings.bar_name }}</h1>
+      <p class="muted">Menu QR Code</p>
+
+      {% if qr_ready %}
+      <img
+        src="{{ qr_image_path }}"
+        alt="QR code for menu"
+        class="qr-print-image"
+      />
+      <p class="muted">Scan to open the tap and packaged beer menu</p>
+      <p class="muted">{{ menu_path }}</p>
+      <div class="qr-print-actions">
+        <button class="btn btn-primary" onclick="window.print()">Print QR</button>
+        <a class="btn btn-secondary" href="{{ menu_path }}" target="_blank" rel="noopener noreferrer">Open Menu</a>
+      </div>
+      {% else %}
+      <p class="muted">QR generation is currently unavailable.</p>
+      <p class="muted">Install requirements with: <code>pip install -r requirements.txt</code></p>
+      {% if qr_error %}
+      <p class="muted">Details: {{ qr_error }}</p>
+      {% endif %}
+      {% endif %}
+    </main>
+  </body>
+</html>

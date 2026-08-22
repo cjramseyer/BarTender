@@ -1,6 +1,6 @@
 # BarTender Getting Started Guide
 
-Last updated: 2026-08-20
+Last updated: 2026-08-22
 Audience: first-time users
 
 ## Quick Setup
@@ -20,6 +20,7 @@ Open Settings in BarTender UI and set:
 - Measurement (us or metric)
 - Theme (light or dark)
 - Printable Menu QR Mode (off, display, print, or both)
+- Default Pour Preset (used by dashboard and taps pour selectors)
 
 Recommended defaults:
 
@@ -31,10 +32,11 @@ Recommended defaults:
 Use this order for a clean initial setup:
 
 1. Add bar stock items.
-2. Add kegs.
-3. Add taps.
-4. Assign kegs to taps.
-5. Verify display view.
+2. Add beers.
+3. Add kegs.
+4. Add taps.
+5. Assign kegs to taps.
+6. Verify display view.
 
 ```mermaid
 flowchart LR
@@ -44,6 +46,17 @@ flowchart LR
   D --> E[View Dashboard and Display]
 ```
 
+Updated order with beer catalog:
+
+```mermaid
+flowchart LR
+  A[Add Stock] --> B[Add Beers]
+  B --> C[Add Kegs]
+  C --> D[Add Taps]
+  D --> E[Assign Kegs to Taps]
+  E --> F[View Dashboard and Display]
+```
+
 ### Step 1: Add Bar Stock
 
 - Go to Bar Stock.
@@ -51,11 +64,18 @@ flowchart LR
 - Enter name, category, quantity, unit, notes.
 - Save.
 
-### Step 2: Add Kegs
+### Step 2: Add Beers
+
+- Go to Beers.
+- Click New Beer.
+- Enter beer details (name required).
+- Save.
+
+### Step 3: Add Kegs
 
 - Go to Kegs.
 - Click Add Keg.
-- Enter keg details (name, type, size, status, brewer, ABV/IBU, volume).
+- Enter keg details (name, selected beer, size, status, volume).
 - Optional: add filled date and notes.
 - Save.
 
@@ -63,9 +83,9 @@ Default behavior note:
 
 - New kegs default status to empty unless you choose another status.
 - New keg name is prefilled as Keg N based on existing keg names.
-- Name/beer details are required only when status is full.
+- Name/beer selection is required only when status is full.
 
-### Step 3: Add Taps
+### Step 4: Add Taps
 
 - Go to Taps.
 - Click Add Tap.
@@ -76,7 +96,7 @@ Default behavior note:
 
 - New tap label is prefilled as Tap N based on existing tap labels.
 
-### Step 4: Assign Kegs to Taps
+### Step 5: Assign Kegs to Taps
 
 - Edit a tap and select Assigned Keg.
 - Save.
@@ -86,12 +106,12 @@ Auto-fill behavior note:
 - When a keg is connected to a tap and tapped date is empty, tapped date auto-fills.
 - Existing tapped dates are preserved.
 
-### Step 5: Verify Display
+### Step 6: Verify Display
 
 - Check dashboard and taps page for current assignment.
 - Open display service if using a wallboard.
 
-### Step 6: Verify Printable Menu
+### Step 7: Verify Printable Menu
 
 - Open /menu from the top navigation.
 - Confirm currently assigned taps and keg details are visible.
@@ -134,10 +154,11 @@ Restore workflow:
 
 ## Quick API Smoke Test
 
-Use browser or HTTP client:
+Use API Reference page (`/api-reference`) from Settings or top navigation, or use an HTTP client:
 
 - GET /api/settings
 - GET /api/stock
+- GET /api/beers
 - GET /api/kegs
 - GET /api/taps
 
