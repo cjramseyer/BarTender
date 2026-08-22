@@ -427,6 +427,7 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 .tap-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
   padding: 0.4rem 0;
@@ -472,6 +473,18 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   font-weight: 700;
   color: var(--text);
   min-width: 2.2rem;
+}
+
+.tap-pour-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-basis: 100%;
+}
+
+.tap-pour-row .form-control-sm {
+  width: auto;
+  min-width: 180px;
 }
 
 .stock-summary {

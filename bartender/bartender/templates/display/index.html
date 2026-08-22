@@ -286,7 +286,6 @@
                 <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
               </div>
               <div class="keg-level-meta">
-                <span class="keg-level-label">Current Fill</span>
                 <span class="keg-level-value">{{ fill_pct }}%</span>
               </div>
             </div>
@@ -296,23 +295,16 @@
               >
             </p>
             <p class="muted">
-              Type: {{ keg.type or '—' }}
-            </p>
-            <p class="muted">
-              Beer: {{ beer_brewer or keg.brewery or '—' }}{% if beer_abv or
+              {{ beer_brewer or keg.brewery or '—' }}{% if beer_abv or
               keg.abv %} · {{ beer_abv or keg.abv }}% ABV{% endif %}{% if
               beer_ibu %} · {{ beer_ibu }} IBU{% endif %}
             </p>
             {% if beer_brewed_on %}
-            <p class="muted">Brewed: {{ beer_brewed_on }}</p>
+            <p class="muted">{{ beer_brewed_on }}</p>
             {% endif %}
             <p class="muted">
               {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{
               keg.size or '' }}{% endif %}
-            </p>
-            <p class="muted">
-              Volume: {% if keg.current_volume is not none %}{{ keg.current_volume
-              }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
             </p>
             {% else %}
             <p class="no-keg">— No keg assigned —</p>

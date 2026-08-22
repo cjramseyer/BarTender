@@ -148,12 +148,10 @@
             <span class="badge badge-{{ keg.status }}">{{ keg.status | replace('_', ' ') | title }}</span>
           </div>
           <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
-          <p class="muted">Type: {{ keg.type or '—' }}</p>
-          <p class="muted">Brewer: {{ brewer or '—' }}</p>
-          <p class="muted">ABV: {{ abv or '—' }}{% if abv %}%{% endif %}</p>
-          <p class="muted">IBU: {{ keg.beer_ibu or '—' }}</p>
-          <p class="muted">Fill: {{ fill_pct }}%</p>
-          <p class="muted">Volume: {% if keg.current_volume is not none %}{{ keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</p>
+          <p class="muted">{{ brewer or '—' }}</p>
+          <p class="muted">{{ abv or '—' }}{% if abv %}%{% endif %}</p>
+          <p class="muted">{{ keg.beer_ibu or '—' }}</p>
+          <p class="muted">{{ fill_pct }}%</p>
         </article>
         {% endfor %}
       </div>
