@@ -1,3 +1,5 @@
 .vscode/
 .venv/
 depr/
+bartender/.data/
+bartender/bartender/__pycache__/

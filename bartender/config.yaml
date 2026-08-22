@@ -11,6 +11,9 @@ init: false
 ports:
   8099/tcp: null
   8100/tcp: 8100
+ports_description:
+  8099/tcp: "BarTender web UI and API"
+  8100/tcp: "Read-only display and menu endpoints"
 ingress: true
 panel_icon: "mdi:beer"
 panel_title: "BarTender"

@@ -369,7 +369,7 @@
             </div>
             <p>
               <span class="badge badge-{{ keg.status }}"
-                >{{ keg.status | replace('_', ' ') | title }}</span
+                >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span
               >
             </p>
             <p class="muted">
@@ -380,10 +380,6 @@
             {% if beer_brewed_on %}
             <p class="muted">{{ beer_brewed_on }}</p>
             {% endif %}
-            <p class="muted">
-              {% if keg.size == 'Custom' %}{{ keg.custom_size }}{% else %}{{
-              keg.size or '' }}{% endif %}
-            </p>
             {% else %}
             <p class="no-keg">— No keg assigned —</p>
             {% endif %}
@@ -402,9 +398,6 @@
           <div class="stock-name">{{ keg.name or 'Unnamed Keg' }}</div>
           {% if keg.beer_name %}
           <div class="stock-cat">{{ keg.beer_name }}</div>
-          {% endif %}
-          {% if keg.size %}
-          <div class="stock-cat">{{ keg.size }}</div>
           {% endif %}
         </div>
         {% endfor %}

@@ -2,6 +2,23 @@
 
 Manage your home bar with a web UI built into Home Assistant.
 
+## Installation and Startup
+
+1. In Home Assistant, go to **Settings -> Add-ons -> Add-on Store**.
+2. Add repository URL: `https://github.com/cjramseyer/BarTender`.
+3. Install **BarTender**.
+4. Start the add-on.
+5. Open the BarTender sidebar panel.
+6. Complete the first-time setup wizard (bar name, measurement, theme).
+
+## Read-Only Access Endpoints
+
+- Display board: `/display`
+- Printable menu: `/menu`
+- API reference page: `/api-reference`
+
+Use **Settings -> Read-Only External URLs** to copy generated external links.
+
 ## Features
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
@@ -53,6 +70,42 @@ Manage your home bar with a web UI built into Home Assistant.
 ## Configuration
 
 No configuration required. All settings are managed from within the web UI after the add-on starts.
+
+## Core Usage Flows
+
+### Kegs
+
+- Add or bulk-create keg entries.
+- Fill empty kegs from the Beer Catalog.
+- Record pours (Manual mode) to decrement volume and update fill percent.
+- When a keg reaches cleaning status, use the clean workflow to reset it to ready defaults.
+
+### Taps
+
+- Create taps and assign full/on-tap kegs.
+- Use pour presets to record standard pours.
+- Monitor volume remaining and fill level from dashboard or taps views.
+
+### Bar Stock
+
+- Track inventory items with quantity, category, and notes.
+- Disable the Bar Stock feature from Settings if not needed.
+
+## Key Settings
+
+- **Pour Mode**: Manual, POS (API), Inline Device (planned)
+- **Keg Types**: editable keg/container options and defaults
+- **Pour Presets**: named preset volumes and default preset
+- **Analytics**: low-keg threshold and days-left forecasting window
+- **Menu QR**: where QR appears on display/print output
+
+## Troubleshooting
+
+- **Modal closes unexpectedly**: update to latest build where overlay-close behavior is locked down for edit dialogs.
+- **On Deck cannot be set**: keg must be filled (or on-tap) before On Deck can be enabled.
+- **Keg needs cleaning**: mark clean from the kegs workflow to reset fill/beer fields.
+- **QR unavailable**: verify dependencies from `requirements.txt` are installed.
+- **Display not reachable externally**: confirm display port mapping and host networking in your add-on environment.
 
 ## Support
 
