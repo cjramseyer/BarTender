@@ -14,6 +14,7 @@
       <span class="badge badge-in_use">Beer</span>
     </div>
     <div class="keg-card-body">
+      <p><strong>Packaging:</strong> {{ 'Kegged' if (beer.packaging or 'kegged') == 'kegged' else 'Bottled/Can' }}</p>
       <p><strong>Type:</strong> {{ beer.type or '—' }}</p>
       <p><strong>Brewer:</strong> {{ beer.brewer or '—' }}</p>
       <p><strong>Brewery:</strong> {{ beer.brewery or '—' }}</p>
@@ -52,6 +53,15 @@
       <div class="form-group">
         <label>Name *</label>
         <input type="text" id="beerName" class="form-control" required placeholder="e.g. Hazy IPA" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Packaging</label>
+          <select id="beerPackaging" class="form-control">
+            <option value="kegged">Kegged</option>
+            <option value="bottled_can">Bottled/Can</option>
+          </select>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -116,6 +126,7 @@
     document.getElementById("beerModalTitle").textContent = "Edit Beer";
     document.getElementById("beerId").value = beer.id;
     document.getElementById("beerName").value = beer.name || "";
+    document.getElementById("beerPackaging").value = beer.packaging || "kegged";
     document.getElementById("beerType").value = beer.type || "";
     document.getElementById("beerBrewer").value = beer.brewer || "";
     document.getElementById("beerBrewery").value = beer.brewery || "";
@@ -131,6 +142,7 @@
     const id = document.getElementById("beerId").value;
     const body = {
       name: document.getElementById("beerName").value.trim(),
+      packaging: document.getElementById("beerPackaging").value,
       type: document.getElementById("beerType").value.trim(),
       brewer: document.getElementById("beerBrewer").value.trim(),
       brewery: document.getElementById("beerBrewery").value.trim(),

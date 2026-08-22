@@ -659,6 +659,13 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   min-width: 0;
 }
 
+.tap-pour-row .dashboard-pour-select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 180px;
+  max-width: 240px;
+}
+
 /* Filter bar */
 .filter-bar {
   display: flex;
@@ -839,6 +846,15 @@ small.muted {
   font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 0.35rem;
+}
+
+.menu-section-title {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+}
+
+.menu-section-gap {
+  margin-top: 1.5rem;
 }
 
 .menu-qr-block {
