@@ -25,7 +25,7 @@ Primary runtime components:
 - Bar stock CRUD (create, list, update, delete).
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
-- Settings management (bar name, measurement, theme, bar stock toggle, default keg type, default pour preset, dashboard manage button position, printable menu QR mode).
+- Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Read-only display page.
@@ -108,7 +108,7 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name, bar_logo_url, dashboard_manage_button_position, bar_stock_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset.
+- Accepted keys: measurement, theme, bar_name, bar_logo_url, dashboard_manage_button_position, bar_stock_enabled, api_reference_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset.
 - Request example:
 
 ```json

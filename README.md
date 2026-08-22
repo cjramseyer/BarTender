@@ -24,7 +24,7 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - **Beer Catalog** — Manage reusable beer records (name, type, brewer, ABV/IBU, brewed date, notes)
 - **Keg Management** — Track keg inventory, lifecycle state, and fill-level data; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line
-- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, keg type choices/default, and pour defaults
+- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, keg type choices/default, and pour defaults
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
@@ -57,7 +57,7 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
 - Added Beer Catalog management and linked kegs to selected beers (`beer_id`, `beer_name`) instead of direct beer-detail editing in keg forms.
 - Added fill-keg flow that requires selecting a beer from the catalog when marking a keg full.
-- Added in-app API Reference page (`/api-reference`) and interactive API tester, linked from Settings and top navigation.
+- Added in-app API Reference page (`/api-reference`) and interactive API tester, with nav visibility controlled from Settings.
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
 
 ## Installation
