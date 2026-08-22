@@ -32,6 +32,17 @@ DATA_FILE = DATA_DIR / "bartender.json"
 INGRESS_PATH = os.environ.get("INGRESS_PATH", "")
 DISPLAY_PORT = os.environ.get("DISPLAY_PORT", "8100")
 
+STANDARD_KEG_TYPE_CHOICES = [
+    "1/6 bbl (5.2 gal)",
+    "1/4 bbl (7.75 gal)",
+    "1/2 bbl (15.5 gal)",
+    "Corny (5 gal)",
+    "20 L",
+    "30 L",
+    "50 L",
+    "Custom",
+]
+
 app = Flask(__name__)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
 
@@ -49,17 +60,7 @@ DEFAULT_DATA = {
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
-        "keg_type_choices": [
-            "IPA",
-            "Pale Ale",
-            "Lager",
-            "Stout",
-            "Porter",
-            "Wheat",
-            "Sour",
-            "Cider",
-            "Other",
-        ],
+        "keg_type_choices": STANDARD_KEG_TYPE_CHOICES,
         "menu_qr_mode": "both",
         "pour_options": [
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
@@ -432,16 +433,7 @@ def _normalize_keg_type_choices(raw_choices, default_type: str) -> list[str]:
     if choices:
         return choices
 
-    return [
-        "1/6 bbl (5.2 gal)",
-        "1/4 bbl (7.75 gal)",
-        "1/2 bbl (15.5 gal)",
-        "Corny (5 gal)",
-        "20 L",
-        "30 L",
-        "50 L",
-        "Custom",
-    ]
+    return STANDARD_KEG_TYPE_CHOICES.copy()
 
 
 def _normalize_default_keg_type(raw_default: str, choices: list[str]) -> str:
