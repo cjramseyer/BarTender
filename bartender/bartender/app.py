@@ -5,7 +5,7 @@ import os
 import io
 import csv
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -31,6 +31,30 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
 INGRESS_PATH = os.environ.get("INGRESS_PATH", "")
 DISPLAY_PORT = os.environ.get("DISPLAY_PORT", "8100")
+
+
+def _read_addon_version() -> str:
+    config_path = Path(__file__).resolve().parents[1] / "config.yaml"
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped.startswith("version:"):
+                    _, raw_value = stripped.split(":", 1)
+                    return raw_value.strip().strip('"\'') or "dev"
+    except OSError:
+        pass
+    return "dev"
+
+
+APP_VERSION = _read_addon_version()
+RELEASE_HIGHLIGHTS = [
+    "First-time setup now guides initial bar name configuration.",
+    "Pour controls follow the new pour mode setting.",
+    "Bulk create now asks how many items to make.",
+    "Kegs can be marked as On Deck and surfaced in dashboards.",
+    "Dashboard analytics summarize recent pour activity.",
+]
 
 STANDARD_KEG_TYPE_CHOICES = [
     "1/6 bbl (5.2 gal)",
@@ -58,6 +82,8 @@ DEFAULT_DATA = {
         "bar_name": "My Bar",
         "bar_logo_url": "",
         "api_reference_enabled": True,
+        "pour_mode": "manual",
+        "setup_completed": False,
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
@@ -73,6 +99,7 @@ DEFAULT_DATA = {
     "beers": [],
     "kegs": [],
     "taps": [],
+    "pour_events": [],
 }
 
 
@@ -90,6 +117,15 @@ def load_data() -> dict:
         else:
             for key, value in DEFAULT_DATA["settings"].items():
                 data["settings"].setdefault(key, value)
+
+        setup_default = str(data["settings"].get("bar_name", "")).strip() not in ("", "My Bar")
+        data["settings"]["setup_completed"] = _coerce_bool(
+            data["settings"].get("setup_completed"),
+            setup_default,
+        )
+        data["settings"]["pour_mode"] = _normalize_pour_mode(
+            data["settings"].get("pour_mode")
+        )
 
         # Backward compatibility: migrate legacy manage_button_position key.
         if (
@@ -139,6 +175,7 @@ def load_data() -> dict:
             data["settings"].get("default_keg_type", ""),
             data["settings"].get("keg_type_choices", []),
         )
+        data["pour_events"] = [event for event in data.get("pour_events", []) if isinstance(event, dict)]
         beers_by_id = {
             beer.get("id"): beer for beer in data.get("beers", []) if isinstance(beer.get("id"), int)
         }
@@ -161,6 +198,7 @@ def load_data() -> dict:
             keg.setdefault("beer_brewed_on", "")
             keg["beer_id"] = _coerce_int(keg.get("beer_id"), None)
             keg.setdefault("beer_name", "")
+            keg.setdefault("on_deck", False)
             if keg.get("beer_id") is not None:
                 beer = beers_by_id.get(keg.get("beer_id"))
                 if beer:
@@ -233,11 +271,132 @@ def _normalize_menu_qr_mode(value) -> str:
     return "both"
 
 
+def _normalize_pour_mode(value) -> str:
+    mode = str(value or "manual").strip().lower()
+    if mode in ("manual", "pos", "inline_device"):
+        return mode
+    return "manual"
+
+
 def _normalize_logo_url(value) -> str:
     url = str(value or "").strip()
     if len(url) > 2048:
         return ""
     return url
+
+
+def _record_pour_event(
+    data: dict,
+    keg: dict,
+    amount: float,
+    unit: str,
+    source: str,
+    tap_id=None,
+    preset_name: str = "",
+) -> None:
+    normalized_unit = _normalize_volume_unit(unit)
+    event = {
+        "id": _next_id(data.setdefault("pour_events", [])),
+        "keg_id": keg.get("id"),
+        "tap_id": tap_id,
+        "amount": round(float(amount), 3),
+        "unit": normalized_unit,
+        "amount_ml": round(_convert_volume(float(amount), normalized_unit, "ml") or 0.0, 3),
+        "source": source,
+        "preset_name": preset_name,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    data.setdefault("pour_events", []).append(event)
+
+
+def _build_on_deck_kegs(data: dict) -> list[dict]:
+    return [
+        keg
+        for keg in data.get("kegs", [])
+        if _coerce_bool(keg.get("on_deck"), False)
+        and keg.get("status") not in ("retired",)
+    ]
+
+
+def _build_dashboard_analytics(data: dict) -> dict:
+    settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+    measurement = settings.get("measurement", "us")
+    display_unit = _default_volume_unit(measurement)
+    now = datetime.now(timezone.utc)
+    recent_window = now - timedelta(days=7)
+    forecast_window = now - timedelta(days=14)
+
+    events = [event for event in data.get("pour_events", []) if isinstance(event, dict)]
+    recent_events = []
+    for event in events:
+        try:
+            created_at = datetime.fromisoformat(str(event.get("created_at", "")).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if created_at >= recent_window:
+            recent_events.append(event)
+
+    total_recent_ml = sum(_coerce_float(event.get("amount_ml"), 0.0) or 0.0 for event in recent_events)
+    total_recent_display = _convert_volume(total_recent_ml, "ml", display_unit) or 0.0
+
+    low_volume_kegs = []
+    forecast_items = []
+    for keg in data.get("kegs", []):
+        current_volume = _coerce_float(keg.get("current_volume"), None)
+        if current_volume is None or current_volume <= 0:
+            continue
+        fill_pct = _clamp_percent_full(
+            keg.get("percent_full"),
+            _default_percent_for_status(keg.get("status", "empty")),
+        )
+        if fill_pct <= 25:
+            low_volume_kegs.append({
+                "id": keg.get("id"),
+                "name": keg.get("name") or "Unnamed Keg",
+                "fill_pct": fill_pct,
+                "current_volume": current_volume,
+                "volume_unit": keg.get("volume_unit") or display_unit,
+            })
+
+        keg_unit = _normalize_volume_unit(keg.get("volume_unit") or display_unit)
+        recent_keg_events = []
+        for event in events:
+            if event.get("keg_id") != keg.get("id"):
+                continue
+            try:
+                created_at = datetime.fromisoformat(str(event.get("created_at", "")).replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if created_at < forecast_window:
+                continue
+            converted = _convert_volume(_coerce_float(event.get("amount"), 0.0) or 0.0, event.get("unit"), keg_unit)
+            if converted is not None:
+                recent_keg_events.append(converted)
+
+        if not recent_keg_events:
+            continue
+
+        daily_rate = sum(recent_keg_events) / 14.0
+        if daily_rate <= 0:
+            continue
+
+        forecast_items.append({
+            "id": keg.get("id"),
+            "name": keg.get("name") or "Unnamed Keg",
+            "days_remaining": round(current_volume / daily_rate, 1),
+            "current_volume": current_volume,
+            "volume_unit": keg_unit,
+        })
+
+    forecast_items.sort(key=lambda item: item.get("days_remaining", 9999))
+
+    return {
+        "recent_pour_count": len(recent_events),
+        "recent_pour_volume": round(total_recent_display, 2),
+        "recent_pour_unit": display_unit,
+        "low_volume_kegs": low_volume_kegs,
+        "forecast_items": forecast_items[:3],
+    }
 
 
 def _format_host_for_url(hostname: str) -> str:
@@ -743,6 +902,14 @@ def _validate_full_keg_requirements(keg_like: dict):
     return None
 
 
+@app.context_processor
+def inject_runtime_metadata():
+    return {
+        "app_version": APP_VERSION,
+        "release_highlights": RELEASE_HIGHLIGHTS,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Routes – pages
 # ---------------------------------------------------------------------------
@@ -756,6 +923,8 @@ def index():
         taps=data["taps"],
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
+        on_deck_kegs=_build_on_deck_kegs(data),
+        dashboard_analytics=_build_dashboard_analytics(data),
         ingress=INGRESS_PATH,
     )
 
@@ -846,6 +1015,7 @@ def display_view():
         taps=data["taps"],
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
+        on_deck_kegs=_build_on_deck_kegs(data),
         qr_image_path=qr_image_path,
         menu_qr_mode=menu_qr_mode,
         qr_ready=qr_ready,
@@ -1013,6 +1183,8 @@ def api_save_settings():
         "bar_name",
         "bar_logo_url",
         "api_reference_enabled",
+        "pour_mode",
+        "setup_completed",
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
@@ -1046,6 +1218,16 @@ def api_save_settings():
         data["settings"].get("api_reference_enabled"),
         True,
     )
+    data["settings"]["pour_mode"] = _normalize_pour_mode(
+        data["settings"].get("pour_mode")
+    )
+    if "setup_completed" in body:
+        data["settings"]["setup_completed"] = _coerce_bool(
+            data["settings"].get("setup_completed"),
+            False,
+        )
+    elif str(data["settings"].get("bar_name", "")).strip() not in ("", "My Bar"):
+        data["settings"]["setup_completed"] = True
     data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
         data["settings"].get("keg_type_choices", []),
         data["settings"].get("default_keg_type", ""),
@@ -1324,6 +1506,7 @@ def api_add_keg():
         "beer_ibu": body.get("beer_ibu", ""),
         "beer_brewed_on": body.get("beer_brewed_on", ""),
         "line_cleaning_keg": _coerce_bool(body.get("line_cleaning_keg"), False),
+        "on_deck": _coerce_bool(body.get("on_deck"), False),
         "current_volume": _coerce_float(body.get("current_volume"), None),
         "volume_unit": _normalize_volume_unit(
             body.get("volume_unit")
@@ -1410,6 +1593,7 @@ def api_add_kegs_bulk():
             "beer_ibu": item.get("beer_ibu", ""),
             "beer_brewed_on": item.get("beer_brewed_on", ""),
             "line_cleaning_keg": _coerce_bool(item.get("line_cleaning_keg"), False),
+            "on_deck": _coerce_bool(item.get("on_deck"), False),
             "current_volume": _coerce_float(item.get("current_volume"), None),
             "volume_unit": _normalize_volume_unit(
                 item.get("volume_unit")
@@ -1539,6 +1723,7 @@ def api_update_keg(keg_id: int):
                 "beer_ibu",
                 "beer_brewed_on",
                 "line_cleaning_keg",
+                "on_deck",
                 "current_volume",
                 "volume_unit",
                 "brewery",
@@ -1654,6 +1839,7 @@ def api_fill_keg(keg_id: int):
                 return jsonify(validation_error), 409
             keg["filled_date"] = body.get("filled_date") or _today_utc_date()
             keg["percent_full"] = _clamp_percent_full(body.get("percent_full"), 100)
+            keg["on_deck"] = False
             keg["updated_at"] = datetime.now(timezone.utc).isoformat()
             save_data(data)
             return jsonify(keg)
@@ -1675,6 +1861,7 @@ def api_pour_keg(keg_id: int):
         payload, status = _apply_pour_to_keg(data, keg, amount, body.get("unit"))
         if status != 200:
             return jsonify(payload), status
+        _record_pour_event(data, keg, amount, body.get("unit"), "keg", preset_name=str(body.get("preset_name", "")))
         save_data(data)
         return jsonify(payload)
 
@@ -1710,6 +1897,7 @@ def api_pour_tap(tap_id: int):
         payload, status = _apply_pour_to_keg(data, keg, amount, body.get("unit"))
         if status != 200:
             return jsonify(payload), status
+        _record_pour_event(data, keg, amount, body.get("unit"), "tap", tap_id=tap_id, preset_name=str(body.get("preset_name", "")))
         save_data(data)
         return jsonify(payload)
 
@@ -1933,6 +2121,7 @@ def _build_export_archive(data: dict) -> bytes:
         zf.writestr("taps.json", json.dumps(data.get("taps", []), indent=2))
         zf.writestr("beers.json", json.dumps(data.get("beers", []), indent=2))
         zf.writestr("bar_stock.json", json.dumps(data.get("bar_stock", []), indent=2))
+        zf.writestr("pour_events.json", json.dumps(data.get("pour_events", []), indent=2))
         zf.writestr("bartender_export.json", json.dumps(payload, indent=2))
 
         # CSV exports for convenience.
@@ -1983,6 +2172,7 @@ def _import_archive_payload(file_bytes: bytes):
                 "taps": taps if isinstance(taps, list) else [],
                 "beers": beers if isinstance(beers, list) else [],
                 "bar_stock": bar_stock if isinstance(bar_stock, list) else [],
+                "pour_events": _read_archive_json(zf, "pour_events.json", []),
             }
     except zipfile.BadZipFile:
         return None
@@ -1996,6 +2186,7 @@ def _sanitize_import_payload(raw_data: dict) -> dict:
         "taps": [x for x in raw_data.get("taps", []) if isinstance(raw_data.get("taps", []), list) and isinstance(x, dict)] if isinstance(raw_data.get("taps", []), list) else [],
         "beers": [x for x in raw_data.get("beers", []) if isinstance(x, dict)] if isinstance(raw_data.get("beers", []), list) else [],
         "bar_stock": [x for x in raw_data.get("bar_stock", []) if isinstance(x, dict)] if isinstance(raw_data.get("bar_stock", []), list) else [],
+        "pour_events": [x for x in raw_data.get("pour_events", []) if isinstance(x, dict)] if isinstance(raw_data.get("pour_events", []), list) else [],
     }
 
 

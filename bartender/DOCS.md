@@ -7,18 +7,25 @@ Manage your home bar with a web UI built into Home Assistant.
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
 - **Beer Catalog** — Manage reusable beer records for consistent keg assignment
-- **Keg Management** — Track keg inventory and lifecycle while selecting beer details from the catalog
+- **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog
 - **Tap Management** — Assign kegs to numbered, labelled tap lines
 - **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
-- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode
-- **Pour Workflow** — Track pours and automatically decrement current keg volume
+- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, pour mode, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode
+- **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
+- **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
+- **Analytics** — Dashboard summaries for recent pours, near-empty kegs, and depletion forecasting
 - **API Reference + Tester** — Built-in endpoint docs and in-app request tester UI
 
 ## Recent Changes
 
 - Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
+- Added first-time setup wizard requiring a bar name before initial use.
+- Added pour mode settings and conditional pour control visibility.
+- Added On Deck keg workflow and dashboard/display sections.
+- Added dashboard pour analytics and depletion forecasting summaries.
+- Changed bulk create flows to ask for a quantity instead of raw JSON input.
 - Added backup restore support with import preview and explicit `replace`/`merge` modes.
 - Added portable versioned JSON backup export (`GET /api/export/json`).
 - Added ZIP archive backup export (`GET /api/export/archive`) and kept `GET /api/export/csv` as a legacy alias.

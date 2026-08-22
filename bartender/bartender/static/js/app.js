@@ -20,6 +20,90 @@ function closeModal(id) {
 // Close modal when clicking overlay background
 document.addEventListener("click", (e) => {
   if (e.target.classList.contains("modal")) {
+    if (e.target.dataset.lock === "true") {
+      return;
+    }
+    if (e.target.id === "updateNoticeModal") {
+      dismissUpdateNotice();
+      return;
+    }
     e.target.classList.remove("is-open");
   }
 });
+
+function initAppPrompts(appVersion) {
+  const setupModal = document.getElementById("setupWizardModal");
+  const updateModal = document.getElementById("updateNoticeModal");
+  const currentVersion = String(appVersion || "").trim();
+
+  if (setupModal) {
+    openModal("setupWizardModal");
+    return;
+  }
+
+  if (!updateModal || !currentVersion) {
+    return;
+  }
+
+  const seenVersion = localStorage.getItem("bartender_seen_version");
+  if (seenVersion !== currentVersion) {
+    openModal("updateNoticeModal");
+  }
+}
+
+async function submitSetupWizard(event) {
+  event.preventDefault();
+  const ingress = window.BARTENDER_INGRESS || "";
+  const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
+  const barName = document.getElementById("setupBarName");
+  const measurement = document.querySelector(
+    'input[name="setup_measurement"]:checked',
+  );
+  const theme = document.querySelector('input[name="setup_theme"]:checked');
+  const message = document.getElementById("setupWizardMsg");
+
+  const payload = {
+    bar_name: barName ? barName.value.trim() : "",
+    measurement: measurement ? measurement.value : "us",
+    theme: theme ? theme.value : "light",
+    setup_completed: true,
+  };
+
+  if (!payload.bar_name) {
+    if (message) {
+      message.textContent = "Bar name is required.";
+    }
+    return;
+  }
+
+  try {
+    const response = await fetch(`${ingress}/api/settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Setup save failed: ${response.status}`);
+    }
+
+    if (appVersion) {
+      localStorage.setItem("bartender_seen_version", appVersion);
+    }
+    closeModal("setupWizardModal");
+    location.reload();
+  } catch (err) {
+    console.error(err);
+    if (message) {
+      message.textContent = "Unable to save setup. Please try again.";
+    }
+  }
+}
+
+function dismissUpdateNotice() {
+  const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
+  if (appVersion) {
+    localStorage.setItem("bartender_seen_version", appVersion);
+  }
+  closeModal("updateNoticeModal");
+}
