@@ -230,6 +230,15 @@ content %}
           </label>
           <small class="muted">When disabled, API Reference is hidden from the top nav.</small>
         </div>
+        <div class="form-group">
+          <label>Pour Mode</label>
+          <select id="pourMode" class="form-control">
+            <option value="manual" {% if (settings.pour_mode or 'manual') == 'manual' %}selected{% endif %}>Manual</option>
+            <option value="pos" {% if (settings.pour_mode or 'manual') == 'pos' %}selected{% endif %}>POS (API)</option>
+            <option value="inline_device" {% if (settings.pour_mode or 'manual') == 'inline_device' %}selected{% endif %} disabled>Inline Device (Coming Soon)</option>
+          </select>
+          <small class="muted">Non-manual modes hide the pour button in the UI.</small>
+        </div>
         {% if qr_ready %}
         <div class="form-group">
           <label>Printable Menu QR Code</label>
@@ -369,6 +378,7 @@ content %}
   const DEFAULT_KEG_TYPE_CHOICES = {{ (settings.keg_type_choices or []) | tojson }};
   const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
   const DEFAULT_POUR_PRESET = {{ (settings.default_pour_preset or '') | tojson }};
+  const DEFAULT_POUR_MODE = {{ (settings.pour_mode or 'manual') | tojson }};
 
   function initExternalReadonlyLinks() {
     const displayLink = document.getElementById("externalDisplayUrl");
@@ -647,6 +657,9 @@ content %}
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
       api_reference_enabled: document.getElementById("apiReferenceEnabled").checked,
+      pour_mode: document.getElementById("pourMode")
+        ? document.getElementById("pourMode").value
+        : DEFAULT_POUR_MODE,
       pour_options: collectPourOptions(),
       default_pour_preset: document.getElementById("defaultPourPreset").value,
     };

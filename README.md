@@ -22,10 +22,12 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
 - **Beer Catalog** — Manage reusable beer records (name, type, brewer, ABV/IBU, brewed date, notes)
-- **Keg Management** — Track keg inventory, lifecycle state, and fill-level data; select beer details from the Beer Catalog
+- **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line
-- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, keg type choices/default, and pour defaults
-- **Pour Workflow** — Record pours against keg volume with unit conversion and validation
+- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, pour mode, keg type choices/default, and pour defaults
+- **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
+- **Setup Wizard** — First-run setup flow that captures the bar name before first use
+- **Analytics** — Dashboard summary for recent pours, depletion forecasting, and low-volume alerts
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
@@ -35,6 +37,11 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 ## Recent Changes
 
 - Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
+- Added first-time setup wizard that requires a bar name before initial use.
+- Added pour mode setting so pour controls only appear in Manual mode.
+- Added On Deck keg workflow and dashboard/display sections for upcoming kegs.
+- Added dashboard pour analytics, low-volume alerts, and depletion forecasting.
+- Changed bulk create flows to ask for a quantity instead of raw JSON.
 - Added backup restore support with import preview and explicit `replace`/`merge` modes.
 - Added portable versioned JSON backup export (`GET /api/export/json`).
 - Added ZIP archive backup export (`GET /api/export/archive`) and kept `GET /api/export/csv` as a legacy alias.

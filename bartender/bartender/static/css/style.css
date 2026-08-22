@@ -718,6 +718,9 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   margin: 1rem;
 }
+.modal-dialog-lg {
+  max-width: 680px;
+}
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -738,6 +741,37 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   padding-top: 1rem;
   border-top: 1px solid var(--border);
   margin-top: 0.5rem;
+}
+
+.wizard-intro,
+.update-notice {
+  padding: 1.25rem;
+}
+
+.wizard-intro p,
+.update-notice p {
+  margin-bottom: 0.85rem;
+}
+
+.notice-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.15rem;
+  color: var(--text-muted);
+}
+
+.notice-list li + li {
+  margin-top: 0.35rem;
+}
+
+.wizard-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 720px) {
+  .wizard-grid {
+    grid-template-columns: 1.2fr 1fr;
+  }
 }
 
 /* Settings */

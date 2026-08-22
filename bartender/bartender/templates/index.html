@@ -33,6 +33,7 @@ content %}
           keg.volume_unit or '—' }}{% else %}—{% endif %}</span
         >
         {% if keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
+        {% if (settings.pour_mode or 'manual') == 'manual' %}
         {% set pour_options = settings.pour_options if settings.pour_options is defined else [] %}
         {% set default_pour_preset = settings.default_pour_preset if settings.default_pour_preset is defined else '' %}
         <div class="tap-pour-row">
@@ -54,6 +55,7 @@ content %}
         <span class="muted">Configure pour options in Settings.</span>
         {% endif %}
         </div>
+        {% endif %}
         {% endif %}
         {% else %}
         <span class="badge badge-empty">No keg assigned</span>
@@ -106,6 +108,58 @@ content %}
       >
     </div>
   </div>
+
+  <div class="card">
+    <h2>📈 Pour Analytics</h2>
+    <div class="stat-row">
+      <div class="stat">
+        <span class="stat-value">{{ dashboard_analytics.recent_pour_count }}</span>
+        <span class="stat-label">Last 7 Days</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ dashboard_analytics.recent_pour_volume }}</span>
+        <span class="stat-label">{{ dashboard_analytics.recent_pour_unit }}</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ dashboard_analytics.low_volume_kegs | length }}</span>
+        <span class="stat-label">Low Kegs</span>
+      </div>
+    </div>
+    {% if dashboard_analytics.low_volume_kegs %}
+    <p class="muted">Near-empty kegs:</p>
+    <ul class="stock-summary">
+      {% for keg in dashboard_analytics.low_volume_kegs[:3] %}
+      <li>{{ keg.name }} – {{ keg.fill_pct }}% remaining</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if dashboard_analytics.forecast_items %}
+    <p class="muted">Estimated depletion:</p>
+    <ul class="stock-summary">
+      {% for keg in dashboard_analytics.forecast_items %}
+      <li>{{ keg.name }} – about {{ keg.days_remaining }} days left</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+  {% if on_deck_kegs %}
+  <div class="card">
+    <h2>🔜 On Deck ({{ on_deck_kegs | length }})</h2>
+    <ul class="stock-summary">
+      {% for keg in on_deck_kegs %}
+      <li>
+        <strong>{{ keg.name or 'Unnamed Keg' }}</strong>
+        {% if keg.beer_name %} – {{ keg.beer_name }}{% endif %}
+        {% if keg.size %} ({{ keg.size }}){% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="dashboard-manage-row">
+      <a class="btn btn-sm dashboard-manage-btn" href="{{ ingress }}/kegs">Manage On Deck</a>
+    </div>
+  </div>
+  {% endif %}
 
   {% if settings.bar_stock_enabled %}
   <div class="card">

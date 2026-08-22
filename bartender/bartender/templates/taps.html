@@ -74,6 +74,7 @@
     </div>
     <div class="tap-card-footer">
       {% if keg and keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
+      {% if (settings.pour_mode or 'manual') == 'manual' %}
       {% set pour_options = settings.pour_options if settings.pour_options is defined else [] %}
       {% set default_pour_preset = settings.default_pour_preset if settings.default_pour_preset is defined else '' %}
       <div class="tap-pour-row">
@@ -95,6 +96,7 @@
         <span class="muted">Configure pour options in Settings.</span>
         {% endif %}
       </div>
+      {% endif %}
       {% endif %}
       <div class="tap-action-row">
       <button
@@ -180,15 +182,18 @@
     </div>
     <form id="bulkTapForm" onsubmit="submitBulkTaps(event)">
       <div class="form-group">
-        <label>JSON Array</label>
-        <textarea
-          id="bulkTapPayload"
-          class="form-control"
-          rows="12"
-          placeholder='[{"number":1,"label":"Tap 1","keg_id":null}]'
-        ></textarea>
+          <label>How many?</label>
+          <input
+            type="number"
+            id="bulkTapCount"
+            class="form-control"
+            min="1"
+            step="1"
+            value="2"
+            required
+          />
         <small class="muted">
-          Each item should include: number (required), label (optional), keg_id (optional), notes (optional).
+            Creates sequential tap numbers starting at the next available slot.
         </small>
       </div>
       <div class="modal-footer">
@@ -267,6 +272,19 @@
   }
 
   function openBulkTapModal() {
+    document.getElementById("bulkTapCount").value = 2;
+    openModal("bulkTapModal");
+  }
+
+  async function submitBulkTaps(event) {
+    event.preventDefault();
+    const countInput = document.getElementById("bulkTapCount");
+    const count = parseInt(countInput.value, 10);
+    if (Number.isNaN(count) || count <= 0) {
+      alert("Please enter how many taps to create.");
+      return;
+    }
+
     const usedNumbers = new Set(
       TAPS.map((tap) => parseInt(tap.number, 10)).filter((n) => !Number.isNaN(n)),
     );
@@ -274,45 +292,16 @@
     while (usedNumbers.has(nextNumber)) {
       nextNumber += 1;
     }
-    const sampleKeg = KEGS.find((keg) => keg.status === "full" || keg.status === "in_use");
-    const sample = [
-      {
-        number: nextNumber,
-        label: `Tap ${nextNumber}`,
-        keg_id: sampleKeg ? sampleKeg.id : null,
-        notes: "Bulk created"
-      },
-      {
-        number: nextNumber + 1,
-        label: `Tap ${nextNumber + 1}`,
+
+    const items = Array.from({ length: count }, (_, index) => {
+      const number = nextNumber + index;
+      return {
+        number,
+        label: `Tap ${number}`,
         keg_id: null,
-        notes: "Ready for assignment"
-      }
-    ];
-    document.getElementById("bulkTapPayload").value = JSON.stringify(sample, null, 2);
-    openModal("bulkTapModal");
-  }
-
-  async function submitBulkTaps(event) {
-    event.preventDefault();
-    const payloadText = document.getElementById("bulkTapPayload").value.trim();
-    if (!payloadText) {
-      alert("Please provide a JSON array of tap objects.");
-      return;
-    }
-
-    let items;
-    try {
-      items = JSON.parse(payloadText);
-    } catch (err) {
-      alert("Bulk payload must be valid JSON.");
-      return;
-    }
-
-    if (!Array.isArray(items) || !items.length) {
-      alert("Bulk payload must be a non-empty JSON array.");
-      return;
-    }
+        notes: "Bulk created",
+      };
+    });
 
     const response = await fetch(`${INGRESS}/api/taps/bulk`, {
       method: "POST",
