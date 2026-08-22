@@ -1,0 +1,178 @@
+{% extends "base.html" %} {% block title %}Beers{% endblock %} {% block content %}
+<div class="page-header">
+  <h1>🍻 Beers</h1>
+  <button class="btn btn-primary manage-btn" onclick="openAddBeer()">
+    + New Beer
+  </button>
+</div>
+
+<div class="keg-grid" id="beerGrid">
+  {% for beer in beers %}
+  <div class="keg-card" data-id="{{ beer.id }}">
+    <div class="keg-card-header">
+      <span class="keg-name">{{ beer.name }}</span>
+      <span class="badge badge-in_use">Beer</span>
+    </div>
+    <div class="keg-card-body">
+      <p><strong>Type:</strong> {{ beer.type or '—' }}</p>
+      <p><strong>Brewer:</strong> {{ beer.brewer or '—' }}</p>
+      <p><strong>ABV:</strong> {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</p>
+      <p><strong>IBU:</strong> {{ beer.ibu or '—' }}</p>
+      <p><strong>Brewed On:</strong> {{ beer.brewed_on or '—' }}</p>
+      {% if beer.notes %}
+      <p class="muted">{{ beer.notes }}</p>
+      {% endif %}
+    </div>
+    <div class="keg-card-footer">
+      <button
+        class="btn btn-sm btn-secondary"
+        onclick="editBeer({{ beer | tojson | forceescape }})"
+      >
+        Edit
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="deleteBeer({{ beer.id }})">
+        Delete
+      </button>
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">No beers added yet. Add one to use it when filling kegs.</p>
+  {% endfor %}
+</div>
+
+<div class="modal" id="beerModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="beerModalTitle">Add Beer</h3>
+      <button class="btn btn-icon" onclick="closeModal('beerModal')">✕</button>
+    </div>
+    <form id="beerForm" onsubmit="submitBeer(event)">
+      <input type="hidden" id="beerId" />
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" id="beerName" class="form-control" required placeholder="e.g. Hazy IPA" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <input type="text" id="beerType" class="form-control" placeholder="IPA, Lager, Stout..." />
+        </div>
+        <div class="form-group">
+          <label>Brewer</label>
+          <input type="text" id="beerBrewer" class="form-control" placeholder="e.g. Local Brewery" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ABV (%)</label>
+          <input type="number" id="beerAbv" class="form-control" min="0" step="0.1" placeholder="e.g. 5.4" />
+        </div>
+        <div class="form-group">
+          <label>IBU</label>
+          <input type="number" id="beerIbu" class="form-control" min="0" step="1" placeholder="e.g. 42" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brewed On</label>
+          <input type="date" id="beerBrewedOn" class="form-control" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="beerNotes" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('beerModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  const INGRESS = "{{ ingress }}";
+
+  function openAddBeer() {
+    document.getElementById("beerModalTitle").textContent = "Add Beer";
+    document.getElementById("beerForm").reset();
+    document.getElementById("beerId").value = "";
+    openModal("beerModal");
+  }
+
+  function editBeer(beer) {
+    document.getElementById("beerModalTitle").textContent = "Edit Beer";
+    document.getElementById("beerId").value = beer.id;
+    document.getElementById("beerName").value = beer.name || "";
+    document.getElementById("beerType").value = beer.type || "";
+    document.getElementById("beerBrewer").value = beer.brewer || "";
+    document.getElementById("beerAbv").value = beer.abv || "";
+    document.getElementById("beerIbu").value = beer.ibu || "";
+    document.getElementById("beerBrewedOn").value = beer.brewed_on || "";
+    document.getElementById("beerNotes").value = beer.notes || "";
+    openModal("beerModal");
+  }
+
+  async function submitBeer(e) {
+    e.preventDefault();
+    const id = document.getElementById("beerId").value;
+    const body = {
+      name: document.getElementById("beerName").value.trim(),
+      type: document.getElementById("beerType").value.trim(),
+      brewer: document.getElementById("beerBrewer").value.trim(),
+      abv: document.getElementById("beerAbv").value.trim(),
+      ibu: document.getElementById("beerIbu").value.trim(),
+      brewed_on: document.getElementById("beerBrewedOn").value,
+      notes: document.getElementById("beerNotes").value.trim(),
+    };
+
+    const method = id ? "PUT" : "POST";
+    const url = id ? `${INGRESS}/api/beers/${id}` : `${INGRESS}/api/beers`;
+    const response = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to save beer.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) message = errorBody.error;
+      } catch (err) {
+        // Keep fallback message.
+      }
+      alert(message);
+      return;
+    }
+
+    location.reload();
+  }
+
+  async function deleteBeer(id) {
+    if (!confirm("Delete this beer?")) return;
+    const response = await fetch(`${INGRESS}/api/beers/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      let message = "Unable to delete beer.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) {
+          message = errorBody.error;
+          if (Array.isArray(errorBody.keg_names) && errorBody.keg_names.length) {
+            message += ` Linked kegs: ${errorBody.keg_names.join(", ")}.`;
+          }
+        }
+      } catch (err) {
+        // Keep fallback message.
+      }
+      alert(message);
+      return;
+    }
+
+    location.reload();
+  }
+</script>
+{% endblock %}

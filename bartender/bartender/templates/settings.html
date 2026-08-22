@@ -6,6 +6,17 @@ content %}
 <div class="card settings-card">
   <h2>📺 Read-Only External URLs</h2>
   <p class="muted">Use these external links for read-only access (served from port {{ display_port }}).</p>
+  <p class="muted" style="margin-top: 1rem">API Reference</p>
+  <div class="settings-url-row">
+    <a
+      id="apiReferenceUrl"
+      class="settings-url-link"
+      href="{{ ingress }}/api-reference"
+      target="_blank"
+      rel="noopener noreferrer"
+      >{{ ingress }}/api-reference</a
+    >
+  </div>
   <p class="muted" style="margin-top: 0.35rem">Display URL</p>
   <div class="settings-url-row">
     <a
@@ -205,6 +216,13 @@ content %}
         + Add Pour Option
       </button>
     </div>
+    <div class="form-group">
+      <label>Default Pour Preset</label>
+      <select id="defaultPourPreset" class="form-control"></select>
+      <small class="muted">
+        This preset is preselected anywhere pour choices are shown.
+      </small>
+    </div>
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">Save Settings</button>
       <span id="saveMsg" class="save-msg"></span>
@@ -263,6 +281,7 @@ content %}
   const INGRESS = "{{ ingress }}";
   const DISPLAY_PORT = "{{ display_port }}";
   const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
+  const DEFAULT_POUR_PRESET = {{ (settings.default_pour_preset or '') | tojson }};
 
   function initExternalReadonlyLinks() {
     try {
@@ -335,7 +354,7 @@ content %}
         </select>
       </div>
       <div class="form-group" style="align-self: end">
-        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.pour-option-row').remove()">Remove</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="removePourOptionRow(this)">Remove</button>
       </div>
     `;
 
@@ -348,6 +367,15 @@ content %}
     document.getElementById("pourOptionsList").appendChild(
       createPourOptionRow(option || {}),
     );
+    refreshDefaultPourPresetOptions();
+  }
+
+  function removePourOptionRow(button) {
+    const row = button.closest(".pour-option-row");
+    if (row) {
+      row.remove();
+      refreshDefaultPourPresetOptions();
+    }
   }
 
   function loadPourOptions() {
@@ -372,8 +400,51 @@ content %}
     return options;
   }
 
+  function buildPourPresetValue(option) {
+    const name = String(option.name || "").replaceAll("|", "/");
+    return `${option.amount}|${option.unit}|${name}`;
+  }
+
+  function refreshDefaultPourPresetOptions() {
+    const select = document.getElementById("defaultPourPreset");
+    if (!select) return;
+
+    const previous = select.value || DEFAULT_POUR_PRESET;
+    const options = collectPourOptions();
+    select.innerHTML = "";
+
+    if (!options.length) {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "No pour presets configured";
+      select.appendChild(placeholder);
+      select.disabled = true;
+      return;
+    }
+
+    select.disabled = false;
+    options.forEach((option) => {
+      const optionElement = document.createElement("option");
+      optionElement.value = buildPourPresetValue(option);
+      optionElement.textContent = `${option.name} (${option.amount} ${option.unit})`;
+      select.appendChild(optionElement);
+    });
+
+    const hasPrevious = Array.from(select.options).some(
+      (optionElement) => optionElement.value === previous,
+    );
+    select.value = hasPrevious ? previous : select.options[0].value;
+  }
+
   loadPourOptions();
+  refreshDefaultPourPresetOptions();
   initExternalReadonlyLinks();
+
+  const pourOptionsList = document.getElementById("pourOptionsList");
+  if (pourOptionsList) {
+    pourOptionsList.addEventListener("input", refreshDefaultPourPresetOptions);
+    pourOptionsList.addEventListener("change", refreshDefaultPourPresetOptions);
+  }
 
   async function saveSettings(e) {
     e.preventDefault();
@@ -395,6 +466,7 @@ content %}
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
       pour_options: collectPourOptions(),
+      default_pour_preset: document.getElementById("defaultPourPreset").value,
     };
 
     const menuQrModeInput = document.getElementById("menuQrMode");

@@ -34,11 +34,14 @@ content %}
         >
         {% if keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
         {% set pour_options = settings.pour_options if settings.pour_options is defined else [] %}
+        {% set default_pour_preset = settings.default_pour_preset if settings.default_pour_preset is defined else '' %}
+        <div class="tap-pour-row">
         {% if pour_options %}
         <select id="dashboardTapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
           {% for option in pour_options %}
           <option
             value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"
+            {% if default_pour_preset == (option.amount | string ~ '|' ~ option.unit ~ '|' ~ (option.name | replace('|', '/'))) %}selected{% endif %}
           >
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>
@@ -50,6 +53,7 @@ content %}
         {% else %}
         <span class="muted">Configure pour options in Settings.</span>
         {% endif %}
+        </div>
         {% endif %}
         {% else %}
         <span class="badge badge-empty">No keg assigned</span>
