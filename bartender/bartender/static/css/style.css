@@ -90,6 +90,23 @@ body {
   font-weight: 700;
   font-size: 1.1rem;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.brand-logo-lg {
+  width: 40px;
+  height: 40px;
 }
 
 .nav-links {
@@ -814,6 +831,12 @@ small.muted {
 
 .menu-header {
   margin-bottom: 1rem;
+}
+
+.menu-brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .menu-header h1 {

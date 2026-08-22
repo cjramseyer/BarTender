@@ -56,7 +56,12 @@
   </head>
   <body class="qr-print-page">
     <main class="container qr-print-card card">
-      <h1>{{ settings.bar_name }}</h1>
+      <div class="menu-brand-row" style="justify-content: center">
+        {% if settings.bar_logo_url %}
+        <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo brand-logo-lg" loading="lazy" />
+        {% endif %}
+        <h1>{{ settings.bar_name }}</h1>
+      </div>
       <p class="muted">Menu QR Code</p>
 
       {% if qr_ready %}

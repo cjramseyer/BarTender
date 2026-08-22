@@ -160,18 +160,6 @@
             onchange="toggleCustomSize()"
           >
             <option value="">Select size…</option>
-            <optgroup label="US" id="sizeGroupUS">
-              <option value="1/6 bbl (5.2 gal)">1/6 bbl (5.2 gal)</option>
-              <option value="1/4 bbl (7.75 gal)">1/4 bbl (7.75 gal)</option>
-              <option value="1/2 bbl (15.5 gal)">1/2 bbl (15.5 gal)</option>
-              <option value="Corny (5 gal)">Corny (5 gal)</option>
-            </optgroup>
-            <optgroup label="Metric" id="sizeGroupMetric">
-              <option value="20 L">20 L</option>
-              <option value="30 L">30 L</option>
-              <option value="50 L">50 L</option>
-            </optgroup>
-            <option value="Custom">Custom</option>
           </select>
         </div>
         <div class="form-group" id="customSizeGroup" style="display: none">
@@ -311,6 +299,7 @@
 <script>
   const INGRESS = "{{ ingress }}";
   const DEFAULT_VOLUME_UNIT = {{ ('oz' if (settings.measurement or 'us') == 'us' else 'ml') | tojson }};
+  const DEFAULT_KEG_TYPE_CHOICES = {{ (settings.keg_type_choices or []) | tojson }};
   const KEGS = {{ kegs | tojson }};
   const BEERS = {{ beers | tojson }};
   const ADD_NEW_BEER_VALUE = "__add_new_beer__";
@@ -557,6 +546,52 @@
       v === "Custom" ? "" : "none";
   }
 
+  function populateKegSizeOptions(selectedValue = "") {
+    const select = document.getElementById("kegSize");
+    if (!select) return;
+
+    const choices = Array.isArray(DEFAULT_KEG_TYPE_CHOICES)
+      ? DEFAULT_KEG_TYPE_CHOICES
+      : [];
+    const normalizedChoices = [];
+    const seen = new Set();
+    for (const choice of choices) {
+      const value = String(choice || "").trim();
+      if (!value) continue;
+      const key = value.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      normalizedChoices.push(value);
+    }
+
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select size…";
+    select.appendChild(placeholder);
+
+    for (const choice of normalizedChoices) {
+      const option = document.createElement("option");
+      option.value = choice;
+      option.textContent = choice;
+      select.appendChild(option);
+    }
+
+    const normalizedSelected = String(selectedValue || "").trim();
+    if (
+      normalizedSelected &&
+      !normalizedChoices.some((value) => value.toLowerCase() === normalizedSelected.toLowerCase())
+    ) {
+      const option = document.createElement("option");
+      option.value = normalizedSelected;
+      option.textContent = normalizedSelected;
+      select.appendChild(option);
+    }
+
+    select.value = normalizedSelected;
+    toggleCustomSize();
+  }
+
   function openAddKeg() {
     document.getElementById("kegModalTitle").textContent = "Add Keg";
     document.getElementById("kegForm").reset();
@@ -570,18 +605,21 @@
     document.getElementById("kegVolumeUnit").value = DEFAULT_VOLUME_UNIT;
     document.getElementById("kegLineCleaning").checked = false;
     applyLineCleaningConstraint();
-    document.getElementById("customSizeGroup").style.display = "none";
+    populateKegSizeOptions("");
     openModal("kegModal");
   }
 
   function openBulkKegModal() {
     const firstBeer = BEERS.length ? BEERS[0] : null;
+    const fallbackSize = Array.isArray(DEFAULT_KEG_TYPE_CHOICES) && DEFAULT_KEG_TYPE_CHOICES.length
+      ? DEFAULT_KEG_TYPE_CHOICES[0]
+      : "1/6 bbl (5.2 gal)";
     const sample = [
       {
         name: nextIncrementedName(KEGS, "Keg"),
         beer_id: firstBeer ? firstBeer.id : null,
         status: firstBeer ? "full" : "empty",
-        size: "1/6 bbl (5.2 gal)",
+        size: fallbackSize,
         current_volume: firstBeer ? 5.2 : null,
         volume_unit: "gal",
         percent_full: firstBeer ? 100 : 0,
@@ -591,7 +629,7 @@
         name: nextIncrementedName([...KEGS, { name: nextIncrementedName(KEGS, "Keg") }], "Keg"),
         beer_id: null,
         status: "empty",
-        size: "1/6 bbl (5.2 gal)",
+        size: fallbackSize,
         percent_full: 0,
         notes: "Ready to fill"
       }
@@ -655,7 +693,7 @@
     document.getElementById("kegBeer").value = keg.beer_id || "";
     document.getElementById("kegStatus").value = keg.status;
     applyStatusConstraintForCleaning(keg.status);
-    document.getElementById("kegSize").value = keg.size;
+    populateKegSizeOptions(keg.size || "");
     document.getElementById("kegCustomSize").value = keg.custom_size;
     document.getElementById("kegLineCleaning").checked = !!keg.line_cleaning_keg;
     applyLineCleaningConstraint(keg.id);

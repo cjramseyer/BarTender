@@ -14,7 +14,14 @@
   </head>
   <body>
     <nav class="navbar">
-      <a class="nav-brand" href="{{ ingress }}/">🍺 {{ settings.bar_name }}</a>
+      <a class="nav-brand" href="{{ ingress }}/">
+        {% if settings.bar_logo_url %}
+        <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo" loading="lazy" />
+        {% else %}
+        <span aria-hidden="true">🍺</span>
+        {% endif %}
+        <span>{{ settings.bar_name }}</span>
+      </a>
       <ul class="nav-links">
         <li><a href="{{ ingress }}/">Dashboard</a></li>
         <li><a href="{{ ingress }}/taps">Taps</a></li>
