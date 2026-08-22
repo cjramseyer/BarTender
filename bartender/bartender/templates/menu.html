@@ -9,7 +9,12 @@
   <body class="print-menu-page">
     <main class="container menu-container">
       <div class="menu-header">
-        <h1>{{ settings.bar_name }}</h1>
+        <div class="menu-brand-row">
+          {% if settings.bar_logo_url %}
+          <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo brand-logo-lg" loading="lazy" />
+          {% endif %}
+          <h1>{{ settings.bar_name }}</h1>
+        </div>
         <p class="muted">Printable Menu</p>
       </div>
 

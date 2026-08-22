@@ -7,6 +7,7 @@ import csv
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 try:
     import qrcode
@@ -44,6 +45,7 @@ DEFAULT_DATA = {
         "measurement": "us",
         "theme": "light",
         "bar_name": "My Bar",
+        "bar_logo_url": "",
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
@@ -119,10 +121,12 @@ def load_data() -> dict:
             data["settings"].get("default_pour_preset", ""),
             data["settings"].get("pour_options", []),
         )
+        data["settings"]["bar_logo_url"] = _normalize_logo_url(
+            data["settings"].get("bar_logo_url", "")
+        )
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
             data["settings"].get("keg_type_choices", []),
-            data.get("beers", []),
             data["settings"].get("default_keg_type", ""),
         )
         data["settings"]["default_keg_type"] = _normalize_default_keg_type(
@@ -221,6 +225,38 @@ def _normalize_menu_qr_mode(value) -> str:
     if mode in ("off", "display", "print", "both"):
         return mode
     return "both"
+
+
+def _normalize_logo_url(value) -> str:
+    url = str(value or "").strip()
+    if len(url) > 2048:
+        return ""
+    return url
+
+
+def _format_host_for_url(hostname: str) -> str:
+    if ":" in hostname and not hostname.startswith("["):
+        return f"[{hostname}]"
+    return hostname
+
+
+def _external_readonly_base_url() -> str:
+    parsed = urlsplit(request.host_url)
+    host = parsed.hostname or "localhost"
+    display_port = str(DISPLAY_PORT or "8100").strip()
+    if display_port:
+        netloc = f"{_format_host_for_url(host)}:{display_port}"
+    else:
+        netloc = parsed.netloc
+    return f"{parsed.scheme}://{netloc}"
+
+
+def _external_display_url() -> str:
+    return f"{_external_readonly_base_url()}/"
+
+
+def _external_menu_url() -> str:
+    return f"{_external_readonly_base_url()}/menu"
 
 
 def _qr_is_available() -> bool:
@@ -375,7 +411,7 @@ def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str
     return _pour_option_value(pour_options[0])
 
 
-def _normalize_keg_type_choices(raw_choices, beers: list[dict], default_type: str) -> list[str]:
+def _normalize_keg_type_choices(raw_choices, default_type: str) -> list[str]:
     choices = []
     seen = set()
 
@@ -388,16 +424,6 @@ def _normalize_keg_type_choices(raw_choices, beers: list[dict], default_type: st
             seen.add(key)
             choices.append(value)
 
-    for beer in beers:
-        if not isinstance(beer, dict):
-            continue
-        value = str(beer.get("type", "")).strip()
-        key = value.lower()
-        if not value or key in seen:
-            continue
-        seen.add(key)
-        choices.append(value)
-
     fallback = str(default_type or "").strip()
     fallback_key = fallback.lower()
     if fallback and fallback_key not in seen:
@@ -406,7 +432,16 @@ def _normalize_keg_type_choices(raw_choices, beers: list[dict], default_type: st
     if choices:
         return choices
 
-    return ["IPA", "Lager", "Stout", "Other"]
+    return [
+        "1/6 bbl (5.2 gal)",
+        "1/4 bbl (7.75 gal)",
+        "1/2 bbl (15.5 gal)",
+        "Corny (5 gal)",
+        "20 L",
+        "30 L",
+        "50 L",
+        "Custom",
+    ]
 
 
 def _normalize_default_keg_type(raw_default: str, choices: list[str]) -> str:
@@ -785,6 +820,8 @@ def settings():
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         display_port=DISPLAY_PORT,
+        external_display_url=_external_display_url(),
+        external_menu_url=_external_menu_url(),
         ingress=INGRESS_PATH,
     )
 
@@ -854,7 +891,7 @@ def menu_view():
             "fill_pct": fill_pct,
         })
 
-    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    menu_path = _external_menu_url()
     qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
@@ -875,7 +912,7 @@ def menu_view():
 @app.route("/menu/qr-print")
 def menu_qr_print_view():
     data = load_data()
-    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
+    menu_path = _external_menu_url()
     qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
     return render_template(
         "menu_qr_print.html",
@@ -903,8 +940,7 @@ def api_menu_qr():
             503,
         )
 
-    menu_path = f"{INGRESS_PATH}/menu" if INGRESS_PATH else "/menu"
-    menu_url = f"{request.host_url.rstrip('/')}{menu_path}"
+    menu_url = _external_menu_url()
 
     qr = qrcode.QRCode(box_size=8, border=2)
     qr.add_data(menu_url)
@@ -964,6 +1000,7 @@ def api_save_settings():
         "measurement",
         "theme",
         "bar_name",
+        "bar_logo_url",
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
@@ -995,7 +1032,6 @@ def api_save_settings():
     )
     data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
         data["settings"].get("keg_type_choices", []),
-        data.get("beers", []),
         data["settings"].get("default_keg_type", ""),
     )
     data["settings"]["default_keg_type"] = _normalize_default_keg_type(
@@ -1012,6 +1048,9 @@ def api_save_settings():
     data["settings"]["default_pour_preset"] = _normalize_default_pour_preset(
         data["settings"].get("default_pour_preset", ""),
         data["settings"].get("pour_options", []),
+    )
+    data["settings"]["bar_logo_url"] = _normalize_logo_url(
+        data["settings"].get("bar_logo_url", "")
     )
 
     save_data(data)
