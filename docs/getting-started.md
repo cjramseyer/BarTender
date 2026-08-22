@@ -16,6 +16,8 @@ Audience: first-time users
 Open Settings in BarTender UI and set:
 
 - Bar Name
+- Bar Logo URL (optional)
+- Keg Type Choices (keg/container sizes shown in Add Keg)
 - Default Keg Type (optional)
 - Measurement (us or metric)
 - Theme (light or dark)

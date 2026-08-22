@@ -52,6 +52,19 @@
         color: #fff;
         padding: 1rem 1.5rem;
       }
+      .brand-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      .brand-logo {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1px solid var(--border);
+        background: #fff;
+      }
       header h1 {
         font-size: 1.4rem;
       }
@@ -134,7 +147,12 @@
   </head>
   <body>
     <header>
-      <h1>{{ settings.bar_name }}</h1>
+      <div class="brand-row">
+        {% if settings.bar_logo_url %}
+        <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo" loading="lazy" />
+        {% endif %}
+        <h1>{{ settings.bar_name }}</h1>
+      </div>
       <div class="subtitle">Read-Only Menu · auto-refreshes every 60 s</div>
     </header>
 

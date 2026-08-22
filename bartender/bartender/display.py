@@ -20,6 +20,7 @@ DEFAULT_DATA = {
         "measurement": "us",
         "theme": "light",
         "bar_name": "My Bar",
+        "bar_logo_url": "",
         "bar_stock_enabled": True,
     },
     "beers": [],
