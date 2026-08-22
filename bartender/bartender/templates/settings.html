@@ -219,6 +219,17 @@ content %}
             Enable Bar Stock Feature
           </label>
         </div>
+        <div class="form-group">
+          <label class="radio-label">
+            <input
+              type="checkbox"
+              id="apiReferenceEnabled"
+              {% if settings.api_reference_enabled %}checked{% endif %}
+            />
+            Show API Reference in Navigation
+          </label>
+          <small class="muted">When disabled, API Reference is hidden from the top nav.</small>
+        </div>
         {% if qr_ready %}
         <div class="form-group">
           <label>Printable Menu QR Code</label>
@@ -635,6 +646,7 @@ content %}
         ? managePosInput.value
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
+      api_reference_enabled: document.getElementById("apiReferenceEnabled").checked,
       pour_options: collectPourOptions(),
       default_pour_preset: document.getElementById("defaultPourPreset").value,
     };
