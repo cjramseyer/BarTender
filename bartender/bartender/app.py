@@ -47,6 +47,17 @@ DEFAULT_DATA = {
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
         "default_keg_type": "",
+        "keg_type_choices": [
+            "IPA",
+            "Pale Ale",
+            "Lager",
+            "Stout",
+            "Porter",
+            "Wheat",
+            "Sour",
+            "Cider",
+            "Other",
+        ],
         "menu_qr_mode": "both",
         "pour_options": [
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
@@ -109,6 +120,15 @@ def load_data() -> dict:
             data["settings"].get("pour_options", []),
         )
         data["beers"] = _normalize_beers(data.get("beers", []))
+        data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
+            data["settings"].get("keg_type_choices", []),
+            data.get("beers", []),
+            data["settings"].get("default_keg_type", ""),
+        )
+        data["settings"]["default_keg_type"] = _normalize_default_keg_type(
+            data["settings"].get("default_keg_type", ""),
+            data["settings"].get("keg_type_choices", []),
+        )
         beers_by_id = {
             beer.get("id"): beer for beer in data.get("beers", []) if isinstance(beer.get("id"), int)
         }
@@ -350,6 +370,55 @@ def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str
     return _pour_option_value(pour_options[0])
 
 
+def _normalize_keg_type_choices(raw_choices, beers: list[dict], default_type: str) -> list[str]:
+    choices = []
+    seen = set()
+
+    if isinstance(raw_choices, list):
+        for item in raw_choices:
+            value = str(item or "").strip()
+            key = value.lower()
+            if not value or key in seen:
+                continue
+            seen.add(key)
+            choices.append(value)
+
+    for beer in beers:
+        if not isinstance(beer, dict):
+            continue
+        value = str(beer.get("type", "")).strip()
+        key = value.lower()
+        if not value or key in seen:
+            continue
+        seen.add(key)
+        choices.append(value)
+
+    fallback = str(default_type or "").strip()
+    fallback_key = fallback.lower()
+    if fallback and fallback_key not in seen:
+        choices.append(fallback)
+
+    if choices:
+        return choices
+
+    return ["IPA", "Lager", "Stout", "Other"]
+
+
+def _normalize_default_keg_type(raw_default: str, choices: list[str]) -> str:
+    default_value = str(raw_default or "").strip()
+    if not choices:
+        return default_value
+
+    if not default_value:
+        return choices[0]
+
+    for item in choices:
+        if item.lower() == default_value.lower():
+            return item
+
+    return choices[0]
+
+
 def _normalize_beers(raw_beers) -> list[dict]:
     if not isinstance(raw_beers, list):
         return []
@@ -382,6 +451,7 @@ def _normalize_beers(raw_beers) -> list[dict]:
             "name": str(entry.get("name", "")).strip(),
             "type": str(entry.get("type", entry.get("style", ""))).strip(),
             "brewer": str(entry.get("brewer", "")).strip(),
+            "brewery": str(entry.get("brewery", "")).strip(),
             "abv": str(entry.get("abv", "")).strip(),
             "ibu": str(entry.get("ibu", "")).strip(),
             "brewed_on": str(entry.get("brewed_on", "")).strip(),
@@ -406,6 +476,7 @@ def _apply_beer_to_keg(keg: dict, beer: dict) -> None:
     keg["beer_name"] = beer.get("name", "")
     keg["type"] = beer.get("type", "")
     keg["beer_brewer"] = beer.get("brewer", "")
+    keg["beer_brewery"] = beer.get("brewery", "")
     keg["beer_abv"] = beer.get("abv", "")
     keg["beer_ibu"] = beer.get("ibu", "")
     keg["beer_brewed_on"] = beer.get("brewed_on", "")
@@ -848,6 +919,7 @@ def api_save_settings():
         "dashboard_manage_button_position",
         "bar_stock_enabled",
         "default_keg_type",
+        "keg_type_choices",
         "menu_qr_mode",
         "pour_options",
         "default_pour_preset",
@@ -873,9 +945,15 @@ def api_save_settings():
         data["settings"].get("bar_stock_enabled"),
         True,
     )
-    data["settings"]["default_keg_type"] = str(
-        data["settings"].get("default_keg_type", "")
-    ).strip()
+    data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
+        data["settings"].get("keg_type_choices", []),
+        data.get("beers", []),
+        data["settings"].get("default_keg_type", ""),
+    )
+    data["settings"]["default_keg_type"] = _normalize_default_keg_type(
+        data["settings"].get("default_keg_type", ""),
+        data["settings"].get("keg_type_choices", []),
+    )
     data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
         data["settings"].get("menu_qr_mode")
     )
@@ -990,6 +1068,7 @@ def api_add_beer():
         "name": name,
         "type": str(body.get("type", "")).strip(),
         "brewer": str(body.get("brewer", "")).strip(),
+        "brewery": str(body.get("brewery", "")).strip(),
         "abv": str(body.get("abv", "")).strip(),
         "ibu": str(body.get("ibu", "")).strip(),
         "brewed_on": str(body.get("brewed_on", "")).strip(),
@@ -1011,7 +1090,7 @@ def api_update_beer(beer_id: int):
         if beer.get("id") != beer_id:
             continue
 
-        for field in ("name", "type", "brewer", "abv", "ibu", "brewed_on", "notes"):
+        for field in ("name", "type", "brewer", "brewery", "abv", "ibu", "brewed_on", "notes"):
             if field in body:
                 beer[field] = str(body.get(field, "")).strip()
 
@@ -1550,6 +1629,7 @@ def _beer_csv_rows(beers: list[dict]) -> list[list]:
         "name",
         "type",
         "brewer",
+        "brewery",
         "abv",
         "ibu",
         "brewed_on",

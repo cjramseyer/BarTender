@@ -16,6 +16,7 @@
     <div class="keg-card-body">
       <p><strong>Type:</strong> {{ beer.type or '—' }}</p>
       <p><strong>Brewer:</strong> {{ beer.brewer or '—' }}</p>
+      <p><strong>Brewery:</strong> {{ beer.brewery or '—' }}</p>
       <p><strong>ABV:</strong> {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</p>
       <p><strong>IBU:</strong> {{ beer.ibu or '—' }}</p>
       <p><strong>Brewed On:</strong> {{ beer.brewed_on or '—' }}</p>
@@ -55,11 +56,22 @@
       <div class="form-row">
         <div class="form-group">
           <label>Type</label>
-          <input type="text" id="beerType" class="form-control" placeholder="IPA, Lager, Stout..." />
+          <select id="beerType" class="form-control">
+            <option value="">— None —</option>
+            {% for keg_type in settings.keg_type_choices or [] %}
+            <option value="{{ keg_type }}">{{ keg_type }}</option>
+            {% endfor %}
+          </select>
         </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label>Brewer</label>
-          <input type="text" id="beerBrewer" class="form-control" placeholder="e.g. Local Brewery" />
+          <input type="text" id="beerBrewer" class="form-control" placeholder="e.g. John Doe" />
+        </div>
+        <div class="form-group">
+          <label>Brewery</label>
+          <input type="text" id="beerBrewery" class="form-control" placeholder="e.g. Local Brewery" />
         </div>
       </div>
       <div class="form-row">
@@ -106,6 +118,7 @@
     document.getElementById("beerName").value = beer.name || "";
     document.getElementById("beerType").value = beer.type || "";
     document.getElementById("beerBrewer").value = beer.brewer || "";
+    document.getElementById("beerBrewery").value = beer.brewery || "";
     document.getElementById("beerAbv").value = beer.abv || "";
     document.getElementById("beerIbu").value = beer.ibu || "";
     document.getElementById("beerBrewedOn").value = beer.brewed_on || "";
@@ -120,6 +133,7 @@
       name: document.getElementById("beerName").value.trim(),
       type: document.getElementById("beerType").value.trim(),
       brewer: document.getElementById("beerBrewer").value.trim(),
+      brewery: document.getElementById("beerBrewery").value.trim(),
       abv: document.getElementById("beerAbv").value.trim(),
       ibu: document.getElementById("beerIbu").value.trim(),
       brewed_on: document.getElementById("beerBrewedOn").value,

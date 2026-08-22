@@ -126,11 +126,6 @@
           <label>Beer</label>
           <select id="kegBeer" class="form-control">
             <option value="">— None —</option>
-            {% for beer in beers %}
-            <option value="{{ beer.id }}">
-              {{ beer.name }}{% if beer.type %} · {{ beer.type }}{% endif %}{% if beer.brewer %} — {{ beer.brewer }}{% endif %}
-            </option>
-            {% endfor %}
           </select>
           <small class="muted">Manage beer details on the Beers page.</small>
         </div>
@@ -257,11 +252,6 @@
         <label>Beer *</label>
         <select id="fillKegBeer" class="form-control" required>
           <option value="">Select beer…</option>
-          {% for beer in beers %}
-          <option value="{{ beer.id }}">
-            {{ beer.name }}{% if beer.type %} · {{ beer.type }}{% endif %}{% if beer.brewer %} — {{ beer.brewer }}{% endif %}
-          </option>
-          {% endfor %}
         </select>
         <small class="muted">Choose from beers configured on the Beers page.</small>
       </div>
@@ -284,6 +274,173 @@
   const DEFAULT_VOLUME_UNIT = {{ ('oz' if (settings.measurement or 'us') == 'us' else 'ml') | tojson }};
   const KEGS = {{ kegs | tojson }};
   const BEERS = {{ beers | tojson }};
+  const ADD_NEW_BEER_VALUE = "__add_new_beer__";
+
+  function beerOptionLabel(beer) {
+    const brewerDetails = [];
+    if (beer.brewer) brewerDetails.push(`Brewer: ${beer.brewer}`);
+    if (beer.brewery) brewerDetails.push(`Brewery: ${beer.brewery}`);
+    const detailSuffix = brewerDetails.length ? ` — ${brewerDetails.join(" · ")}` : "";
+    return `${beer.name || "Unnamed Beer"}${beer.type ? ` · ${beer.type}` : ""}${detailSuffix}`;
+  }
+
+  function sortedBeers() {
+    return [...BEERS].sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+        sensitivity: "base",
+      }),
+    );
+  }
+
+  function renderBeerSelectOptions() {
+    const kegBeerSelect = document.getElementById("kegBeer");
+    const fillKegBeerSelect = document.getElementById("fillKegBeer");
+    const previousKegValue = kegBeerSelect ? kegBeerSelect.value : "";
+    const previousFillValue = fillKegBeerSelect ? fillKegBeerSelect.value : "";
+
+    if (kegBeerSelect) {
+      kegBeerSelect.innerHTML = "";
+      const noneOption = document.createElement("option");
+      noneOption.value = "";
+      noneOption.textContent = "— None —";
+      kegBeerSelect.appendChild(noneOption);
+    }
+
+    if (fillKegBeerSelect) {
+      fillKegBeerSelect.innerHTML = "";
+      const placeholderOption = document.createElement("option");
+      placeholderOption.value = "";
+      placeholderOption.textContent = "Select beer…";
+      fillKegBeerSelect.appendChild(placeholderOption);
+    }
+
+    for (const beer of sortedBeers()) {
+      const optionValue = String(beer.id);
+      if (kegBeerSelect) {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = beerOptionLabel(beer);
+        kegBeerSelect.appendChild(option);
+      }
+      if (fillKegBeerSelect) {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = beerOptionLabel(beer);
+        fillKegBeerSelect.appendChild(option);
+      }
+    }
+
+    const addNewText = "+ Add New Beer...";
+    if (kegBeerSelect) {
+      const addOption = document.createElement("option");
+      addOption.value = ADD_NEW_BEER_VALUE;
+      addOption.textContent = addNewText;
+      kegBeerSelect.appendChild(addOption);
+    }
+    if (fillKegBeerSelect) {
+      const addOption = document.createElement("option");
+      addOption.value = ADD_NEW_BEER_VALUE;
+      addOption.textContent = addNewText;
+      fillKegBeerSelect.appendChild(addOption);
+    }
+
+    if (kegBeerSelect) {
+      const hasPrevious = Array.from(kegBeerSelect.options).some(
+        (option) => option.value === previousKegValue,
+      );
+      kegBeerSelect.value = hasPrevious ? previousKegValue : "";
+    }
+    if (fillKegBeerSelect) {
+      const hasPrevious = Array.from(fillKegBeerSelect.options).some(
+        (option) => option.value === previousFillValue,
+      );
+      fillKegBeerSelect.value = hasPrevious ? previousFillValue : "";
+    }
+  }
+
+  async function createBeerFromKegManagement(selectId) {
+    const select = document.getElementById(selectId);
+    const restoreValue = select?.dataset.previousValue || "";
+
+    const nameInput = prompt("New beer name:");
+    if (nameInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const name = String(nameInput).trim();
+    if (!name) {
+      alert("Beer name is required.");
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const typeInput = prompt("Beer type (optional):", "");
+    if (typeInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const brewerInput = prompt("Brewer (optional):", "");
+    if (brewerInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const breweryInput = prompt("Brewery (optional):", "");
+    if (breweryInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const response = await fetch(`${INGRESS}/api/beers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        type: String(typeInput || "").trim(),
+        brewer: String(brewerInput || "").trim(),
+        brewery: String(breweryInput || "").trim(),
+      }),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to create beer.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) message = errorBody.error;
+      } catch (err) {
+        // Keep fallback message.
+      }
+      alert(message);
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const created = await response.json();
+    BEERS.push(created);
+    renderBeerSelectOptions();
+    const createdId = String(created.id);
+
+    const kegBeerSelect = document.getElementById("kegBeer");
+    const fillKegBeerSelect = document.getElementById("fillKegBeer");
+    if (kegBeerSelect) kegBeerSelect.value = createdId;
+    if (fillKegBeerSelect) fillKegBeerSelect.value = createdId;
+  }
+
+  function wireBeerSelectForAddNew(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    select.addEventListener("focus", () => {
+      select.dataset.previousValue = select.value;
+    });
+
+    select.addEventListener("change", async () => {
+      if (select.value !== ADD_NEW_BEER_VALUE) return;
+      await createBeerFromKegManagement(selectId);
+    });
+  }
 
   function nextIncrementedName(items, basePrefix) {
     const regex = new RegExp(`^${basePrefix}\\s+(\\d+)$`, "i");
@@ -493,16 +650,11 @@
   }
 
   function openFillKeg(kegId, existingFilledDate, currentBeerId) {
-    if (!BEERS.length) {
-      alert("Add at least one beer on the Beers page before filling a keg.");
-      return;
-    }
-
     document.getElementById("fillKegId").value = kegId;
     document.getElementById("fillExistingDate").value = existingFilledDate || "";
     document.getElementById("fillKegDate").value = todayInputDate();
     document.getElementById("fillKegBeer").value =
-      currentBeerId || String(BEERS[0].id);
+      currentBeerId || (BEERS.length ? String(BEERS[0].id) : "");
     openModal("fillKegModal");
   }
 
@@ -568,5 +720,9 @@
         !status || card.dataset.status === status ? "" : "none";
     });
   }
+
+  renderBeerSelectOptions();
+  wireBeerSelectForAddNew("kegBeer");
+  wireBeerSelectForAddNew("fillKegBeer");
 </script>
 {% endblock %}

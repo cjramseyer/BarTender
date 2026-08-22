@@ -728,6 +728,31 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   margin-bottom: 0;
 }
 
+.settings-collapsible {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.settings-collapsible > summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+  padding: 0.9rem 1rem;
+}
+
+.settings-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-collapsible[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-collapsible-body {
+  padding: 0.9rem 1rem 1rem;
+}
+
 .settings-url-link {
   display: inline-block;
   max-width: 100%;
