@@ -1,6 +1,6 @@
 # BarTender Mobile App Documentation
 
-Last updated: 2026-08-19
+Last updated: 2026-08-22
 Doc scope: Flutter mobile viewer in mobile/
 
 ## Overview
@@ -95,6 +95,10 @@ The mobile viewer reads from:
 - GET /api/kegs
 - GET /api/stock
 
+Additional endpoint available for integrations:
+
+- GET /api/beers
+
 Failure behavior:
 
 - Non-2xx status throws an exception.
@@ -118,6 +122,7 @@ Not implemented:
 
 - Authentication workflow.
 - Write operations (add/edit/delete).
+- Beer catalog management UI (currently web UI only).
 - Background sync or push notifications.
 - Offline caching beyond saved server URL.
 

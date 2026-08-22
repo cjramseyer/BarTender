@@ -6,13 +6,15 @@ Manage your home bar with a web UI built into Home Assistant.
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
-- **Keg Management** — Track kegs by name, type, brewer, ABV/IBU, brewed date, volume, and lifecycle status
+- **Beer Catalog** — Manage reusable beer records for consistent keg assignment
+- **Keg Management** — Track keg inventory and lifecycle while selecting beer details from the catalog
 - **Tap Management** — Assign kegs to numbered, labelled tap lines
 - **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
-- **Settings** — Bar name, measurement, theme, bar stock toggle, default keg type, dashboard manage button position, and printable menu QR mode
+- **Settings** — Bar name, measurement, theme, bar stock toggle, pour defaults, dashboard button position, and printable menu QR mode
 - **Pour Workflow** — Track pours and automatically decrement current keg volume
+- **API Reference + Tester** — Built-in endpoint docs and in-app request tester UI
 
 ## Recent Changes
 
@@ -36,6 +38,10 @@ Manage your home bar with a web UI built into Home Assistant.
 - Added dashboard tap pour controls with preset selection.
 - Updated pour behavior so pouring adjusts both `current_volume` and `percent_full`, with automatic `full` to `in_use` transition on first pour.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
+- Added Beer Catalog page and beer CRUD APIs (`/api/beers`).
+- Added keg-to-beer linking so beer details are selected from a catalog, including fill-keg beer selection.
+- Added in-app API Reference page (`/api-reference`) with an API request tester.
+- Added default pour preset setting applied to pour selectors across dashboard and taps pages.
 
 ## Configuration
 

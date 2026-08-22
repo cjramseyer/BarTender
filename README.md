@@ -21,13 +21,15 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
-- **Keg Management** — Track kegs by name, type, size, brewer, ABV/IBU, brewed date, volume, and lifecycle status (`full`, `in_use`, `empty`, `cleaning`, `retired`)
+- **Beer Catalog** — Manage reusable beer records (name, type, brewer, ABV/IBU, brewed date, notes)
+- **Keg Management** — Track keg inventory, lifecycle state, and fill-level data; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line
-- **Settings** — Configurable bar name, measurement system (US / metric), UI theme (light / dark), bar stock visibility, and default keg type
+- **Settings** — Configurable bar name, measurement system (US / metric), UI theme (light / dark), bar stock visibility, and pour defaults
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
+- **API Reference + Tester** — In-app endpoint documentation with a request tester for GET/POST/PUT/DELETE calls
 - **Ingress** — Runs behind the Home Assistant ingress proxy; no port exposure required
 
 ## Recent Changes
@@ -53,6 +55,10 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - Added dashboard tap pour controls with preset selection.
 - Updated pour behavior so each pour also updates `percent_full`, and first pour transitions keg status from `full` to `in_use`.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
+- Added Beer Catalog management and linked kegs to selected beers (`beer_id`, `beer_name`) instead of direct beer-detail editing in keg forms.
+- Added fill-keg flow that requires selecting a beer from the catalog when marking a keg full.
+- Added in-app API Reference page (`/api-reference`) and interactive API tester, linked from Settings and top navigation.
+- Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
 
 ## Installation
 
@@ -81,6 +87,10 @@ The add-on exposes a JSON REST API at the ingress URL.
 | POST   | `/api/stock`                  | Add a stock item                                 |
 | PUT    | `/api/stock/<id>`             | Update a stock item                              |
 | DELETE | `/api/stock/<id>`             | Delete a stock item                              |
+| GET    | `/api/beers`                  | List all beers                                   |
+| POST   | `/api/beers`                  | Add a beer                                       |
+| PUT    | `/api/beers/<id>`             | Update a beer                                    |
+| DELETE | `/api/beers/<id>`             | Delete a beer                                    |
 | GET    | `/api/kegs`                   | List all kegs                                    |
 | POST   | `/api/kegs`                   | Add a keg                                        |
 | PUT    | `/api/kegs/<id>`              | Update a keg                                     |
@@ -103,6 +113,10 @@ The add-on exposes a JSON REST API at the ingress URL.
 | GET    | `/api/menu/qr/health`         | Check runtime QR dependency readiness            |
 
 Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
+
+UI reference route:
+
+- `GET /api-reference` — In-app API documentation and request tester UI
 
 ## Supported Architectures
 

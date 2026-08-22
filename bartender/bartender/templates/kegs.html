@@ -2,9 +2,14 @@
 %}
 <div class="page-header">
   <h1>🛢 Kegs</h1>
-  <button class="btn btn-primary manage-btn" onclick="openAddKeg()">
-    + New Keg
-  </button>
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap">
+    <button class="btn btn-primary manage-btn" onclick="openAddKeg()">
+      + New Keg
+    </button>
+    <button class="btn btn-secondary" onclick="openBulkKegModal()">
+      + Bulk Create
+    </button>
+  </div>
 </div>
 
 <div class="filter-bar">
@@ -28,7 +33,9 @@
   is defined else (100 if keg.status == 'full' else 50 if keg.status == 'in_use'
   else 0) %} {% set beer_name = keg.beer_name or '—' %} {% set beer_brewer =
   keg.beer_brewer or keg.brewery %} {% set beer_abv = keg.beer_abv or keg.abv %}
-  <div class="keg-card" data-status="{{ keg.status }}" data-id="{{ keg.id }}">
+  {% set filled_display = keg.filled_date or '—' %} {% set notes_display = keg.notes
+  or '—' %}
+  <div class="keg-card" data-status="{{ keg.status }}" data-id="{{ keg.id }}" data-created-at="{{ keg.created_at or '' }}" data-filled-date="{{ keg.filled_date or '' }}">
     <div class="keg-card-header">
       <span class="keg-name">{{ keg.name or 'Unnamed Keg' }}</span>
       <div>
@@ -69,11 +76,10 @@
         keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
       </p>
       <p><strong>Percent Full:</strong> {{ fill_pct }}%</p>
-      {% if keg.filled_date %}
-      <p><strong>Filled:</strong> {{ keg.filled_date }}</p>
-      {% endif %} {% if keg.notes %}
-      <p class="muted">{{ keg.notes }}</p>
-      {% endif %}
+      <p><strong>Filled:</strong> {{ filled_display }}</p>
+      <p><strong>Keg Age:</strong> <span class="keg-age-value">—</span></p>
+      <p><strong>Beer Age:</strong> <span class="beer-age-value">—</span></p>
+      <p><strong>Notes:</strong> {{ notes_display }}</p>
     </div>
     <div class="keg-card-footer">
       {% if keg.status == 'empty' %}
@@ -81,6 +87,10 @@
         class="btn btn-sm btn-primary"
         onclick='openFillKeg({{ keg.id }}, {{ (keg.filled_date or "") | tojson }}, {{ (keg.beer_id or "") | tojson }})'
       >
+        Fill Keg
+      </button>
+      {% else %}
+      <button class="btn btn-sm btn-primary" type="button" disabled>
         Fill Keg
       </button>
       {% endif %}
@@ -126,13 +136,8 @@
           <label>Beer</label>
           <select id="kegBeer" class="form-control">
             <option value="">— None —</option>
-            {% for beer in beers %}
-            <option value="{{ beer.id }}">
-              {{ beer.name }}{% if beer.type %} · {{ beer.type }}{% endif %}{% if beer.brewer %} — {{ beer.brewer }}{% endif %}
-            </option>
-            {% endfor %}
           </select>
-          <small class="muted">Manage beer details on the Beers page.</small>
+          <small class="muted">Only beers marked as kegged are shown.</small>
         </div>
         <div class="form-group">
           <label>Status</label>
@@ -257,13 +262,8 @@
         <label>Beer *</label>
         <select id="fillKegBeer" class="form-control" required>
           <option value="">Select beer…</option>
-          {% for beer in beers %}
-          <option value="{{ beer.id }}">
-            {{ beer.name }}{% if beer.type %} · {{ beer.type }}{% endif %}{% if beer.brewer %} — {{ beer.brewer }}{% endif %}
-          </option>
-          {% endfor %}
         </select>
-        <small class="muted">Choose from beers configured on the Beers page.</small>
+        <small class="muted">Only beers marked as kegged are shown.</small>
       </div>
       <div class="form-group">
         <label>Filled Date</label>
@@ -278,12 +278,213 @@
     </form>
   </div>
 </div>
+
+<div class="modal" id="bulkKegModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Bulk Create Kegs</h3>
+      <button class="btn btn-icon" onclick="closeModal('bulkKegModal')">✕</button>
+    </div>
+    <form id="bulkKegForm" onsubmit="submitBulkKegs(event)">
+      <div class="form-group">
+        <label>JSON Array</label>
+        <textarea
+          id="bulkKegPayload"
+          class="form-control"
+          rows="12"
+          placeholder='[{"name":"Keg 1","status":"empty","size":"1/6 bbl (5.2 gal)"}]'
+        ></textarea>
+        <small class="muted">
+          Each item supports the same fields as Add Keg, such as: name, beer_id, status, size, custom_size, filled_date, current_volume, volume_unit, percent_full, notes.
+        </small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('bulkKegModal')">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">Create Kegs</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
   const DEFAULT_VOLUME_UNIT = {{ ('oz' if (settings.measurement or 'us') == 'us' else 'ml') | tojson }};
   const KEGS = {{ kegs | tojson }};
   const BEERS = {{ beers | tojson }};
+  const ADD_NEW_BEER_VALUE = "__add_new_beer__";
+
+  function beerOptionLabel(beer) {
+    const brewerDetails = [];
+    if (beer.brewer) brewerDetails.push(`Brewer: ${beer.brewer}`);
+    if (beer.brewery) brewerDetails.push(`Brewery: ${beer.brewery}`);
+    const detailSuffix = brewerDetails.length ? ` — ${brewerDetails.join(" · ")}` : "";
+    return `${beer.name || "Unnamed Beer"}${beer.type ? ` · ${beer.type}` : ""}${detailSuffix}`;
+  }
+
+  function isKeggedBeer(beer) {
+    return String(beer?.packaging || "kegged").toLowerCase() === "kegged";
+  }
+
+  function sortedBeers() {
+    return [...BEERS].sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+        sensitivity: "base",
+      }),
+    );
+  }
+
+  function renderBeerSelectOptions() {
+    const kegBeerSelect = document.getElementById("kegBeer");
+    const fillKegBeerSelect = document.getElementById("fillKegBeer");
+    const previousKegValue = kegBeerSelect ? kegBeerSelect.value : "";
+    const previousFillValue = fillKegBeerSelect ? fillKegBeerSelect.value : "";
+
+    if (kegBeerSelect) {
+      kegBeerSelect.innerHTML = "";
+      const noneOption = document.createElement("option");
+      noneOption.value = "";
+      noneOption.textContent = "— None —";
+      kegBeerSelect.appendChild(noneOption);
+    }
+
+    if (fillKegBeerSelect) {
+      fillKegBeerSelect.innerHTML = "";
+      const placeholderOption = document.createElement("option");
+      placeholderOption.value = "";
+      placeholderOption.textContent = "Select beer…";
+      fillKegBeerSelect.appendChild(placeholderOption);
+    }
+
+    for (const beer of sortedBeers().filter((item) => isKeggedBeer(item))) {
+      const optionValue = String(beer.id);
+      if (kegBeerSelect) {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = beerOptionLabel(beer);
+        kegBeerSelect.appendChild(option);
+      }
+      if (fillKegBeerSelect) {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = beerOptionLabel(beer);
+        fillKegBeerSelect.appendChild(option);
+      }
+    }
+
+    const addNewText = "+ Add New Beer...";
+    if (kegBeerSelect) {
+      const addOption = document.createElement("option");
+      addOption.value = ADD_NEW_BEER_VALUE;
+      addOption.textContent = addNewText;
+      kegBeerSelect.appendChild(addOption);
+    }
+    if (fillKegBeerSelect) {
+      const addOption = document.createElement("option");
+      addOption.value = ADD_NEW_BEER_VALUE;
+      addOption.textContent = addNewText;
+      fillKegBeerSelect.appendChild(addOption);
+    }
+
+    if (kegBeerSelect) {
+      const hasPrevious = Array.from(kegBeerSelect.options).some(
+        (option) => option.value === previousKegValue,
+      );
+      kegBeerSelect.value = hasPrevious ? previousKegValue : "";
+    }
+    if (fillKegBeerSelect) {
+      const hasPrevious = Array.from(fillKegBeerSelect.options).some(
+        (option) => option.value === previousFillValue,
+      );
+      fillKegBeerSelect.value = hasPrevious ? previousFillValue : "";
+    }
+  }
+
+  async function createBeerFromKegManagement(selectId) {
+    const select = document.getElementById(selectId);
+    const restoreValue = select?.dataset.previousValue || "";
+
+    const nameInput = prompt("New beer name:");
+    if (nameInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const name = String(nameInput).trim();
+    if (!name) {
+      alert("Beer name is required.");
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const typeInput = prompt("Beer type (optional):", "");
+    if (typeInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const brewerInput = prompt("Brewer (optional):", "");
+    if (brewerInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const breweryInput = prompt("Brewery (optional):", "");
+    if (breweryInput === null) {
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const response = await fetch(`${INGRESS}/api/beers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        packaging: "kegged",
+        type: String(typeInput || "").trim(),
+        brewer: String(brewerInput || "").trim(),
+        brewery: String(breweryInput || "").trim(),
+      }),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to create beer.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) message = errorBody.error;
+      } catch (err) {
+        // Keep fallback message.
+      }
+      alert(message);
+      if (select) select.value = restoreValue;
+      return;
+    }
+
+    const created = await response.json();
+    BEERS.push(created);
+    renderBeerSelectOptions();
+    const createdId = String(created.id);
+
+    const kegBeerSelect = document.getElementById("kegBeer");
+    const fillKegBeerSelect = document.getElementById("fillKegBeer");
+    if (kegBeerSelect) kegBeerSelect.value = createdId;
+    if (fillKegBeerSelect) fillKegBeerSelect.value = createdId;
+  }
+
+  function wireBeerSelectForAddNew(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    select.addEventListener("focus", () => {
+      select.dataset.previousValue = select.value;
+    });
+
+    select.addEventListener("change", async () => {
+      if (select.value !== ADD_NEW_BEER_VALUE) return;
+      await createBeerFromKegManagement(selectId);
+    });
+  }
 
   function nextIncrementedName(items, basePrefix) {
     const regex = new RegExp(`^${basePrefix}\\s+(\\d+)$`, "i");
@@ -371,6 +572,80 @@
     applyLineCleaningConstraint();
     document.getElementById("customSizeGroup").style.display = "none";
     openModal("kegModal");
+  }
+
+  function openBulkKegModal() {
+    const firstBeer = BEERS.length ? BEERS[0] : null;
+    const sample = [
+      {
+        name: nextIncrementedName(KEGS, "Keg"),
+        beer_id: firstBeer ? firstBeer.id : null,
+        status: firstBeer ? "full" : "empty",
+        size: "1/6 bbl (5.2 gal)",
+        current_volume: firstBeer ? 5.2 : null,
+        volume_unit: "gal",
+        percent_full: firstBeer ? 100 : 0,
+        notes: "Bulk created"
+      },
+      {
+        name: nextIncrementedName([...KEGS, { name: nextIncrementedName(KEGS, "Keg") }], "Keg"),
+        beer_id: null,
+        status: "empty",
+        size: "1/6 bbl (5.2 gal)",
+        percent_full: 0,
+        notes: "Ready to fill"
+      }
+    ];
+    document.getElementById("bulkKegPayload").value = JSON.stringify(sample, null, 2);
+    openModal("bulkKegModal");
+  }
+
+  async function submitBulkKegs(event) {
+    event.preventDefault();
+    const payloadText = document.getElementById("bulkKegPayload").value.trim();
+    if (!payloadText) {
+      alert("Please provide a JSON array of keg objects.");
+      return;
+    }
+
+    let items;
+    try {
+      items = JSON.parse(payloadText);
+    } catch (err) {
+      alert("Bulk payload must be valid JSON.");
+      return;
+    }
+
+    if (!Array.isArray(items) || !items.length) {
+      alert("Bulk payload must be a non-empty JSON array.");
+      return;
+    }
+
+    const response = await fetch(`${INGRESS}/api/kegs/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+
+    if (!response.ok) {
+      let message = "Unable to bulk create kegs.";
+      try {
+        const errorBody = await response.json();
+        if (errorBody.error) {
+          message = typeof errorBody.index === "number"
+            ? `${errorBody.error} (item ${errorBody.index + 1})`
+            : errorBody.error;
+        }
+      } catch (err) {
+        // Keep fallback error message.
+      }
+      alert(message);
+      return;
+    }
+
+    const result = await response.json();
+    alert(`Created ${result.count || 0} kegs.`);
+    location.reload();
   }
 
   function editKeg(keg) {
@@ -493,16 +768,11 @@
   }
 
   function openFillKeg(kegId, existingFilledDate, currentBeerId) {
-    if (!BEERS.length) {
-      alert("Add at least one beer on the Beers page before filling a keg.");
-      return;
-    }
-
     document.getElementById("fillKegId").value = kegId;
     document.getElementById("fillExistingDate").value = existingFilledDate || "";
     document.getElementById("fillKegDate").value = todayInputDate();
     document.getElementById("fillKegBeer").value =
-      currentBeerId || String(BEERS[0].id);
+      currentBeerId || (BEERS.length ? String(BEERS[0].id) : "");
     openModal("fillKegModal");
   }
 
@@ -568,5 +838,72 @@
         !status || card.dataset.status === status ? "" : "none";
     });
   }
+
+  function parseDateToUtcStart(rawValue) {
+    const value = String(rawValue || "").trim();
+    if (!value) return null;
+
+    const dayOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dayOnly) {
+      const year = Number(dayOnly[1]);
+      const month = Number(dayOnly[2]) - 1;
+      const day = Number(dayOnly[3]);
+      return Date.UTC(year, month, day);
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+
+    return Date.UTC(
+      parsed.getUTCFullYear(),
+      parsed.getUTCMonth(),
+      parsed.getUTCDate(),
+    );
+  }
+
+  function formatAgeInDays(dayCount) {
+    if (dayCount < 0) return "0 days";
+    return dayCount === 1 ? "1 day" : `${dayCount} days`;
+  }
+
+  function renderKegAges() {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const startOfTodayUtc = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+    );
+
+    document.querySelectorAll(".keg-card").forEach((card) => {
+      const kegAgeTarget = card.querySelector(".keg-age-value");
+      const beerAgeTarget = card.querySelector(".beer-age-value");
+
+      if (kegAgeTarget) {
+        const createdAtUtc = parseDateToUtcStart(card.dataset.createdAt);
+        if (createdAtUtc === null) {
+          kegAgeTarget.textContent = "—";
+        } else {
+          const kegAgeDays = Math.floor((startOfTodayUtc - createdAtUtc) / msPerDay);
+          kegAgeTarget.textContent = formatAgeInDays(kegAgeDays);
+        }
+      }
+
+      if (beerAgeTarget) {
+        const filledAtUtc = parseDateToUtcStart(card.dataset.filledDate);
+        if (filledAtUtc === null) {
+          beerAgeTarget.textContent = "—";
+        } else {
+          const beerAgeDays = Math.floor((startOfTodayUtc - filledAtUtc) / msPerDay);
+          beerAgeTarget.textContent = formatAgeInDays(beerAgeDays);
+        }
+      }
+    });
+  }
+
+  renderBeerSelectOptions();
+  wireBeerSelectForAddNew("kegBeer");
+  wireBeerSelectForAddNew("fillKegBeer");
+  renderKegAges();
 </script>
 {% endblock %}

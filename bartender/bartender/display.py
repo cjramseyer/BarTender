@@ -22,6 +22,7 @@ DEFAULT_DATA = {
         "bar_name": "My Bar",
         "bar_stock_enabled": True,
     },
+    "beers": [],
     "bar_stock": [],
     "kegs": [],
     "taps": [],
@@ -59,6 +60,13 @@ def _clamp_percent_full(value, fallback: int) -> int:
         return fallback
 
 
+def _normalize_beer_packaging(value) -> str:
+    packaging = str(value or "kegged").strip().lower().replace("/", "_")
+    if packaging in ("bottled", "bottle", "can", "canned", "bottled_can"):
+        return "bottled_can"
+    return "kegged"
+
+
 @display_app.route("/")
 def index():
     data = load_data()
@@ -77,6 +85,14 @@ def menu():
     kegs_by_id = {
         keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
     }
+    packaged_beers = sorted(
+        [
+            beer
+            for beer in data.get("beers", [])
+            if _normalize_beer_packaging(beer.get("packaging", "kegged")) != "kegged"
+        ],
+        key=lambda beer: str(beer.get("name", "")).lower(),
+    )
 
     on_tap = []
     for tap in sorted(
@@ -103,6 +119,7 @@ def menu():
         "display/menu.html",
         settings=data["settings"],
         on_tap=on_tap,
+        packaged_beers=packaged_beers,
     )
 
 

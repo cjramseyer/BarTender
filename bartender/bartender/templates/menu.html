@@ -10,7 +10,7 @@
     <main class="container menu-container">
       <div class="menu-header">
         <h1>{{ settings.bar_name }}</h1>
-        <p class="muted">Currently on Tap</p>
+        <p class="muted">Printable Menu</p>
       </div>
 
       {% if menu_qr_mode != 'off' and qr_ready %}
@@ -43,6 +43,7 @@
       </section>
       {% endif %}
 
+      <h2 class="menu-section-title">What's on tap</h2>
       {% if on_tap %}
       <div class="menu-grid">
         {% for entry in on_tap %}
@@ -74,6 +75,27 @@
       </div>
       {% else %}
       <p class="muted">No kegs are currently assigned to taps.</p>
+      {% endif %}
+
+      <h2 class="menu-section-title menu-section-gap">Bottled/Can Beers</h2>
+      {% if packaged_beers %}
+      <div class="menu-grid">
+        {% for beer in packaged_beers %}
+        <article class="menu-item card">
+          <div class="menu-item-header">
+            <h2>{{ beer.name or 'Unnamed Beer' }}</h2>
+            <span class="badge badge-empty">Packaged</span>
+          </div>
+          <p class="muted">Type: {{ beer.type or '—' }}</p>
+          <p class="muted">Brewer: {{ beer.brewer or '—' }}</p>
+          <p class="muted">Brewery: {{ beer.brewery or '—' }}</p>
+          <p class="muted">ABV: {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</p>
+          <p class="muted">IBU: {{ beer.ibu or '—' }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No bottled/can beers in the catalog.</p>
       {% endif %}
 
       <div class="menu-screen-actions no-print">
