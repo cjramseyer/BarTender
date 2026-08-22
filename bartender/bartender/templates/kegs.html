@@ -212,6 +212,13 @@
         <small id="lineCleaningHint" class="muted" style="display: none"></small>
       </div>
       <div class="form-group">
+        <label class="radio-label">
+          <input type="checkbox" id="kegOnDeck" />
+          Mark as on deck
+        </label>
+        <small class="muted">Shown in the On Deck dashboard and display sections.</small>
+      </div>
+      <div class="form-group">
         <label>Percent Full (0-100)</label>
         <input
           type="number"
@@ -275,15 +282,18 @@
     </div>
     <form id="bulkKegForm" onsubmit="submitBulkKegs(event)">
       <div class="form-group">
-        <label>JSON Array</label>
-        <textarea
-          id="bulkKegPayload"
-          class="form-control"
-          rows="12"
-          placeholder='[{"name":"Keg 1","status":"empty","size":"1/6 bbl (5.2 gal)"}]'
-        ></textarea>
+          <label>How many?</label>
+          <input
+            type="number"
+            id="bulkKegCount"
+            class="form-control"
+            min="1"
+            step="1"
+            value="2"
+            required
+          />
         <small class="muted">
-          Each item supports the same fields as Add Keg, such as: name, beer_id, status, size, custom_size, filled_date, current_volume, volume_unit, percent_full, notes.
+            Creates sequential empty kegs starting from the next available number.
         </small>
       </div>
       <div class="modal-footer">
@@ -604,60 +614,48 @@
     document.getElementById("kegCurrentVolume").value = "";
     document.getElementById("kegVolumeUnit").value = DEFAULT_VOLUME_UNIT;
     document.getElementById("kegLineCleaning").checked = false;
+    document.getElementById("kegOnDeck").checked = false;
     applyLineCleaningConstraint();
     populateKegSizeOptions("");
     openModal("kegModal");
   }
 
   function openBulkKegModal() {
-    const firstBeer = BEERS.length ? BEERS[0] : null;
     const fallbackSize = Array.isArray(DEFAULT_KEG_TYPE_CHOICES) && DEFAULT_KEG_TYPE_CHOICES.length
       ? DEFAULT_KEG_TYPE_CHOICES[0]
       : "1/6 bbl (5.2 gal)";
-    const sample = [
-      {
-        name: nextIncrementedName(KEGS, "Keg"),
-        beer_id: firstBeer ? firstBeer.id : null,
-        status: firstBeer ? "full" : "empty",
-        size: fallbackSize,
-        current_volume: firstBeer ? 5.2 : null,
-        volume_unit: "gal",
-        percent_full: firstBeer ? 100 : 0,
-        notes: "Bulk created"
-      },
-      {
-        name: nextIncrementedName([...KEGS, { name: nextIncrementedName(KEGS, "Keg") }], "Keg"),
-        beer_id: null,
-        status: "empty",
-        size: fallbackSize,
-        percent_full: 0,
-        notes: "Ready to fill"
-      }
-    ];
-    document.getElementById("bulkKegPayload").value = JSON.stringify(sample, null, 2);
+    document.getElementById("bulkKegCount").value = 2;
     openModal("bulkKegModal");
   }
 
   async function submitBulkKegs(event) {
     event.preventDefault();
-    const payloadText = document.getElementById("bulkKegPayload").value.trim();
-    if (!payloadText) {
-      alert("Please provide a JSON array of keg objects.");
+    const countInput = document.getElementById("bulkKegCount");
+    const count = parseInt(countInput.value, 10);
+    if (Number.isNaN(count) || count <= 0) {
+      alert("Please enter how many kegs to create.");
       return;
     }
 
-    let items;
-    try {
-      items = JSON.parse(payloadText);
-    } catch (err) {
-      alert("Bulk payload must be valid JSON.");
-      return;
-    }
+    const nextNumberName = nextIncrementedName(KEGS, "Keg");
+    const baseNumberMatch = nextNumberName.match(/(\d+)$/);
+    const startingNumber = baseNumberMatch ? parseInt(baseNumberMatch[1], 10) : KEGS.length + 1;
+    const fallbackSize = Array.isArray(DEFAULT_KEG_TYPE_CHOICES) && DEFAULT_KEG_TYPE_CHOICES.length
+      ? DEFAULT_KEG_TYPE_CHOICES[0]
+      : "1/6 bbl (5.2 gal)";
 
-    if (!Array.isArray(items) || !items.length) {
-      alert("Bulk payload must be a non-empty JSON array.");
-      return;
-    }
+    const items = Array.from({ length: count }, (_, index) => {
+      const number = startingNumber + index;
+      return {
+        name: `Keg ${number}`,
+        beer_id: null,
+        status: "empty",
+        size: fallbackSize,
+        percent_full: 0,
+        on_deck: false,
+        notes: "Bulk created",
+      };
+    });
 
     const response = await fetch(`${INGRESS}/api/kegs/bulk`, {
       method: "POST",
@@ -697,6 +695,7 @@
     document.getElementById("kegCustomSize").value = keg.custom_size;
     document.getElementById("kegLineCleaning").checked = !!keg.line_cleaning_keg;
     applyLineCleaningConstraint(keg.id);
+    document.getElementById("kegOnDeck").checked = !!keg.on_deck;
     document.getElementById("kegNotes").value = keg.notes;
     document.getElementById("kegTapped").value = keg.tapped_date;
     document.getElementById("kegFilled").value =
@@ -741,6 +740,7 @@
       size: document.getElementById("kegSize").value,
       custom_size: document.getElementById("kegCustomSize").value,
       line_cleaning_keg: document.getElementById("kegLineCleaning").checked,
+      on_deck: document.getElementById("kegOnDeck").checked,
       current_volume: parsedCurrentVolume,
       volume_unit: document.getElementById("kegVolumeUnit").value,
       notes: document.getElementById("kegNotes").value,

@@ -3,6 +3,7 @@
   lang="en"
   data-theme="{{ settings.theme }}"
   data-manage-pos="{{ settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right' }}"
+  data-app-version="{{ app_version }}"
 >
   <head>
     <meta charset="UTF-8" />
@@ -53,11 +54,117 @@
 
     <main class="container">{% block content %}{% endblock %}</main>
 
+    {% if not settings.setup_completed %}
+    <div class="modal is-open" id="setupWizardModal" data-lock="true">
+      <div class="modal-dialog modal-dialog-lg">
+        <div class="modal-header">
+          <h3>Welcome to BarTender</h3>
+        </div>
+        <form onsubmit="submitSetupWizard(event)">
+          <div class="wizard-intro">
+            <p>Set up your bar name and confirm the basics before you start managing taps and kegs.</p>
+            <div class="wizard-grid">
+              <div class="form-group">
+                <label for="setupBarName">Bar Name</label>
+                <input
+                  type="text"
+                  id="setupBarName"
+                  class="form-control"
+                  value="{{ settings.bar_name or '' }}"
+                  required
+                />
+              </div>
+              <div>
+                <div class="form-group">
+                  <label>Measurement System</label>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input
+                        type="radio"
+                        name="setup_measurement"
+                        value="us"
+                        {% if (settings.measurement or 'us') == 'us' %}checked{% endif %}
+                      />
+                      US (gallons, oz)
+                    </label>
+                    <label class="radio-label">
+                      <input
+                        type="radio"
+                        name="setup_measurement"
+                        value="metric"
+                        {% if (settings.measurement or 'us') == 'metric' %}checked{% endif %}
+                      />
+                      Metric (liters, ml)
+                    </label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Theme</label>
+                  <div class="radio-group">
+                    <label class="radio-label">
+                      <input
+                        type="radio"
+                        name="setup_theme"
+                        value="light"
+                        {% if (settings.theme or 'light') == 'light' %}checked{% endif %}
+                      />
+                      ☀ Light
+                    </label>
+                    <label class="radio-label">
+                      <input
+                        type="radio"
+                        name="setup_theme"
+                        value="dark"
+                        {% if (settings.theme or 'light') == 'dark' %}checked{% endif %}
+                      />
+                      🌙 Dark
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="muted">You can change these later in Settings.</p>
+            <span id="setupWizardMsg" class="save-msg"></span>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Finish Setup</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if settings.setup_completed %}
+    <div class="modal" id="updateNoticeModal">
+      <div class="modal-dialog modal-dialog-lg">
+        <div class="modal-header">
+          <h3>What's new in BarTender {{ app_version }}</h3>
+          <button class="btn btn-icon" onclick="dismissUpdateNotice()">✕</button>
+        </div>
+        <div class="update-notice">
+          <p>BarTender has been updated. Here are a few changes to know about:</p>
+          <ul class="notice-list">
+            {% for highlight in release_highlights %}
+            <li>{{ highlight }}</li>
+            {% endfor %}
+          </ul>
+          <p class="muted" style="margin-top: 0.85rem">Dismiss this message once you’ve reviewed the updates.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" onclick="dismissUpdateNotice()">Got it</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <script src="{{ ingress }}/static/js/app.js"></script>
     <script>
+      window.BARTENDER_INGRESS = {{ ingress | tojson }};
+      window.BARTENDER_APP_VERSION = {{ app_version | tojson }};
       initTheme("{{ settings.theme }}", "{{ ingress }}");
       document.body.dataset.managePos =
         document.documentElement.dataset.managePos || "top-right";
+      initAppPrompts(window.BARTENDER_APP_VERSION);
     </script>
     {% block scripts %}{% endblock %}
   </body>

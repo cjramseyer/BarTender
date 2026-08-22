@@ -394,6 +394,23 @@
         {% endfor %}
       </div>
 
+      {% if on_deck_kegs %}
+      <div class="section-title">🔜 On Deck</div>
+      <div class="stock-grid">
+        {% for keg in on_deck_kegs %}
+        <div class="stock-card">
+          <div class="stock-name">{{ keg.name or 'Unnamed Keg' }}</div>
+          {% if keg.beer_name %}
+          <div class="stock-cat">{{ keg.beer_name }}</div>
+          {% endif %}
+          {% if keg.size %}
+          <div class="stock-cat">{{ keg.size }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       <!-- Bar Stock -->
       {% if settings.bar_stock_enabled and bar_stock %}
       <div class="section-title">📦 Bar Stock</div>
