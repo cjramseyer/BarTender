@@ -12,7 +12,7 @@ Manage your home bar with a web UI built into Home Assistant.
 - **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
-- **Settings** — Bar name, measurement, theme, bar stock toggle, pour defaults, dashboard button position, and printable menu QR mode
+- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode
 - **Pour Workflow** — Track pours and automatically decrement current keg volume
 - **API Reference + Tester** — Built-in endpoint docs and in-app request tester UI
 

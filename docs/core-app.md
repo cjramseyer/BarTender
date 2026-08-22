@@ -108,7 +108,7 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name, dashboard_manage_button_position, bar_stock_enabled, default_keg_type, menu_qr_mode, pour_options, default_pour_preset.
+- Accepted keys: measurement, theme, bar_name, bar_logo_url, dashboard_manage_button_position, bar_stock_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset.
 - Request example:
 
 ```json
@@ -417,7 +417,7 @@ GET /menu
 
 GET /api/menu/qr
 
-- Generates a PNG QR code that points to /menu on the current host.
+- Generates a PNG QR code that points to the canonical external read-only menu URL (host + DISPLAY_PORT, default 8100).
 - 503 response when QR dependencies are unavailable.
 
 GET /api/menu/qr/health
