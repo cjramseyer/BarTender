@@ -56,7 +56,9 @@ async function submitSetupWizard(event) {
   const ingress = window.BARTENDER_INGRESS || "";
   const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
   const barName = document.getElementById("setupBarName");
-  const measurement = document.querySelector('input[name="setup_measurement"]:checked');
+  const measurement = document.querySelector(
+    'input[name="setup_measurement"]:checked',
+  );
   const theme = document.querySelector('input[name="setup_theme"]:checked');
   const message = document.getElementById("setupWizardMsg");
 
