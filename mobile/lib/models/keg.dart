@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class Keg {
   final int id;
   final String name;
@@ -32,11 +34,15 @@ class Keg {
         brewery: json['brewery'] as String? ?? '',
         abv: json['abv'] as String? ?? '',
         notes: json['notes'] as String? ?? '',
-        filledDate: (json['filled_date'] as String?) ?? (json['purchased_date'] as String?) ?? '',
+        filledDate: (json['filled_date'] as String?) ??
+            (json['purchased_date'] as String?) ??
+            '',
         percentFull: (json['percent_full'] as num?)?.round() ??
             ((json['status'] as String? ?? 'empty') == 'full'
                 ? 100
-                : ((json['status'] as String? ?? 'empty') == 'in_use' ? 50 : 0)),
+                : ((json['status'] as String? ?? 'empty') == 'in_use'
+                    ? 50
+                    : 0)),
       );
 
   Color get statusColor {
