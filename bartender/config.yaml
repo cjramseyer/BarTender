@@ -4,8 +4,6 @@ description: "Manage your bar: track kegs, taps, and stock with a web UI."
 version: "dev"
 slug: "bartender"
 url: "https://github.com/cjramseyer/BarTender"
-documentation: "https://github.com/cjramseyer/BarTender/blob/main/bartender/DOCS.md"
-issue_tracker: "https://github.com/cjramseyer/BarTender/issues"
 arch:
   - amd64
   - aarch64
