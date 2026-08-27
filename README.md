@@ -103,39 +103,39 @@ External API security is configured in **Settings -> Features**:
 
 The add-on exposes a JSON REST API at the ingress URL.
 
-| Method | Endpoint                      | Description                                      |
-| ------ | ----------------------------- | ------------------------------------------------ |
-| GET    | `/api/settings`               | Get current settings                             |
-| POST   | `/api/settings`               | Update settings                                  |
+| Method | Endpoint                           | Description                                               |
+| ------ | ---------------------------------- | --------------------------------------------------------- |
+| GET    | `/api/settings`                    | Get current settings                                      |
+| POST   | `/api/settings`                    | Update settings                                           |
 | POST   | `/api/settings/external-auth/test` | Validate external API auth/allowlist/rate-limit readiness |
-| GET    | `/api/stock`                  | List all bar stock items                         |
-| POST   | `/api/stock`                  | Add a stock item                                 |
-| PUT    | `/api/stock/<id>`             | Update a stock item                              |
-| DELETE | `/api/stock/<id>`             | Delete a stock item                              |
-| GET    | `/api/beers`                  | List all beers                                   |
-| POST   | `/api/beers`                  | Add a beer                                       |
-| PUT    | `/api/beers/<id>`             | Update a beer                                    |
-| DELETE | `/api/beers/<id>`             | Delete a beer                                    |
-| GET    | `/api/kegs`                   | List all kegs                                    |
-| POST   | `/api/kegs`                   | Add a keg                                        |
-| PUT    | `/api/kegs/<id>`              | Update a keg                                     |
-| POST   | `/api/kegs/<id>/fill`         | Fill/refill a keg                                |
-| POST   | `/api/kegs/<id>/pour`         | Record a pour and reduce current volume          |
-| DELETE | `/api/kegs/<id>`              | Delete a keg                                     |
-| GET    | `/api/taps`                   | List all taps                                    |
-| POST   | `/api/taps`                   | Add a tap                                        |
-| PUT    | `/api/taps/<id>`              | Update a tap                                     |
-| POST   | `/api/taps/<id>/pour`         | Record a preset/manual pour against assigned keg |
-| DELETE | `/api/taps/<id>`              | Delete a tap                                     |
-| GET    | `/api/export/json`            | Export portable versioned JSON backup            |
-| GET    | `/api/export/archive`         | Export ZIP archive backup                        |
-| GET    | `/api/export/csv`             | Legacy alias for archive ZIP export              |
-| POST   | `/api/import/archive/preview` | Preview archive import result (replace or merge) |
-| POST   | `/api/import/archive`         | Import ZIP archive backup (replace or merge)     |
-| POST   | `/api/import/json/preview`    | Preview JSON import result (replace or merge)    |
-| POST   | `/api/import/json`            | Import JSON backup (replace or merge)            |
-| GET    | `/api/menu/qr`                | Generate printable menu QR code PNG              |
-| GET    | `/api/menu/qr/health`         | Check runtime QR dependency readiness            |
+| GET    | `/api/stock`                       | List all bar stock items                                  |
+| POST   | `/api/stock`                       | Add a stock item                                          |
+| PUT    | `/api/stock/<id>`                  | Update a stock item                                       |
+| DELETE | `/api/stock/<id>`                  | Delete a stock item                                       |
+| GET    | `/api/beers`                       | List all beers                                            |
+| POST   | `/api/beers`                       | Add a beer                                                |
+| PUT    | `/api/beers/<id>`                  | Update a beer                                             |
+| DELETE | `/api/beers/<id>`                  | Delete a beer                                             |
+| GET    | `/api/kegs`                        | List all kegs                                             |
+| POST   | `/api/kegs`                        | Add a keg                                                 |
+| PUT    | `/api/kegs/<id>`                   | Update a keg                                              |
+| POST   | `/api/kegs/<id>/fill`              | Fill/refill a keg                                         |
+| POST   | `/api/kegs/<id>/pour`              | Record a pour and reduce current volume                   |
+| DELETE | `/api/kegs/<id>`                   | Delete a keg                                              |
+| GET    | `/api/taps`                        | List all taps                                             |
+| POST   | `/api/taps`                        | Add a tap                                                 |
+| PUT    | `/api/taps/<id>`                   | Update a tap                                              |
+| POST   | `/api/taps/<id>/pour`              | Record a preset/manual pour against assigned keg          |
+| DELETE | `/api/taps/<id>`                   | Delete a tap                                              |
+| GET    | `/api/export/json`                 | Export portable versioned JSON backup                     |
+| GET    | `/api/export/archive`              | Export ZIP archive backup                                 |
+| GET    | `/api/export/csv`                  | Legacy alias for archive ZIP export                       |
+| POST   | `/api/import/archive/preview`      | Preview archive import result (replace or merge)          |
+| POST   | `/api/import/archive`              | Import ZIP archive backup (replace or merge)              |
+| POST   | `/api/import/json/preview`         | Preview JSON import result (replace or merge)             |
+| POST   | `/api/import/json`                 | Import JSON backup (replace or merge)                     |
+| GET    | `/api/menu/qr`                     | Generate printable menu QR code PNG                       |
+| GET    | `/api/menu/qr/health`              | Check runtime QR dependency readiness                     |
 
 Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
 

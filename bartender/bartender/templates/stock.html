@@ -98,7 +98,11 @@ content %}
       </div>
       <div class="form-group">
         <label>Size</label>
-        <select id="stockStandardSize" class="form-control" onchange="toggleCustomStockSize()">
+        <select
+          id="stockStandardSize"
+          class="form-control"
+          onchange="toggleCustomStockSize()"
+        >
           <option value="">Select a standard size…</option>
           <option value="__custom__">Other / Custom</option>
         </select>
@@ -129,8 +133,23 @@ content %}
 <script>
   const INGRESS = "{{ ingress }}";
   const MEASUREMENT = "{{ settings.measurement or 'us' }}";
-  const STANDARD_SIZES_US = ["50 ml", "200 ml", "375 ml", "750 ml", "1 L", "1.75 L"];
-  const STANDARD_SIZES_METRIC = ["50 ml", "200 ml", "375 ml", "500 ml", "700 ml", "1 L", "1.5 L"];
+  const STANDARD_SIZES_US = [
+    "50 ml",
+    "200 ml",
+    "375 ml",
+    "750 ml",
+    "1 L",
+    "1.75 L",
+  ];
+  const STANDARD_SIZES_METRIC = [
+    "50 ml",
+    "200 ml",
+    "375 ml",
+    "500 ml",
+    "700 ml",
+    "1 L",
+    "1.5 L",
+  ];
 
   function parseSizeLabel(label) {
     const m = (label || "").trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(ml|l)$/i);
@@ -147,7 +166,8 @@ content %}
       select.remove(2);
     }
 
-    const sizes = MEASUREMENT === "metric" ? STANDARD_SIZES_METRIC : STANDARD_SIZES_US;
+    const sizes =
+      MEASUREMENT === "metric" ? STANDARD_SIZES_METRIC : STANDARD_SIZES_US;
     sizes.forEach((size) => {
       const option = document.createElement("option");
       option.value = size;

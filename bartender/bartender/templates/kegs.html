@@ -33,9 +33,15 @@
   is defined else (100 if keg.status == 'full' else 50 if keg.status == 'in_use'
   else 0) %} {% set beer_name = keg.beer_name or '—' %} {% set beer_brewer =
   keg.beer_brewer or keg.brewery %} {% set beer_abv = keg.beer_abv or keg.abv %}
-  {% set filled_display = keg.filled_date or '—' %} {% set notes_display = keg.notes
-  or '—' %}
-  <div class="keg-card" data-status="{{ keg.status }}" data-id="{{ keg.id }}" data-created-at="{{ keg.created_at or '' }}" data-filled-date="{{ keg.filled_date or '' }}">
+  {% set filled_display = keg.filled_date or '—' %} {% set notes_display =
+  keg.notes or '—' %}
+  <div
+    class="keg-card"
+    data-status="{{ keg.status }}"
+    data-id="{{ keg.id }}"
+    data-created-at="{{ keg.created_at or '' }}"
+    data-filled-date="{{ keg.filled_date or '' }}"
+  >
     <div class="keg-card-header">
       <span class="keg-name">{{ keg.name or 'Unnamed Keg' }}</span>
       <div>
@@ -43,7 +49,8 @@
         <span class="badge badge-cleaning">Line Cleaning</span>
         {% endif %}
         <span class="badge badge-{{ keg.status }}"
-          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span
+          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_',
+          ' ') | title) }}</span
         >
       </div>
     </div>
@@ -68,12 +75,15 @@
       </p>
       <p><strong>Beer:</strong> {{ beer_name }}</p>
       <p><strong>Brewer:</strong> {{ beer_brewer or '—' }}</p>
-      <p><strong>ABV:</strong> {{ beer_abv or '—' }}{% if beer_abv %}%{% endif %}</p>
+      <p>
+        <strong>ABV:</strong> {{ beer_abv or '—' }}{% if beer_abv %}%{% endif %}
+      </p>
       <p><strong>IBU:</strong> {{ keg.beer_ibu or '—' }}</p>
       <p><strong>Brewed On:</strong> {{ keg.beer_brewed_on or '—' }}</p>
       <p>
-        <strong>Current Volume:</strong> {% if keg.current_volume is not none %}{{
-        keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
+        <strong>Current Volume:</strong> {% if keg.current_volume is not none
+        %}{{ keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{%
+        endif %}
       </p>
       <p><strong>Percent Full:</strong> {{ fill_pct }}%</p>
       <p><strong>Filled:</strong> {{ filled_display }}</p>
@@ -89,8 +99,7 @@
       >
         Fill Keg
       </button>
-      {% endif %}
-      {% if keg.status == 'cleaning' %}
+      {% endif %} {% if keg.status == 'cleaning' %}
       <button class="btn btn-sm btn-secondary" onclick="cleanKeg({{ keg.id }})">
         Clean Keg
       </button>
@@ -128,9 +137,7 @@
           class="form-control"
           placeholder="e.g. Keg 1"
         />
-        <small class="muted">
-          Required only when status is Full.
-        </small>
+        <small class="muted"> Required only when status is Full. </small>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -145,9 +152,15 @@
           <select id="kegStatus" class="form-control">
             <option value="full" data-default-label="Full">Full</option>
             <option value="in_use" data-default-label="On-Tap">On-Tap</option>
-            <option value="empty" selected data-default-label="Empty">Empty</option>
-            <option value="cleaning" data-default-label="Cleaning">Cleaning</option>
-            <option value="retired" data-default-label="Retired">Retired</option>
+            <option value="empty" selected data-default-label="Empty">
+              Empty
+            </option>
+            <option value="cleaning" data-default-label="Cleaning">
+              Cleaning
+            </option>
+            <option value="retired" data-default-label="Retired">
+              Retired
+            </option>
           </select>
           <small id="statusHint" class="muted" style="display: none"></small>
         </div>
@@ -210,14 +223,20 @@
           <input type="checkbox" id="kegLineCleaning" />
           Mark as line cleaning keg
         </label>
-        <small id="lineCleaningHint" class="muted" style="display: none"></small>
+        <small
+          id="lineCleaningHint"
+          class="muted"
+          style="display: none"
+        ></small>
       </div>
       <div class="form-group">
         <label class="radio-label">
           <input type="checkbox" id="kegOnDeck" />
           Mark as on deck
         </label>
-        <small class="muted">Shown in the On Deck dashboard and display sections.</small>
+        <small class="muted"
+          >Shown in the On Deck dashboard and display sections.</small
+        >
       </div>
       <div class="form-group">
         <label>Percent Full (0-100)</label>
@@ -249,7 +268,9 @@
   <div class="modal-dialog">
     <div class="modal-header">
       <h3>Fill Keg</h3>
-      <button class="btn btn-icon" onclick="closeModal('fillKegModal')">✕</button>
+      <button class="btn btn-icon" onclick="closeModal('fillKegModal')">
+        ✕
+      </button>
     </div>
     <form id="fillKegForm" onsubmit="submitFillKeg(event)">
       <input type="hidden" id="fillKegId" />
@@ -279,22 +300,24 @@
   <div class="modal-dialog">
     <div class="modal-header">
       <h3>Bulk Create Kegs</h3>
-      <button class="btn btn-icon" onclick="closeModal('bulkKegModal')">✕</button>
+      <button class="btn btn-icon" onclick="closeModal('bulkKegModal')">
+        ✕
+      </button>
     </div>
     <form id="bulkKegForm" onsubmit="submitBulkKegs(event)">
       <div class="form-group">
-          <label>How many?</label>
-          <input
-            type="number"
-            id="bulkKegCount"
-            class="form-control"
-            min="1"
-            step="1"
-            value="2"
-            required
-          />
+        <label>How many?</label>
+        <input
+          type="number"
+          id="bulkKegCount"
+          class="form-control"
+          min="1"
+          step="1"
+          value="2"
+          required
+        />
         <small class="muted">
-            Creates sequential empty kegs starting from the next available number.
+          Creates sequential empty kegs starting from the next available number.
         </small>
       </div>
       <div class="modal-footer">

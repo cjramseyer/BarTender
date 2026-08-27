@@ -15,11 +15,11 @@
 <div class="taps-grid" id="tapsGrid">
   {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
   tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
-  keg.percent_full is defined else (100 if keg and keg.status == 'full' else
-  50 if keg and keg.status == 'in_use' else 0) %} {% set beer_brewer =
+  keg.percent_full is defined else (100 if keg and keg.status == 'full' else 50
+  if keg and keg.status == 'in_use' else 0) %} {% set beer_brewer =
   keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if keg else
-  '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set
-  beer_brewed_on = keg.beer_brewed_on if keg else '' %}
+  '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set beer_brewed_on =
+  keg.beer_brewed_on if keg else '' %}
   <div class="tap-card" data-id="{{ tap.id }}">
     <div class="tap-card-header">
       <span class="tap-number">Tap #{{ tap.number }}</span>
@@ -44,7 +44,8 @@
       </div>
       <p>
         <span class="badge badge-{{ keg.status }}"
-          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span
+          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_',
+          ' ') | title) }}</span
         >
       </p>
       <p class="muted">Type: {{ keg.type or '—' }}</p>
@@ -61,8 +62,8 @@
         keg.size or '—' }}{% endif %}
       </p>
       <p class="muted">
-        Volume Remaining: {% if keg.current_volume is not none %}{{ keg.current_volume }}
-        {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
+        Volume Remaining: {% if keg.current_volume is not none %}{{
+        keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
       </p>
       {% if keg.tapped_date %}
       <p class="muted">Tapped: {{ keg.tapped_date }}</p>
@@ -73,44 +74,57 @@
       {% endif %}
     </div>
     <div class="tap-card-footer">
-      {% if keg and keg.current_volume is not none and keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
-      {% if (settings.pour_mode or 'manual') == 'manual' %}
-      {% set pour_options = settings.pour_options if settings.pour_options is defined else [] %}
-      {% set default_pour_preset = settings.default_pour_preset if settings.default_pour_preset is defined else '' %}
+      {% if keg and keg.current_volume is not none and keg.current_volume > 0
+      and keg.status not in ('cleaning', 'retired') %} {% if (settings.pour_mode
+      or 'manual') == 'manual' %} {% set pour_options = settings.pour_options if
+      settings.pour_options is defined else [] %} {% set default_pour_preset =
+      settings.default_pour_preset if settings.default_pour_preset is defined
+      else '' %}
       <div class="tap-pour-row">
         {% if pour_options %}
-        <select id="tapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
-          {% for option in pour_options %}
-          {% set option_amount_token = '%g' | format(option.amount) %}
-          {% set option_name_token = option.name | replace('|', '/') %}
-          {% set option_value = option_amount_token ~ '|' ~ option.unit ~ '|' ~ option_name_token %}
+        <select
+          id="tapPourPreset-{{ tap.id }}"
+          class="form-control form-control-sm"
+        >
+          {% for option in pour_options %} {% set option_amount_token = '%g' |
+          format(option.amount) %} {% set option_name_token = option.name |
+          replace('|', '/') %} {% set option_value = option_amount_token ~ '|' ~
+          option.unit ~ '|' ~ option_name_token %}
           <option
             value="{{ option_value }}"
-            {% if default_pour_preset == option_value %}selected{% endif %}
+            {%
+            if
+            default_pour_preset=""
+            ="option_value"
+            %}selected{%
+            endif
+            %}
           >
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>
           {% endfor %}
         </select>
-        <button class="btn btn-sm btn-secondary" onclick="pourTap({{ tap.id }})">
+        <button
+          class="btn btn-sm btn-secondary"
+          onclick="pourTap({{ tap.id }})"
+        >
           Pour
         </button>
         {% else %}
         <span class="muted">Configure pour options in Settings.</span>
         {% endif %}
       </div>
-      {% endif %}
-      {% endif %}
+      {% endif %} {% endif %}
       <div class="tap-action-row">
-      <button
-        class="btn btn-sm btn-secondary"
-        onclick="editTap({{ tap | tojson | forceescape }})"
-      >
-        Edit
-      </button>
-      <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">
-        Delete
-      </button>
+        <button
+          class="btn btn-sm btn-secondary"
+          onclick="editTap({{ tap | tojson | forceescape }})"
+        >
+          Edit
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">
+          Delete
+        </button>
       </div>
     </div>
   </div>
@@ -156,8 +170,9 @@
           <option value="">— None —</option>
           {% for keg in kegs %} {% if keg.status in ('full', 'in_use') %}
           <option value="{{ keg.id }}">
-            {{ keg.name }} ({{ 'on-tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ')) }}{% if keg.size
-            %}, {{ keg.size }}{% endif %})
+            {{ keg.name }} ({{ 'on-tap' if keg.status == 'in_use' else
+            (keg.status | replace('_', ' ')) }}{% if keg.size %}, {{ keg.size
+            }}{% endif %})
           </option>
           {% endif %} {% endfor %}
         </select>
@@ -181,22 +196,24 @@
   <div class="modal-dialog">
     <div class="modal-header">
       <h3>Bulk Create Taps</h3>
-      <button class="btn btn-icon" onclick="closeModal('bulkTapModal')">✕</button>
+      <button class="btn btn-icon" onclick="closeModal('bulkTapModal')">
+        ✕
+      </button>
     </div>
     <form id="bulkTapForm" onsubmit="submitBulkTaps(event)">
       <div class="form-group">
-          <label>How many?</label>
-          <input
-            type="number"
-            id="bulkTapCount"
-            class="form-control"
-            min="1"
-            step="1"
-            value="2"
-            required
-          />
+        <label>How many?</label>
+        <input
+          type="number"
+          id="bulkTapCount"
+          class="form-control"
+          min="1"
+          step="1"
+          value="2"
+          required
+        />
         <small class="muted">
-            Creates sequential tap numbers starting at the next available slot.
+          Creates sequential tap numbers starting at the next available slot.
         </small>
       </div>
       <div class="modal-footer">

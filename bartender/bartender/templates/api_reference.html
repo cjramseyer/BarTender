@@ -1,11 +1,13 @@
-{% extends "base.html" %} {% block title %}API Reference{% endblock %} {% block content %}
+{% extends "base.html" %} {% block title %}API Reference{% endblock %} {% block
+content %}
 <div class="page-header">
   <h1>🔎 API Reference</h1>
 </div>
 
 <div class="card">
   <p class="muted">
-    This reference lists API endpoints for BarTender. Paths are shown relative to ingress.
+    This reference lists API endpoints for BarTender. Paths are shown relative
+    to ingress.
   </p>
   <div class="table-wrap">
     <table class="table">
@@ -27,7 +29,7 @@
             <button
               type="button"
               class="btn btn-sm btn-secondary"
-              onclick='useEndpoint({{ method | tojson }}, {{ path | tojson }})'
+              onclick="useEndpoint({{ method | tojson }}, {{ path | tojson }})"
             >
               Use
             </button>
@@ -42,7 +44,8 @@
 <div class="card" style="margin-top: 1rem">
   <h2>API Tester</h2>
   <p class="muted">
-    Send test requests to BarTender endpoints. Requests run with your current browser session and ingress context.
+    Send test requests to BarTender endpoints. Requests run with your current
+    browser session and ingress context.
   </p>
   <p class="muted">
     Selecting an endpoint auto-loads sample request data in the expected format.
@@ -52,7 +55,11 @@
     <div class="form-row">
       <div class="form-group">
         <label>Method</label>
-        <select id="apiMethod" class="form-control" onchange="updateBodyState()">
+        <select
+          id="apiMethod"
+          class="form-control"
+          onchange="updateBodyState()"
+        >
           <option value="GET" selected>GET</option>
           <option value="POST">POST</option>
           <option value="PUT">PUT</option>
@@ -92,24 +99,32 @@
     </div>
 
     <div class="form-actions">
-      <button id="apiSendBtn" type="submit" class="btn btn-primary">Send Request</button>
+      <button id="apiSendBtn" type="submit" class="btn btn-primary">
+        Send Request
+      </button>
       <span id="apiStatus" class="save-msg"></span>
     </div>
   </form>
 
   <div class="form-group" style="margin-top: 1rem">
     <label>Sample Response</label>
-    <pre id="apiSampleResponse" class="form-control" style="min-height: 180px; white-space: pre-wrap"></pre>
+    <pre
+      id="apiSampleResponse"
+      class="form-control"
+      style="min-height: 180px; white-space: pre-wrap"
+    ></pre>
   </div>
 
   <div class="form-group" style="margin-top: 1rem">
     <label>Response</label>
-    <pre id="apiResponse" class="form-control" style="min-height: 180px; white-space: pre-wrap"></pre>
+    <pre
+      id="apiResponse"
+      class="form-control"
+      style="min-height: 180px; white-space: pre-wrap"
+    ></pre>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
   const SAMPLE_REQUEST_BODIES = {
@@ -124,9 +139,9 @@
       menu_qr_mode: "url",
       pour_options: [
         { name: "Pint", amount: 16, unit: "oz" },
-        { name: "Half Pint", amount: 8, unit: "oz" }
+        { name: "Half Pint", amount: 8, unit: "oz" },
       ],
-      default_pour_preset: "16|oz|Pint"
+      default_pour_preset: "16|oz|Pint",
     },
     "POST /api/stock": {
       name: "Orange Juice",
@@ -135,11 +150,11 @@
       size_label: "750 ml",
       size_value: 750,
       size_unit: "ml",
-      notes: "Keep chilled"
+      notes: "Keep chilled",
     },
     "PUT /api/stock/<id>": {
       quantity: 5,
-      notes: "Restocked this morning"
+      notes: "Restocked this morning",
     },
     "POST /api/beers": {
       name: "Hazy Trail IPA",
@@ -150,14 +165,14 @@
       abv: "6.4",
       ibu: "42",
       brewed_on: "2026-08-01",
-      notes: "Citrus-forward"
+      notes: "Citrus-forward",
     },
     "PUT /api/beers/<id>": {
       name: "Hazy Trail IPA",
       packaging: "bottled_can",
       brewer: "Alex Brewer",
       brewery: "Cedar Valley Brewing",
-      notes: "Updated tasting notes"
+      notes: "Updated tasting notes",
     },
     "POST /api/kegs": {
       name: "Taproom Keg #12",
@@ -168,7 +183,7 @@
       volume_unit: "gal",
       percent_full: 100,
       filled_date: "2026-08-22",
-      notes: "Front bar"
+      notes: "Front bar",
     },
     "POST /api/kegs/bulk": {
       items: [
@@ -179,37 +194,37 @@
           status: "full",
           current_volume: 5.2,
           volume_unit: "gal",
-          percent_full: 100
+          percent_full: 100,
         },
         {
           name: "Keg 22",
           status: "empty",
           size: "1/6 bbl (5.2 gal)",
-          percent_full: 0
-        }
-      ]
+          percent_full: 0,
+        },
+      ],
     },
     "PUT /api/kegs/<id>": {
       status: "in_use",
       percent_full: 84,
-      notes: "Moved to patio tap"
+      notes: "Moved to patio tap",
     },
     "POST /api/kegs/<id>/fill": {
       beer_id: 1,
       status: "full",
       filled_date: "2026-08-22",
       percent_full: 100,
-      force: false
+      force: false,
     },
     "POST /api/kegs/<id>/pour": {
       amount: 16,
-      unit: "oz"
+      unit: "oz",
     },
     "POST /api/taps": {
       number: 1,
       label: "Main Bar 1",
       keg_id: 1,
-      notes: "Most popular"
+      notes: "Most popular",
     },
     "POST /api/taps/bulk": {
       items: [
@@ -217,24 +232,24 @@
           number: 7,
           label: "Tap 7",
           keg_id: 1,
-          notes: "Bulk created"
+          notes: "Bulk created",
         },
         {
           number: 8,
           label: "Tap 8",
           keg_id: null,
-          notes: "Ready for assignment"
-        }
-      ]
+          notes: "Ready for assignment",
+        },
+      ],
     },
     "PUT /api/taps/<id>": {
       label: "Main Bar Left",
       keg_id: 2,
-      notes: "Rotated keg"
+      notes: "Rotated keg",
     },
     "POST /api/taps/<id>/pour": {
       amount: 12,
-      unit: "oz"
+      unit: "oz",
     },
     "POST /api/import/json": {
       format: "bartender-export",
@@ -244,13 +259,13 @@
         settings: {
           measurement: "us",
           theme: "light",
-          bar_name: "Sample Taproom"
+          bar_name: "Sample Taproom",
         },
         beers: [],
         kegs: [],
         taps: [],
-        bar_stock: []
-      }
+        bar_stock: [],
+      },
     },
     "POST /api/import/json/preview": {
       format: "bartender-export",
@@ -260,14 +275,14 @@
         settings: {
           measurement: "us",
           theme: "light",
-          bar_name: "Sample Taproom"
+          bar_name: "Sample Taproom",
         },
         beers: [],
         kegs: [],
         taps: [],
-        bar_stock: []
-      }
-    }
+        bar_stock: [],
+      },
+    },
   };
 
   const SAMPLE_RESPONSES = {
@@ -284,18 +299,18 @@
         menu_qr_mode: "url",
         pour_options: [
           { name: "Pint", amount: 16, unit: "oz" },
-          { name: "Half Pint", amount: 8, unit: "oz" }
+          { name: "Half Pint", amount: 8, unit: "oz" },
         ],
-        default_pour_preset: "16|oz|Pint"
-      }
+        default_pour_preset: "16|oz|Pint",
+      },
     },
     "POST /api/settings": {
       status: "200 OK",
       body: {
         measurement: "us",
         theme: "light",
-        bar_name: "Sample Taproom"
-      }
+        bar_name: "Sample Taproom",
+      },
     },
     "GET /api/beers": {
       status: "200 OK",
@@ -311,9 +326,9 @@
           ibu: "42",
           brewed_on: "2026-08-01",
           notes: "Citrus-forward",
-          updated_at: "2026-08-22T12:00:00Z"
-        }
-      ]
+          updated_at: "2026-08-22T12:00:00Z",
+        },
+      ],
     },
     "POST /api/beers": {
       status: "201 Created",
@@ -328,8 +343,8 @@
         ibu: "42",
         brewed_on: "2026-08-01",
         notes: "Citrus-forward",
-        updated_at: "2026-08-22T12:01:00Z"
-      }
+        updated_at: "2026-08-22T12:01:00Z",
+      },
     },
     "PUT /api/beers/<id>": {
       status: "200 OK",
@@ -344,12 +359,12 @@
         ibu: "42",
         brewed_on: "2026-08-01",
         notes: "Updated tasting notes",
-        updated_at: "2026-08-22T12:02:00Z"
-      }
+        updated_at: "2026-08-22T12:02:00Z",
+      },
     },
     "DELETE /api/beers/<id>": {
       status: "200 OK",
-      body: { ok: true }
+      body: { ok: true },
     },
     "GET /api/kegs": {
       status: "200 OK",
@@ -368,9 +383,9 @@
           current_volume: 4.6,
           volume_unit: "gal",
           percent_full: 88,
-          updated_at: "2026-08-22T12:03:00Z"
-        }
-      ]
+          updated_at: "2026-08-22T12:03:00Z",
+        },
+      ],
     },
     "POST /api/kegs": {
       status: "201 Created",
@@ -381,8 +396,8 @@
         beer_name: "Hazy Trail IPA",
         status: "full",
         percent_full: 100,
-        updated_at: "2026-08-22T12:04:00Z"
-      }
+        updated_at: "2026-08-22T12:04:00Z",
+      },
     },
     "POST /api/kegs/bulk": {
       status: "201 Created",
@@ -391,9 +406,9 @@
         count: 2,
         created: [
           { id: 21, name: "Keg 21", status: "full" },
-          { id: 22, name: "Keg 22", status: "empty" }
-        ]
-      }
+          { id: 22, name: "Keg 22", status: "empty" },
+        ],
+      },
     },
     "PUT /api/kegs/<id>": {
       status: "200 OK",
@@ -402,8 +417,8 @@
         status: "in_use",
         percent_full: 84,
         notes: "Moved to patio tap",
-        updated_at: "2026-08-22T12:05:00Z"
-      }
+        updated_at: "2026-08-22T12:05:00Z",
+      },
     },
     "POST /api/kegs/<id>/fill": {
       status: "200 OK",
@@ -412,8 +427,8 @@
         status: "full",
         percent_full: 100,
         filled_date: "2026-08-22",
-        updated_at: "2026-08-22T12:06:00Z"
-      }
+        updated_at: "2026-08-22T12:06:00Z",
+      },
     },
     "POST /api/kegs/<id>/pour": {
       status: "200 OK",
@@ -423,19 +438,19 @@
           requested_amount: 16,
           requested_unit: "oz",
           converted_amount: 0.125,
-          keg_unit: "gal"
+          keg_unit: "gal",
         },
         keg: {
           id: 1,
           current_volume: 4.475,
           percent_full: 86,
-          status: "in_use"
-        }
-      }
+          status: "in_use",
+        },
+      },
     },
     "DELETE /api/kegs/<id>": {
       status: "200 OK",
-      body: { ok: true }
+      body: { ok: true },
     },
     "GET /api/taps": {
       status: "200 OK",
@@ -446,9 +461,9 @@
           label: "Main Bar 1",
           keg_id: 1,
           notes: "Most popular",
-          updated_at: "2026-08-22T12:07:00Z"
-        }
-      ]
+          updated_at: "2026-08-22T12:07:00Z",
+        },
+      ],
     },
     "POST /api/taps": {
       status: "201 Created",
@@ -458,8 +473,8 @@
         label: "Main Bar 2",
         keg_id: 3,
         notes: "New line",
-        updated_at: "2026-08-22T12:08:00Z"
-      }
+        updated_at: "2026-08-22T12:08:00Z",
+      },
     },
     "POST /api/taps/bulk": {
       status: "201 Created",
@@ -468,9 +483,9 @@
         count: 2,
         created: [
           { id: 7, number: 7, label: "Tap 7", keg_id: 1 },
-          { id: 8, number: 8, label: "Tap 8", keg_id: null }
-        ]
-      }
+          { id: 8, number: 8, label: "Tap 8", keg_id: null },
+        ],
+      },
     },
     "PUT /api/taps/<id>": {
       status: "200 OK",
@@ -480,8 +495,8 @@
         label: "Main Bar Left",
         keg_id: 2,
         notes: "Rotated keg",
-        updated_at: "2026-08-22T12:09:00Z"
-      }
+        updated_at: "2026-08-22T12:09:00Z",
+      },
     },
     "POST /api/taps/<id>/pour": {
       status: "200 OK",
@@ -489,23 +504,23 @@
         ok: true,
         poured: {
           requested_amount: 12,
-          requested_unit: "oz"
+          requested_unit: "oz",
         },
         keg: {
           id: 2,
           status: "in_use",
           current_volume: 4.2,
-          percent_full: 81
-        }
-      }
+          percent_full: 81,
+        },
+      },
     },
     "DELETE /api/taps/<id>": {
       status: "200 OK",
-      body: { ok: true }
+      body: { ok: true },
     },
     "POST /api/import/json": {
       status: "200 OK",
-      body: { ok: true, mode: "replace" }
+      body: { ok: true, mode: "replace" },
     },
     "POST /api/import/json/preview": {
       status: "200 OK",
@@ -517,38 +532,38 @@
           beers: 0,
           kegs: 0,
           taps: 0,
-          bar_stock: 0
-        }
-      }
+          bar_stock: 0,
+        },
+      },
     },
     "GET /api/menu/qr/health": {
       status: "200 OK",
       body: {
         ok: true,
-        dependency_ready: true
-      }
+        dependency_ready: true,
+      },
     },
     "GET /api/export/json": {
       status: "200 OK",
       body: {
-        note: "Returns downloadable application/json file: bartender_export.json"
-      }
+        note: "Returns downloadable application/json file: bartender_export.json",
+      },
     },
     "GET /api/export/archive": {
       status: "200 OK",
       body: {
-        note: "Returns downloadable application/zip file: bartender_export.zip"
-      }
+        note: "Returns downloadable application/zip file: bartender_export.zip",
+      },
     },
     "GET /api/export/csv": {
       status: "200 OK",
       body: {
-        note: "Legacy alias. Returns downloadable application/zip file: bartender_export.zip"
-      }
+        note: "Legacy alias. Returns downloadable application/zip file: bartender_export.zip",
+      },
     },
     "POST /api/import/archive": {
       status: "200 OK",
-      body: { ok: true, mode: "replace" }
+      body: { ok: true, mode: "replace" },
     },
     "POST /api/import/archive/preview": {
       status: "200 OK",
@@ -560,10 +575,10 @@
           beers: 3,
           kegs: 2,
           taps: 2,
-          bar_stock: 4
-        }
-      }
-    }
+          bar_stock: 4,
+        },
+      },
+    },
   };
 
   function getSampleResponse(method, path) {
@@ -575,7 +590,8 @@
     const output = document.getElementById("apiSampleResponse");
     const sample = getSampleResponse(method, path);
     if (!sample) {
-      output.textContent = "No sample response available for this endpoint yet.";
+      output.textContent =
+        "No sample response available for this endpoint yet.";
       return;
     }
 
@@ -623,7 +639,8 @@
       : "Body disabled for this method.";
 
     if (expectsMultipart) {
-      bodyHint.textContent = "This endpoint expects multipart/form-data with a file upload and is not supported by this JSON tester.";
+      bodyHint.textContent =
+        "This endpoint expects multipart/form-data with a file upload and is not supported by this JSON tester.";
       bodyInput.value = "";
       return;
     }
