@@ -22,7 +22,10 @@ content %}
           aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
         >
           <div class="keg-level-shell keg-level-shell-sm">
-            <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
+            <div
+              class="keg-level-fill js-keg-level-fill"
+              data-fill-pct="{{ fill_pct }}"
+            ></div>
           </div>
           <span class="tap-keg-percent">{{ fill_pct }}%</span>
         </div>
@@ -44,17 +47,9 @@ content %}
             {% for option in pour_options %} {% set option_amount_token = '%g' |
             format(option.amount) %} {% set option_name_token = option.name |
             replace('|', '/') %} {% set option_value = option_amount_token ~ '|'
-            ~ option.unit ~ '|' ~ option_name_token %}
-            <option
-              value="{{ option_value }}"
-              {%
-              if
-              default_pour_preset=""
-              ="option_value"
-              %}selected{%
-              endif
-              %}
-            >
+            ~ option.unit ~ '|' ~ option_name_token %} {% set selected_attr = '
+            selected' if default_pour_preset == option_value else '' %}
+            <option value="{{ option_value }}" {{ selected_attr }}>
               {{ option.name }} ({{ option.amount }} {{ option.unit }})
             </option>
             {% endfor %}
@@ -65,8 +60,9 @@ content %}
             }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</span
           >
           <button
-            class="btn btn-sm btn-secondary dashboard-pour-btn dashboard-pour-btn-tall"
-            onclick="pourDashboardTap({{ tap.id }})"
+            class="btn btn-sm btn-secondary dashboard-pour-btn dashboard-pour-btn-tall js-dashboard-pour-btn"
+            data-tap-id="{{ tap.id }}"
+            type="button"
           >
             Pour
           </button>
@@ -273,6 +269,27 @@ content %}
 <script>
   const INGRESS = "{{ ingress }}";
 
+  function wireDashboardTapControls() {
+    document.querySelectorAll(".js-keg-level-fill").forEach((fillEl) => {
+      const rawValue = Number.parseFloat(fillEl.dataset.fillPct || "0");
+      const normalized = Number.isFinite(rawValue)
+        ? Math.max(0, Math.min(100, rawValue))
+        : 0;
+      fillEl.style.height = `${normalized}%`;
+    });
+
+    document.querySelectorAll(".js-dashboard-pour-btn").forEach((buttonEl) => {
+      buttonEl.addEventListener("click", () => {
+        const tapId = Number.parseInt(buttonEl.dataset.tapId || "", 10);
+        if (!Number.isFinite(tapId) || tapId <= 0) {
+          alert("Unable to determine which tap to pour.");
+          return;
+        }
+        pourDashboardTap(tapId);
+      });
+    });
+  }
+
   async function pourDashboardTap(tapId) {
     const select = document.getElementById(`dashboardTapPourPreset-${tapId}`);
     if (!select) {
@@ -306,6 +323,12 @@ content %}
     }
 
     location.reload();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wireDashboardTapControls);
+  } else {
+    wireDashboardTapControls();
   }
 </script>
 {% endblock %}
