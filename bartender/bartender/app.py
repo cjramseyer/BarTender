@@ -1627,10 +1627,19 @@ def kegs():
 @app.route("/beers")
 def beers():
     data = load_data()
+    beer_type_choices = sorted(
+        {
+            str(beer.get("type", "")).strip()
+            for beer in data.get("beers", [])
+            if str(beer.get("type", "")).strip()
+        },
+        key=lambda value: value.lower(),
+    )
     return render_template(
         "beers.html",
         settings=data["settings"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
+        beer_type_choices=beer_type_choices,
         ingress=INGRESS_PATH,
     )
 
