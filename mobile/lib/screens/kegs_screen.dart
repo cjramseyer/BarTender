@@ -73,7 +73,7 @@ class _KegsScreenState extends State<KegsScreen> {
                           ),
                           Chip(
                             label: Text(keg.status.replaceAll('_', ' ')),
-                            backgroundColor: keg.statusColor.withOpacity(0.15),
+                            backgroundColor: keg.statusColor.withValues(alpha: 0.15),
                             side: BorderSide(color: keg.statusColor),
                             labelStyle: TextStyle(color: keg.statusColor, fontSize: 12),
                           ),

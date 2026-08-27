@@ -6,6 +6,12 @@ import io
 import csv
 import zipfile
 import re
+import ipaddress
+import secrets
+import math
+import time
+import threading
+from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -32,6 +38,16 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
 INGRESS_PATH = os.environ.get("INGRESS_PATH", "")
 DISPLAY_PORT = os.environ.get("DISPLAY_PORT", "8100")
+EXTERNAL_API_MODE = str(os.environ.get("EXTERNAL_API_MODE", "")).strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
+DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE = 120
+_EXTERNAL_API_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
+_EXTERNAL_API_RATE_LIMIT_LOCK = threading.Lock()
 
 
 def _read_addon_version() -> str:
@@ -72,6 +88,80 @@ app = Flask(__name__)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
 
 
+@app.before_request
+def enforce_external_api_controls():
+    if not EXTERNAL_API_MODE:
+        return None
+
+    if not request.path.startswith("/api/"):
+        return jsonify({"error": "External API listener exposes API routes only."}), 404
+
+    data = load_data()
+    settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+    client_ip = _get_client_ip_address()
+
+    if _coerce_bool(settings.get("external_api_allowlist_enabled"), False):
+        allowlist = _parse_ip_allowlist(_normalize_ip_allowlist_text(settings.get("external_api_allowlist", "")))
+        if not allowlist:
+            return jsonify({"error": "External API allowlist is enabled but empty."}), 403
+        if not _is_client_ip_allowed(client_ip, allowlist):
+            return jsonify({"error": "Client IP is not allowed."}), 403
+
+    if _coerce_bool(settings.get("external_api_token_auth_enabled"), True):
+        presented = _extract_request_api_token()
+        legacy_token = _normalize_external_api_token(settings.get("external_api_token", ""))
+        read_token = _normalize_external_api_token(settings.get("external_api_read_token", ""))
+        write_token = _normalize_external_api_token(settings.get("external_api_write_token", ""))
+
+        if not any((legacy_token, read_token, write_token)):
+            return jsonify({"error": "External API token is not configured."}), 503
+
+        request_is_read = _is_read_only_request_method(request.method)
+        token_ok = False
+        if request_is_read:
+            token_ok = any(
+                _token_matches(configured, presented)
+                for configured in (read_token, write_token, legacy_token)
+            )
+        else:
+            token_ok = any(
+                _token_matches(configured, presented)
+                for configured in (write_token, legacy_token)
+            )
+
+        if not token_ok:
+            return jsonify({"error": "Invalid or missing API token."}), 401
+
+    if _coerce_bool(settings.get("external_api_rate_limit_enabled"), True):
+        requests_per_minute = _normalize_external_api_rate_limit_per_minute(
+            settings.get("external_api_rate_limit_per_minute")
+        )
+        token_for_limit = _extract_request_api_token()
+        if token_for_limit:
+            rate_key = f"token:{token_for_limit}"
+        elif client_ip is not None:
+            rate_key = f"ip:{client_ip.compressed}"
+        else:
+            rate_key = "ip:unknown"
+        allowed, retry_after_seconds = _consume_external_api_rate_limit(
+            rate_key,
+            requests_per_minute,
+        )
+        if not allowed:
+            response = jsonify(
+                {
+                    "error": "Rate limit exceeded.",
+                    "retry_after_seconds": retry_after_seconds,
+                    "requests_per_minute": requests_per_minute,
+                }
+            )
+            response.status_code = 429
+            response.headers["Retry-After"] = str(retry_after_seconds)
+            return response
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Data persistence
 # ---------------------------------------------------------------------------
@@ -83,6 +173,14 @@ DEFAULT_DATA = {
         "bar_name": "My Bar",
         "bar_logo_url": "",
         "external_base_url": "",
+        "external_api_token_auth_enabled": True,
+        "external_api_token": "",
+        "external_api_read_token": "",
+        "external_api_write_token": "",
+        "external_api_allowlist_enabled": False,
+        "external_api_allowlist": "",
+        "external_api_rate_limit_enabled": True,
+        "external_api_rate_limit_per_minute": DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE,
         "api_reference_enabled": True,
         "pour_mode": "manual",
         "environment_mode": "production",
@@ -191,6 +289,33 @@ def load_data() -> dict:
         )
         data["settings"]["external_base_url"] = _normalize_external_base_url(
             data["settings"].get("external_base_url", "")
+        )
+        data["settings"]["external_api_token_auth_enabled"] = _coerce_bool(
+            data["settings"].get("external_api_token_auth_enabled"),
+            True,
+        )
+        data["settings"]["external_api_token"] = _normalize_external_api_token(
+            data["settings"].get("external_api_token", "")
+        )
+        data["settings"]["external_api_read_token"] = _normalize_external_api_token(
+            data["settings"].get("external_api_read_token", "")
+        )
+        data["settings"]["external_api_write_token"] = _normalize_external_api_token(
+            data["settings"].get("external_api_write_token", "")
+        )
+        data["settings"]["external_api_allowlist_enabled"] = _coerce_bool(
+            data["settings"].get("external_api_allowlist_enabled"),
+            False,
+        )
+        data["settings"]["external_api_allowlist"] = _normalize_ip_allowlist_text(
+            data["settings"].get("external_api_allowlist", "")
+        )
+        data["settings"]["external_api_rate_limit_enabled"] = _coerce_bool(
+            data["settings"].get("external_api_rate_limit_enabled"),
+            True,
+        )
+        data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
+            data["settings"].get("external_api_rate_limit_per_minute")
         )
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
@@ -386,6 +511,122 @@ def _normalize_external_base_url(value) -> str:
 
     normalized_path = parsed.path.rstrip("/")
     return urlunsplit((scheme, parsed.netloc, normalized_path, "", ""))
+
+
+def _normalize_external_api_token(value) -> str:
+    token = str(value or "").strip()
+    if len(token) > 512:
+        token = token[:512]
+    return token
+
+
+def _normalize_external_api_rate_limit_per_minute(value) -> int:
+    parsed = _coerce_int(value, DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE)
+    if parsed is None:
+        return DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE
+    return max(1, min(5000, parsed))
+
+
+def _normalize_ip_allowlist_text(value) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    tokens = []
+    seen = set()
+    for part in re.split(r"[\n,;\s]+", raw):
+        candidate = part.strip()
+        if not candidate:
+            continue
+        try:
+            network = ipaddress.ip_network(candidate, strict=False)
+        except ValueError:
+            continue
+        normalized = str(network)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        tokens.append(normalized)
+    return "\n".join(tokens)
+
+
+def _parse_ip_allowlist(text: str) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+    parsed = []
+    for part in re.split(r"[\n,;\s]+", str(text or "")):
+        candidate = part.strip()
+        if not candidate:
+            continue
+        try:
+            parsed.append(ipaddress.ip_network(candidate, strict=False))
+        except ValueError:
+            continue
+    return parsed
+
+
+def _get_client_ip_address():
+    forwarded = str(request.headers.get("X-Forwarded-For", "")).strip()
+    candidate = forwarded.split(",")[0].strip() if forwarded else str(request.remote_addr or "").strip()
+    if not candidate:
+        return None
+    try:
+        return ipaddress.ip_address(candidate)
+    except ValueError:
+        return None
+
+
+def _is_client_ip_allowed(
+    client_ip,
+    allowlist: list[ipaddress.IPv4Network | ipaddress.IPv6Network],
+) -> bool:
+    if client_ip is None:
+        return False
+    for network in allowlist:
+        if client_ip.version != network.version:
+            continue
+        if client_ip in network:
+            return True
+    return False
+
+
+def _extract_request_api_token() -> str:
+    bearer = str(request.headers.get("Authorization", "")).strip()
+    if bearer.lower().startswith("bearer "):
+        return bearer[7:].strip()
+    return str(request.headers.get("X-API-Token", "")).strip()
+
+
+def _token_matches(configured_token: str, presented_token: str) -> bool:
+    if not configured_token or not presented_token:
+        return False
+    return secrets.compare_digest(configured_token, presented_token)
+
+
+def _is_read_only_request_method(method: str) -> bool:
+    return str(method or "").upper() in ("GET", "HEAD", "OPTIONS")
+
+
+def _consume_external_api_rate_limit(key: str, requests_per_minute: int):
+    now = time.monotonic()
+    window_start = now - 60.0
+    with _EXTERNAL_API_RATE_LIMIT_LOCK:
+        bucket = _EXTERNAL_API_RATE_LIMIT_BUCKETS.setdefault(key, deque())
+        while bucket and bucket[0] <= window_start:
+            bucket.popleft()
+
+        if len(bucket) >= requests_per_minute:
+            retry_after_seconds = max(1, int(math.ceil(60.0 - (now - bucket[0]))))
+            return False, retry_after_seconds
+
+        bucket.append(now)
+        return True, 0
+
+
+def _external_api_listener_base_url() -> str:
+    parsed = urlsplit(request.host_url)
+    host = parsed.hostname or "localhost"
+    port = str(EXTERNAL_API_PORT or "8110").strip()
+    netloc = f"{_format_host_for_url(host)}:{port}" if port else parsed.netloc
+    return f"{parsed.scheme}://{netloc}"
 
 
 def _record_pour_event(
@@ -1348,6 +1589,7 @@ def settings():
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         display_port=DISPLAY_PORT,
+        external_api_port=EXTERNAL_API_PORT,
         external_display_url=_external_display_url(data),
         external_menu_url=_external_menu_url(data),
         auto_external_display_url=_external_display_url(),
@@ -1548,6 +1790,14 @@ def api_save_settings():
         "bar_name",
         "bar_logo_url",
         "external_base_url",
+        "external_api_token_auth_enabled",
+        "external_api_token",
+        "external_api_read_token",
+        "external_api_write_token",
+        "external_api_allowlist_enabled",
+        "external_api_allowlist",
+        "external_api_rate_limit_enabled",
+        "external_api_rate_limit_per_minute",
         "api_reference_enabled",
         "pour_mode",
         "environment_mode",
@@ -1640,9 +1890,87 @@ def api_save_settings():
     data["settings"]["external_base_url"] = _normalize_external_base_url(
         data["settings"].get("external_base_url", "")
     )
+    data["settings"]["external_api_token_auth_enabled"] = _coerce_bool(
+        data["settings"].get("external_api_token_auth_enabled"),
+        True,
+    )
+    data["settings"]["external_api_token"] = _normalize_external_api_token(
+        data["settings"].get("external_api_token", "")
+    )
+    data["settings"]["external_api_read_token"] = _normalize_external_api_token(
+        data["settings"].get("external_api_read_token", "")
+    )
+    data["settings"]["external_api_write_token"] = _normalize_external_api_token(
+        data["settings"].get("external_api_write_token", "")
+    )
+    data["settings"]["external_api_allowlist_enabled"] = _coerce_bool(
+        data["settings"].get("external_api_allowlist_enabled"),
+        False,
+    )
+    data["settings"]["external_api_allowlist"] = _normalize_ip_allowlist_text(
+        data["settings"].get("external_api_allowlist", "")
+    )
+    data["settings"]["external_api_rate_limit_enabled"] = _coerce_bool(
+        data["settings"].get("external_api_rate_limit_enabled"),
+        True,
+    )
+    data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
+        data["settings"].get("external_api_rate_limit_per_minute")
+    )
 
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/settings/external-auth/test", methods=["POST"])
+def api_test_external_auth_settings():
+    data = load_data()
+    settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+
+    token_auth_enabled = _coerce_bool(settings.get("external_api_token_auth_enabled"), True)
+    legacy_token_configured = bool(_normalize_external_api_token(settings.get("external_api_token", "")))
+    read_token_configured = bool(_normalize_external_api_token(settings.get("external_api_read_token", "")))
+    write_token_configured = bool(_normalize_external_api_token(settings.get("external_api_write_token", "")))
+
+    allowlist_enabled = _coerce_bool(settings.get("external_api_allowlist_enabled"), False)
+    allowlist_entries = _parse_ip_allowlist(_normalize_ip_allowlist_text(settings.get("external_api_allowlist", "")))
+
+    rate_limit_enabled = _coerce_bool(settings.get("external_api_rate_limit_enabled"), True)
+    rate_limit_per_minute = _normalize_external_api_rate_limit_per_minute(
+        settings.get("external_api_rate_limit_per_minute")
+    )
+
+    warnings = []
+    if token_auth_enabled and not any(
+        (legacy_token_configured, read_token_configured, write_token_configured)
+    ):
+        warnings.append("Token authentication is enabled but no token is configured.")
+    if allowlist_enabled and not allowlist_entries:
+        warnings.append("Allowlist is enabled but no valid IP/CIDR entries were parsed.")
+    if read_token_configured and not write_token_configured and not legacy_token_configured:
+        warnings.append("Read token is configured but write token is empty, so write endpoints will be denied.")
+
+    return jsonify(
+        {
+            "ok": len(warnings) == 0,
+            "external_api_base_url": _external_api_listener_base_url(),
+            "checks": {
+                "token_auth_enabled": token_auth_enabled,
+                "legacy_token_configured": legacy_token_configured,
+                "read_token_configured": read_token_configured,
+                "write_token_configured": write_token_configured,
+                "allowlist_enabled": allowlist_enabled,
+                "allowlist_entry_count": len(allowlist_entries),
+                "rate_limit_enabled": rate_limit_enabled,
+                "rate_limit_per_minute": rate_limit_per_minute,
+            },
+            "warnings": warnings,
+            "auth_headers": {
+                "Authorization": "Bearer <token>",
+                "X-API-Token": "<token>",
+            },
+        }
+    )
 
 
 @app.route("/api/settings/keg-types/reset", methods=["POST"])

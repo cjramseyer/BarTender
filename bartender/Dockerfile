@@ -17,6 +17,6 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY run.sh /run.sh
 RUN chmod +x /run.sh
 
-EXPOSE 8099 8100
+EXPOSE 8099 8100 8110
 
 CMD ["/run.sh"]

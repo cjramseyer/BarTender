@@ -265,6 +265,112 @@ content %}
           <small class="muted">When disabled, API Reference is hidden from the top nav.</small>
         </div>
         <div class="form-group">
+          <label>External API Integration Access</label>
+          <p class="muted" style="margin-top: 0.25rem">
+            External API listener runs on port {{ external_api_port }} for POS and hardware integrations.
+          </p>
+          <p class="muted" style="margin-top: 0.25rem">
+            Provide token in header Authorization: Bearer YOUR_TOKEN or X-API-Token: YOUR_TOKEN.
+          </p>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem">
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="testExternalApiAccessSettings()"
+            >
+              Test External API Access
+            </button>
+            <span id="externalApiTestMsg" class="save-msg"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="radio-label">
+            <input
+              type="checkbox"
+              id="externalApiTokenAuthEnabled"
+              {% if settings.external_api_token_auth_enabled is not defined or settings.external_api_token_auth_enabled %}checked{% endif %}
+            />
+            Require Token Authentication for External API
+          </label>
+        </div>
+        <div class="form-group">
+          <label>External API Read Token</label>
+          <input
+            type="password"
+            id="externalApiReadToken"
+            class="form-control"
+            value="{{ settings.external_api_read_token or '' }}"
+            placeholder="Used for read-only API calls (GET/HEAD/OPTIONS)"
+            autocomplete="off"
+          />
+        </div>
+        <div class="form-group">
+          <label>External API Write Token</label>
+          <input
+            type="password"
+            id="externalApiWriteToken"
+            class="form-control"
+            value="{{ settings.external_api_write_token or '' }}"
+            placeholder="Used for write API calls (POST/PUT/DELETE)"
+            autocomplete="off"
+          />
+          <small class="muted">Write token can also be used for read requests.</small>
+        </div>
+        <div class="form-group">
+          <label>Legacy Shared Token (optional)</label>
+          <input
+            type="password"
+            id="externalApiToken"
+            class="form-control"
+            value="{{ settings.external_api_token or '' }}"
+            placeholder="Compatibility token for both read and write requests"
+            autocomplete="off"
+          />
+          <small class="muted">Optional. Keep blank if using scoped read/write tokens only.</small>
+        </div>
+        <div class="form-group">
+          <label class="radio-label">
+            <input
+              type="checkbox"
+              id="externalApiAllowlistEnabled"
+              {% if settings.external_api_allowlist_enabled %}checked{% endif %}
+            />
+            Restrict External API by IP/CIDR Allowlist
+          </label>
+        </div>
+        <div class="form-group">
+          <label>External API IP/CIDR Allowlist</label>
+          <textarea
+            id="externalApiAllowlist"
+            class="form-control"
+            rows="4"
+            placeholder="Example:\n192.168.1.10\n192.168.1.0/24"
+          >{{ settings.external_api_allowlist or '' }}</textarea>
+          <small class="muted">Use newline, comma, or space separated IPs/CIDRs.</small>
+        </div>
+        <div class="form-group">
+          <label class="radio-label">
+            <input
+              type="checkbox"
+              id="externalApiRateLimitEnabled"
+              {% if settings.external_api_rate_limit_enabled is not defined or settings.external_api_rate_limit_enabled %}checked{% endif %}
+            />
+            Enable External API Rate Limiting
+          </label>
+        </div>
+        <div class="form-group">
+          <label>External API Rate Limit (requests per minute)</label>
+          <input
+            type="number"
+            id="externalApiRateLimitPerMinute"
+            class="form-control"
+            min="1"
+            max="5000"
+            step="1"
+            value="{{ settings.external_api_rate_limit_per_minute or 120 }}"
+          />
+        </div>
+        <div class="form-group">
           <label>Pour Mode</label>
           <select id="pourMode" class="form-control">
             <option value="manual" {% if (settings.pour_mode or 'manual') == 'manual' %}selected{% endif %}>Manual</option>
@@ -479,16 +585,16 @@ content %}
 <script>
   const INGRESS = "{{ ingress }}";
   const DISPLAY_PORT = "{{ display_port }}";
-  const EXTERNAL_DISPLAY_URL = {{ (external_display_url or '') | tojson }};
-  const EXTERNAL_MENU_URL = {{ (external_menu_url or '') | tojson }};
-  const AUTO_EXTERNAL_DISPLAY_URL = {{ (auto_external_display_url or '') | tojson }};
-  const AUTO_EXTERNAL_MENU_URL = {{ (auto_external_menu_url or '') | tojson }};
-  const DEFAULT_KEG_TYPE = {{ (settings.default_keg_type or '') | tojson }};
-  const DEFAULT_KEG_TYPE_CHOICES = {{ (settings.keg_type_choices or []) | tojson }};
-  const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
-  const DEFAULT_POUR_PRESET = {{ (settings.default_pour_preset or '') | tojson }};
-  const DEFAULT_POUR_MODE = {{ (settings.pour_mode or 'manual') | tojson }};
-  const DEFAULT_ENVIRONMENT_MODE = {{ (settings.environment_mode or 'production') | tojson }};
+  const EXTERNAL_DISPLAY_URL = JSON.parse(`{{ (external_display_url or '') | tojson }}`);
+  const EXTERNAL_MENU_URL = JSON.parse(`{{ (external_menu_url or '') | tojson }}`);
+  const AUTO_EXTERNAL_DISPLAY_URL = JSON.parse(`{{ (auto_external_display_url or '') | tojson }}`);
+  const AUTO_EXTERNAL_MENU_URL = JSON.parse(`{{ (auto_external_menu_url or '') | tojson }}`);
+  const DEFAULT_KEG_TYPE = JSON.parse(`{{ (settings.default_keg_type or '') | tojson }}`);
+  const DEFAULT_KEG_TYPE_CHOICES = JSON.parse(`{{ (settings.keg_type_choices or []) | tojson }}`);
+  const DEFAULT_POUR_OPTIONS = JSON.parse(`{{ (settings.pour_options or []) | tojson }}`);
+  const DEFAULT_POUR_PRESET = JSON.parse(`{{ (settings.default_pour_preset or '') | tojson }}`);
+  const DEFAULT_POUR_MODE = JSON.parse(`{{ (settings.pour_mode or 'manual') | tojson }}`);
+  const DEFAULT_ENVIRONMENT_MODE = JSON.parse(`{{ (settings.environment_mode or 'production') | tojson }}`);
 
   function expandAllSettings() {
     document
@@ -553,6 +659,38 @@ content %}
     } catch (err) {
       console.error("Unable to clear external URL override", err);
       if (msg) msg.textContent = "Unable to clear override. Try again.";
+    }
+  }
+
+  async function testExternalApiAccessSettings() {
+    const msg = document.getElementById("externalApiTestMsg");
+    if (msg) msg.textContent = "Testing...";
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/external-auth/test`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Test failed: ${res.status}`);
+      }
+
+      const body = await res.json();
+      const warningCount = Array.isArray(body.warnings) ? body.warnings.length : 0;
+      if (body.ok) {
+        if (msg) {
+          msg.textContent = `✓ Ready (${body.external_api_base_url})`;
+        }
+      } else {
+        const warningPreview = Array.isArray(body.warnings)
+          ? body.warnings.slice(0, 2).join(" ")
+          : "Check external API settings.";
+        if (msg) {
+          msg.textContent = `Needs attention (${warningCount}): ${warningPreview}`;
+        }
+      }
+    } catch (err) {
+      console.error("External API test failed", err);
+      if (msg) msg.textContent = "Unable to test external API settings.";
     }
   }
 
@@ -898,6 +1036,17 @@ content %}
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
       analytics_enabled: document.getElementById("analyticsEnabled").checked,
       api_reference_enabled: document.getElementById("apiReferenceEnabled").checked,
+      external_api_token_auth_enabled: document.getElementById("externalApiTokenAuthEnabled").checked,
+      external_api_token: document.getElementById("externalApiToken").value,
+      external_api_read_token: document.getElementById("externalApiReadToken").value,
+      external_api_write_token: document.getElementById("externalApiWriteToken").value,
+      external_api_allowlist_enabled: document.getElementById("externalApiAllowlistEnabled").checked,
+      external_api_allowlist: document.getElementById("externalApiAllowlist").value,
+      external_api_rate_limit_enabled: document.getElementById("externalApiRateLimitEnabled").checked,
+      external_api_rate_limit_per_minute: parseInt(
+        document.getElementById("externalApiRateLimitPerMinute").value,
+        10,
+      ),
       pour_mode: document.getElementById("pourMode")
         ? document.getElementById("pourMode").value
         : DEFAULT_POUR_MODE,
@@ -941,6 +1090,26 @@ content %}
       document.documentElement.dataset.managePos =
         body.dashboard_manage_button_position;
       document.body.dataset.managePos = body.dashboard_manage_button_position;
+      if (document.getElementById("externalApiToken")) {
+        document.getElementById("externalApiToken").value =
+          savedSettings.external_api_token || "";
+      }
+      if (document.getElementById("externalApiReadToken")) {
+        document.getElementById("externalApiReadToken").value =
+          savedSettings.external_api_read_token || "";
+      }
+      if (document.getElementById("externalApiWriteToken")) {
+        document.getElementById("externalApiWriteToken").value =
+          savedSettings.external_api_write_token || "";
+      }
+      if (document.getElementById("externalApiAllowlist")) {
+        document.getElementById("externalApiAllowlist").value =
+          savedSettings.external_api_allowlist || "";
+      }
+      if (document.getElementById("externalApiRateLimitPerMinute")) {
+        document.getElementById("externalApiRateLimitPerMinute").value =
+          savedSettings.external_api_rate_limit_per_minute || 120;
+      }
       updateExternalReadonlyLinks(savedSettings.external_base_url || "");
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
