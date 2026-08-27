@@ -11,7 +11,12 @@
       <div class="menu-header">
         <div class="menu-brand-row">
           {% if settings.bar_logo_url %}
-          <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo brand-logo-lg" loading="lazy" />
+          <img
+            src="{{ settings.bar_logo_url }}"
+            alt="{{ settings.bar_name }} logo"
+            class="brand-logo brand-logo-lg"
+            loading="lazy"
+          />
           {% endif %}
           <h1>{{ settings.bar_name }}</h1>
         </div>
@@ -40,7 +45,8 @@
       <section class="menu-warning-block no-print">
         <strong>QR code unavailable on this system</strong>
         <p class="muted">
-          Install requirements to enable QR generation: <code>pip install -r requirements.txt</code>
+          Install requirements to enable QR generation:
+          <code>pip install -r requirements.txt</code>
         </p>
         {% if qr_error %}
         <p class="muted">Details: {{ qr_error }}</p>
@@ -51,17 +57,16 @@
       <h2 class="menu-section-title">What's on tap</h2>
       {% if on_tap %}
       <div class="menu-grid">
-        {% for entry in on_tap %}
-        {% set tap = entry.tap %}
-        {% set keg = entry.keg %}
-        {% set fill_pct = entry.fill_pct %}
-        {% set brewer = keg.beer_brewer or keg.brewery %}
-        {% set abv = keg.beer_abv or keg.abv %}
+        {% for entry in on_tap %} {% set tap = entry.tap %} {% set keg =
+        entry.keg %} {% set fill_pct = entry.fill_pct %} {% set brewer =
+        keg.beer_brewer or keg.brewery %} {% set abv = keg.beer_abv or keg.abv
+        %}
         <article class="menu-item card">
           <div class="menu-item-header">
             <h2>Tap {{ tap.number }}</h2>
             <span class="badge badge-{{ keg.status }}"
-              >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_', ' ') | title) }}</span
+              >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status |
+              replace('_', ' ') | title) }}</span
             >
           </div>
 
@@ -72,8 +77,8 @@
           <p class="muted">IBU: {{ keg.beer_ibu or '—' }}</p>
           <p class="muted">Fill: {{ fill_pct }}%</p>
           <p class="muted">
-            Volume: {% if keg.current_volume is not none %}{{ keg.current_volume }} {{
-            keg.volume_unit or '—' }}{% else %}—{% endif %}
+            Volume: {% if keg.current_volume is not none %}{{ keg.current_volume
+            }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}
           </p>
         </article>
         {% endfor %}
@@ -94,7 +99,9 @@
           <p class="muted">Type: {{ beer.type or '—' }}</p>
           <p class="muted">Brewer: {{ beer.brewer or '—' }}</p>
           <p class="muted">Brewery: {{ beer.brewery or '—' }}</p>
-          <p class="muted">ABV: {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</p>
+          <p class="muted">
+            ABV: {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}
+          </p>
           <p class="muted">IBU: {{ beer.ibu or '—' }}</p>
         </article>
         {% endfor %}
@@ -104,7 +111,9 @@
       {% endif %}
 
       <div class="menu-screen-actions no-print">
-        <button class="btn btn-primary" onclick="window.print()">Print Menu</button>
+        <button class="btn btn-primary" onclick="window.print()">
+          Print Menu
+        </button>
       </div>
     </main>
   </body>
