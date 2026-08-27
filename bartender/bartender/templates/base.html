@@ -13,21 +13,35 @@
       {% block title %}BarTender{% endblock %} – {{ settings.bar_name }}
     </title>
     <link rel="stylesheet" href="{{ ingress }}/static/css/style.css" />
-    <link rel="icon" type="image/svg+xml" href="{{ ingress }}/static/img/bartender-icon.svg" />
-    <link rel="shortcut icon" href="{{ ingress }}/static/img/bartender-icon.svg" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ ingress }}/static/img/bartender-icon.svg"
+    />
+    <link
+      rel="shortcut icon"
+      href="{{ ingress }}/static/img/bartender-icon.svg"
+    />
   </head>
   <body>
     <nav class="navbar">
       <a class="nav-brand" href="{{ ingress }}/">
         {% if settings.bar_logo_url %}
-        <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo" loading="lazy" />
+        <img
+          src="{{ settings.bar_logo_url }}"
+          alt="{{ settings.bar_name }} logo"
+          class="brand-logo"
+          loading="lazy"
+        />
         {% else %}
         <span aria-hidden="true">🍺</span>
         {% endif %}
         <span>{{ settings.bar_name }}</span>
       </a>
       {% if (settings.environment_mode or 'production') == 'sandbox' %}
-      <span class="nav-mode-indicator" title="Sandbox mode is active">Sandbox Mode</span>
+      <span class="nav-mode-indicator" title="Sandbox mode is active"
+        >Sandbox Mode</span
+      >
       {% endif %}
       <ul class="nav-links">
         <li><a href="{{ ingress }}/">Dashboard</a></li>
@@ -39,7 +53,14 @@
         {% endif %}
         <li><a href="{{ ingress }}/settings">⚙ Settings</a></li>
         {% if settings.api_reference_enabled %}
-        <li><a href="{{ ingress }}/api-reference" target="_blank" rel="noopener noreferrer">API Reference</a></li>
+        <li>
+          <a
+            href="{{ ingress }}/api-reference"
+            target="_blank"
+            rel="noopener noreferrer"
+            >API Reference</a
+          >
+        </li>
         {% endif %}
       </ul>
       <a
@@ -68,7 +89,10 @@
         </div>
         <form onsubmit="submitSetupWizard(event)">
           <div class="wizard-intro">
-            <p>Set up your bar name and confirm the basics before you start managing taps and kegs.</p>
+            <p>
+              Set up your bar name and confirm the basics before you start
+              managing taps and kegs.
+            </p>
             <div class="wizard-grid">
               <div class="form-group">
                 <label for="setupBarName">Bar Name</label>
@@ -85,22 +109,32 @@
                   <label>Measurement System</label>
                   <div class="radio-group">
                     <label class="radio-label">
+                      {% if (settings.measurement or 'us') == 'us' %}
                       <input
                         type="radio"
                         name="setup_measurement"
                         value="us"
-                        {% if (settings.measurement or 'us') == 'us' %}checked{% endif %}
+                        checked
                       />
-                      US (gallons, oz)
+                      {% else %}
+                      <input type="radio" name="setup_measurement" value="us" />
+                      {% endif %} US (gallons, oz)
                     </label>
                     <label class="radio-label">
+                      {% if (settings.measurement or 'us') == 'metric' %}
                       <input
                         type="radio"
                         name="setup_measurement"
                         value="metric"
-                        {% if (settings.measurement or 'us') == 'metric' %}checked{% endif %}
+                        checked
                       />
-                      Metric (liters, ml)
+                      {% else %}
+                      <input
+                        type="radio"
+                        name="setup_measurement"
+                        value="metric"
+                      />
+                      {% endif %} Metric (liters, ml)
                     </label>
                   </div>
                 </div>
@@ -108,22 +142,28 @@
                   <label>Theme</label>
                   <div class="radio-group">
                     <label class="radio-label">
+                      {% if (settings.theme or 'light') == 'light' %}
                       <input
                         type="radio"
                         name="setup_theme"
                         value="light"
-                        {% if (settings.theme or 'light') == 'light' %}checked{% endif %}
+                        checked
                       />
-                      ☀ Light
+                      {% else %}
+                      <input type="radio" name="setup_theme" value="light" />
+                      {% endif %} ☀ Light
                     </label>
                     <label class="radio-label">
+                      {% if (settings.theme or 'light') == 'dark' %}
                       <input
                         type="radio"
                         name="setup_theme"
                         value="dark"
-                        {% if (settings.theme or 'light') == 'dark' %}checked{% endif %}
+                        checked
                       />
-                      🌙 Dark
+                      {% else %}
+                      <input type="radio" name="setup_theme" value="dark" />
+                      {% endif %} 🌙 Dark
                     </label>
                   </div>
                 </div>
@@ -138,26 +178,36 @@
         </form>
       </div>
     </div>
-    {% endif %}
-
-    {% if settings.setup_completed %}
+    {% endif %} {% if settings.setup_completed %}
     <div class="modal" id="updateNoticeModal">
       <div class="modal-dialog modal-dialog-lg">
         <div class="modal-header">
           <h3>What's new in BarTender {{ app_version }}</h3>
-          <button class="btn btn-icon" onclick="dismissUpdateNotice()">✕</button>
+          <button class="btn btn-icon" onclick="dismissUpdateNotice()">
+            ✕
+          </button>
         </div>
         <div class="update-notice">
-          <p>BarTender has been updated. Here are a few changes to know about:</p>
+          <p>
+            BarTender has been updated. Here are a few changes to know about:
+          </p>
           <ul class="notice-list">
             {% for highlight in release_highlights %}
             <li>{{ highlight }}</li>
             {% endfor %}
           </ul>
-          <p class="muted" style="margin-top: 0.85rem">Dismiss this message once you’ve reviewed the updates.</p>
+          <p class="muted" style="margin-top: 0.85rem">
+            Dismiss this message once you’ve reviewed the updates.
+          </p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-primary" onclick="dismissUpdateNotice()">Got it</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="dismissUpdateNotice()"
+          >
+            Got it
+          </button>
         </div>
       </div>
     </div>
