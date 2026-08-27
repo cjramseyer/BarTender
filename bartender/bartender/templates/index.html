@@ -13,7 +13,6 @@ content %}
       <li class="tap-item">
         <span class="tap-number">Tap {{ tap.number }}</span>
         {% if keg %}
-        {% set dashboard_status = 'in_use' if tap.keg_id else keg.status %}
         <div
           class="tap-keg-compact"
           role="img"
@@ -25,9 +24,6 @@ content %}
           <span class="tap-keg-percent">{{ fill_pct }}%</span>
         </div>
         <span class="tap-label">{{ keg.name if keg else (tap.label or ('Tap ' ~ tap.number)) }}</span>
-        <span class="badge badge-{{ dashboard_status }}"
-          >{{ 'On-Tap' if dashboard_status == 'in_use' else (dashboard_status | replace('_', ' ') | title) }}</span
-        >
         <span class="tap-label tap-volume-remaining"
           >Volume Remaining: {% if keg.current_volume is not none %}{{ keg.current_volume }} {{
           keg.volume_unit or '—' }}{% else %}—{% endif %}</span
@@ -48,7 +44,7 @@ content %}
           </option>
           {% endfor %}
         </select>
-        <button class="btn btn-sm btn-secondary" onclick="pourDashboardTap({{ tap.id }})">
+        <button class="btn btn-sm btn-secondary dashboard-pour-btn" onclick="pourDashboardTap({{ tap.id }})">
           Pour
         </button>
         {% else %}
@@ -58,7 +54,9 @@ content %}
         {% endif %}
         {% endif %}
         {% else %}
-        <span class="badge badge-empty">No keg assigned</span>
+        {% set tap_state_label = 'Need cleaning' if tap.ever_assigned_keg else 'Available' %}
+        {% set tap_state_badge = 'cleaning' if tap.ever_assigned_keg else 'empty' %}
+        <span class="badge badge-{{ tap_state_badge }}">{{ tap_state_label }}</span>
         {% endif %}
       </li>
       {% endfor %}
@@ -76,8 +74,8 @@ content %}
   </div>
 
   <div class="card">
-    <h2>🛢 Kegs ({{ kegs | length }})</h2>
     {% set connected_keg_ids = taps | map(attribute='keg_id') | reject('equalto', none) | list %}
+    <h2>🛢 Kegs ({{ connected_keg_ids | length }})</h2>
     {% set in_use_count = namespace(value=0) %}
     {% set cleaning_count = namespace(value=0) %}
     {% for keg in kegs %}
@@ -97,7 +95,7 @@ content %}
       </div>
       <div class="stat">
         <span class="stat-value">{{ in_use_count.value }}</span
-        ><span class="stat-label">On-Tap</span>
+        ><span class="stat-label">Tapped</span>
       </div>
       <div class="stat">
         <span class="stat-value">{{ cleaning_count.value }}</span
@@ -110,25 +108,22 @@ content %}
         ><span class="stat-label">Empty</span>
       </div>
     </div>
-    <h3 style="margin: 0.4rem 0 0.6rem">Filled Kegs</h3>
+    <h3 style="margin: 0.4rem 0 0.6rem">Tapped Kegs</h3>
     <ul class="stock-summary">
-      {% set filled_keg_count = namespace(value=0) %}
+      {% set tapped_keg_count = namespace(value=0) %}
       {% for keg in kegs %}
-        {% if keg.status in ('full', 'in_use') and keg.status != 'cleaning' %}
-          {% set filled_keg_count.value = filled_keg_count.value + 1 %}
+        {% if keg.id in connected_keg_ids %}
+          {% set tapped_keg_count.value = tapped_keg_count.value + 1 %}
           <li>
             <strong>{{ keg.name or 'Unnamed Keg' }}</strong>
             {% if keg.beer_name %} - {{ keg.beer_name }}{% endif %}
             - {{ keg.percent_full if keg.percent_full is defined else (100 if keg.status == 'full' else 50) }}%
             {% if keg.filled_date %} - Filled {{ keg.filled_date }}{% endif %}
-            <span class="badge badge-{{ 'in_use' if keg.id in connected_keg_ids else 'empty' }}" style="margin-left: 0.5rem">
-              {{ 'On-Tap' if keg.id in connected_keg_ids else 'Not Tapped' }}
-            </span>
           </li>
         {% endif %}
       {% endfor %}
-      {% if filled_keg_count.value == 0 %}
-      <li class="muted">No filled kegs available.</li>
+      {% if tapped_keg_count.value == 0 %}
+      <li class="muted">No tapped kegs available.</li>
       {% endif %}
     </ul>
     <div class="dashboard-manage-row">

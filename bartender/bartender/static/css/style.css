@@ -688,6 +688,17 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   max-width: 240px;
 }
 
+.tap-pour-row .dashboard-pour-btn {
+  min-height: 2.6rem;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  line-height: 1.1;
+  white-space: normal;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 /* Filter bar */
 .filter-bar {
   display: flex;

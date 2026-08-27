@@ -265,6 +265,13 @@ def load_data() -> dict:
             )
             if _coerce_bool(keg.get("on_deck"), False) and not _can_mark_on_deck(keg):
                 keg["on_deck"] = False
+        for tap in data.get("taps", []):
+            tap.setdefault("label", "")
+            tap.setdefault("notes", "")
+            tap["keg_id"] = _coerce_int(tap.get("keg_id"), None)
+            tap["ever_assigned_keg"] = _coerce_bool(tap.get("ever_assigned_keg"), False)
+            if tap.get("keg_id") is not None:
+                tap["ever_assigned_keg"] = True
         return data
     return json.loads(json.dumps(DEFAULT_DATA))
 
@@ -2194,11 +2201,16 @@ def api_list_taps():
 def api_add_tap():
     data = load_data()
     body = request.get_json(force=True)
+    raw_keg_id = body.get("keg_id")
+    parsed_keg_id = _coerce_int(raw_keg_id, None)
+    if raw_keg_id not in (None, "") and parsed_keg_id is None:
+        return jsonify({"error": "Invalid keg_id."}), 400
     tap = {
         "id": _next_id(data["taps"]),
         "number": body.get("number", len(data["taps"]) + 1),
         "label": body.get("label", ""),
-        "keg_id": body.get("keg_id"),
+        "keg_id": parsed_keg_id,
+        "ever_assigned_keg": parsed_keg_id is not None,
         "notes": body.get("notes", ""),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -2247,6 +2259,7 @@ def api_add_taps_bulk():
             "number": number,
             "label": item.get("label", ""),
             "keg_id": keg_id,
+            "ever_assigned_keg": keg_id is not None,
             "notes": item.get("notes", ""),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -2264,9 +2277,17 @@ def api_update_tap(tap_id: int):
     for tap in data["taps"]:
         if tap["id"] == tap_id:
             body = request.get_json(force=True)
-            for field in ("number", "label", "keg_id", "notes"):
+            for field in ("number", "label", "notes"):
                 if field in body:
                     tap[field] = body[field]
+            if "keg_id" in body:
+                raw_keg_id = body.get("keg_id")
+                parsed_keg_id = _coerce_int(raw_keg_id, None)
+                if raw_keg_id not in (None, "") and parsed_keg_id is None:
+                    return jsonify({"error": "Invalid keg_id."}), 400
+                tap["keg_id"] = parsed_keg_id
+                if parsed_keg_id is not None:
+                    tap["ever_assigned_keg"] = True
             _set_keg_tapped_date_if_missing(data, tap.get("keg_id"))
             tap["updated_at"] = datetime.now(timezone.utc).isoformat()
             save_data(data)
