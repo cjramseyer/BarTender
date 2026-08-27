@@ -333,10 +333,33 @@
 <script>
   const INGRESS = "{{ ingress }}";
   const DEFAULT_VOLUME_UNIT = {{ ('oz' if (settings.measurement or 'us') == 'us' else 'ml') | tojson }};
+  const DEFAULT_KEG_TYPE = {{ (settings.default_keg_type or '') | tojson }};
   const DEFAULT_KEG_TYPE_CHOICES = {{ (settings.keg_type_choices or []) | tojson }};
   const KEGS = {{ kegs | tojson }};
   const BEERS = {{ beers | tojson }};
   const ADD_NEW_BEER_VALUE = "__add_new_beer__";
+
+  function getPreferredDefaultKegSize() {
+    const choices = Array.isArray(DEFAULT_KEG_TYPE_CHOICES)
+      ? DEFAULT_KEG_TYPE_CHOICES
+      : [];
+    const normalizedDefault = String(DEFAULT_KEG_TYPE || "").trim();
+    if (normalizedDefault) {
+      const match = choices.find(
+        (choice) =>
+          String(choice || "").trim().toLowerCase() ===
+          normalizedDefault.toLowerCase(),
+      );
+      if (match) {
+        return String(match || "").trim();
+      }
+      return normalizedDefault;
+    }
+    if (choices.length) {
+      return String(choices[0] || "").trim();
+    }
+    return "1/6 bbl (5.2 gal)";
+  }
 
   function beerOptionLabel(beer) {
     const brewerDetails = [];
@@ -657,14 +680,11 @@
     document.getElementById("kegOnDeck").checked = false;
     syncOnDeckEligibility();
     applyLineCleaningConstraint();
-    populateKegSizeOptions("");
+    populateKegSizeOptions(getPreferredDefaultKegSize());
     openModal("kegModal");
   }
 
   function openBulkKegModal() {
-    const fallbackSize = Array.isArray(DEFAULT_KEG_TYPE_CHOICES) && DEFAULT_KEG_TYPE_CHOICES.length
-      ? DEFAULT_KEG_TYPE_CHOICES[0]
-      : "1/6 bbl (5.2 gal)";
     document.getElementById("bulkKegCount").value = 2;
     openModal("bulkKegModal");
   }
@@ -681,9 +701,7 @@
     const nextNumberName = nextIncrementedName(KEGS, "Keg");
     const baseNumberMatch = nextNumberName.match(/(\d+)$/);
     const startingNumber = baseNumberMatch ? parseInt(baseNumberMatch[1], 10) : KEGS.length + 1;
-    const fallbackSize = Array.isArray(DEFAULT_KEG_TYPE_CHOICES) && DEFAULT_KEG_TYPE_CHOICES.length
-      ? DEFAULT_KEG_TYPE_CHOICES[0]
-      : "1/6 bbl (5.2 gal)";
+    const fallbackSize = getPreferredDefaultKegSize();
 
     const items = Array.from({ length: count }, (_, index) => {
       const number = startingNumber + index;
