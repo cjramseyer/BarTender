@@ -19,9 +19,9 @@ content %}
 </div>
 
 <div class="settings-grid">
-  <div class="card settings-card">
+  <div class="card settings-card settings-external-card">
     <details class="settings-collapsible" open>
-      <summary>📺 Read-Only External URLs</summary>
+      <summary>📺 External URLs</summary>
       <div class="settings-collapsible-body">
         <p class="muted">
           Use these external links for read-only access (served from port {{
@@ -85,7 +85,7 @@ content %}
     </details>
   </div>
 
-  <div class="card settings-card">
+  <div class="card settings-card settings-sections-card">
     <form id="settingsForm" onsubmit="saveSettings(event)">
       <details class="settings-collapsible" open>
         <summary>General</summary>
@@ -694,7 +694,7 @@ content %}
     </form>
   </div>
 
-  <div class="card settings-card">
+  <div class="card settings-card settings-export-card">
     <details class="settings-collapsible">
       <summary>📤 Export Data</summary>
       <div class="settings-collapsible-body">
@@ -713,7 +713,7 @@ content %}
     </details>
   </div>
 
-  <div class="card settings-card">
+  <div class="card settings-card settings-import-card">
     <details class="settings-collapsible">
       <summary>📥 Import Data</summary>
       <div class="settings-collapsible-body">

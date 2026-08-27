@@ -933,8 +933,28 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 
 @media (min-width: 980px) {
   .settings-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     align-items: start;
+  }
+
+  .settings-sections-card {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  .settings-external-card {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .settings-export-card {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .settings-import-card {
+    grid-column: 2;
+    grid-row: 3;
   }
 }
 
