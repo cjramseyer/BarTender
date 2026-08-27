@@ -92,13 +92,7 @@
           option.unit ~ '|' ~ option_name_token %}
           <option
             value="{{ option_value }}"
-            {%
-            if
-            default_pour_preset=""
-            ="option_value"
-            %}selected{%
-            endif
-            %}
+            {% if default_pour_preset == option_value %}selected{% endif %}
           >
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>
