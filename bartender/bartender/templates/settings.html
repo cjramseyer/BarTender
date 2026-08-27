@@ -301,14 +301,23 @@ content %}
             Manage available keg/container types shown in keg dropdowns.
           </small>
           <div id="kegTypeChoicesList" class="stack-gap-sm" style="margin-top: 8px"></div>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            style="margin-top: 8px"
-            onclick="addKegTypeChoiceRow()"
-          >
-            + Add Keg Type
-          </button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 8px">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              onclick="addKegTypeChoiceRow()"
+            >
+              + Add Keg Type
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-danger"
+              onclick="resetKegTypesToDefaults()"
+            >
+              Reset Keg Types
+            </button>
+            <span id="kegTypeResetMsg" class="save-msg"></span>
+          </div>
         </div>
         <div class="form-group">
           <label>Default Keg Type</label>
@@ -598,6 +607,63 @@ content %}
       return;
     }
     choices.forEach((choice) => addKegTypeChoiceRow(choice));
+  }
+
+  function replaceKegTypeChoices(choices = [], defaultChoice = "") {
+    const list = document.getElementById("kegTypeChoicesList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (!Array.isArray(choices) || !choices.length) {
+      addKegTypeChoiceRow("1/6 bbl (5.2 gal)");
+    } else {
+      choices.forEach((choice) => addKegTypeChoiceRow(choice));
+    }
+
+    refreshDefaultKegTypeOptions();
+    const defaultSelect = document.getElementById("defaultKegType");
+    if (!defaultSelect || !defaultChoice) return;
+
+    const match = Array.from(defaultSelect.options).find(
+      (option) => option.value.toLowerCase() === String(defaultChoice).toLowerCase(),
+    );
+    if (match) {
+      defaultSelect.value = match.value;
+    }
+  }
+
+  async function resetKegTypesToDefaults() {
+    const msg = document.getElementById("kegTypeResetMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset keg types to built-in defaults? This will replace custom keg type choices.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/keg-types/reset`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Reset failed: ${res.status}`);
+      }
+
+      const body = await res.json();
+      replaceKegTypeChoices(
+        Array.isArray(body.keg_type_choices) ? body.keg_type_choices : [],
+        body.default_keg_type || "",
+      );
+
+      if (msg) {
+        msg.textContent = "✓ Keg types reset to defaults.";
+      }
+    } catch (err) {
+      console.error("Unable to reset keg types", err);
+      if (msg) {
+        msg.textContent = "Unable to reset keg types. Try again.";
+      }
+    }
   }
 
   function collectKegTypeChoices() {

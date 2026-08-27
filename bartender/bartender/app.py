@@ -1612,6 +1612,24 @@ def api_save_settings():
     return jsonify(data["settings"])
 
 
+@app.route("/api/settings/keg-types/reset", methods=["POST"])
+def api_reset_keg_types_to_defaults():
+    data = load_data()
+    data["settings"]["keg_type_choices"] = STANDARD_KEG_TYPE_CHOICES.copy()
+    data["settings"]["default_keg_type"] = _normalize_default_keg_type(
+        "",
+        data["settings"].get("keg_type_choices", []),
+    )
+    save_data(data)
+    return jsonify(
+        {
+            "ok": True,
+            "keg_type_choices": data["settings"].get("keg_type_choices", []),
+            "default_keg_type": data["settings"].get("default_keg_type", ""),
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # API – Bar Stock
 # ---------------------------------------------------------------------------
