@@ -92,12 +92,18 @@
       <div class="form-row">
         <div class="form-group">
           <label>Type</label>
-          <select id="beerType" class="form-control">
-            <option value="">— None —</option>
-            {% for keg_type in settings.keg_type_choices or [] %}
-            <option value="{{ keg_type }}">{{ keg_type }}</option>
+          <input
+            type="text"
+            id="beerType"
+            class="form-control"
+            list="beerTypeOptions"
+            placeholder="e.g. IPA"
+          />
+          <datalist id="beerTypeOptions">
+            {% for beer_type in beer_type_choices %}
+            <option value="{{ beer_type }}"></option>
             {% endfor %}
-          </select>
+          </datalist>
         </div>
       </div>
       <div class="form-row">

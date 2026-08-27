@@ -44,16 +44,15 @@
       </div>
       <p>
         <span class="badge badge-{{ keg.status }}"
-          >{{ 'On-Tap' if keg.status == 'in_use' else (keg.status | replace('_',
-          ' ') | title) }}</span
+          >{{ keg.status | replace('_', ' ') | title }}</span
         >
       </p>
       <p class="muted">Type: {{ keg.type or '—' }}</p>
+      <p class="muted">Brewer: {{ beer_brewer or keg.brewery or '—' }}</p>
       <p class="muted">
-        Beer: {{ beer_brewer or keg.brewery or '—' }}{% if beer_abv or keg.abv
-        %} · {{ beer_abv or keg.abv }}% ABV{% endif %}{% if beer_ibu %} · {{
-        beer_ibu }} IBU{% endif %}
+        ABV: {{ (beer_abv or keg.abv) ~ '%' if (beer_abv or keg.abv) else '—' }}
       </p>
+      <p class="muted">IBU: {{ beer_ibu or '—' }}</p>
       {% if beer_brewed_on %}
       <p class="muted">Brewed: {{ beer_brewed_on }}</p>
       {% endif %}
@@ -92,7 +91,13 @@
           option.unit ~ '|' ~ option_name_token %}
           <option
             value="{{ option_value }}"
-            {% if default_pour_preset == option_value %}selected{% endif %}
+            {%
+            if
+            default_pour_preset=""
+            ="option_value"
+            %}selected{%
+            endif
+            %}
           >
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>
@@ -164,9 +169,8 @@
           <option value="">— None —</option>
           {% for keg in kegs %} {% if keg.status in ('full', 'in_use') %}
           <option value="{{ keg.id }}">
-            {{ keg.name }} ({{ 'on-tap' if keg.status == 'in_use' else
-            (keg.status | replace('_', ' ')) }}{% if keg.size %}, {{ keg.size
-            }}{% endif %})
+            {{ keg.name }} ({{ keg.status | replace('_', ' ') }}{% if keg.size
+            %}, {{ keg.size }}{% endif %})
           </option>
           {% endif %} {% endfor %}
         </select>
