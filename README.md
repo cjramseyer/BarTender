@@ -107,6 +107,7 @@ The add-on exposes a JSON REST API at the ingress URL.
 | ------ | ----------------------------- | ------------------------------------------------ |
 | GET    | `/api/settings`               | Get current settings                             |
 | POST   | `/api/settings`               | Update settings                                  |
+| POST   | `/api/settings/external-auth/test` | Validate external API auth/allowlist/rate-limit readiness |
 | GET    | `/api/stock`                  | List all bar stock items                         |
 | POST   | `/api/stock`                  | Add a stock item                                 |
 | PUT    | `/api/stock/<id>`             | Update a stock item                              |
