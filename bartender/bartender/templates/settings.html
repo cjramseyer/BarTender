@@ -98,6 +98,27 @@ content %}
           <small class="muted">Shown next to your bar name on dashboard and menu/display pages.</small>
         </div>
         <div class="form-group">
+          <label>External Base URL (optional)</label>
+          <input
+            type="url"
+            id="externalBaseUrl"
+            class="form-control"
+            value="{{ settings.external_base_url or '' }}"
+            placeholder="https://my-host.example.com"
+          />
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.45rem">
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="clearExternalBaseUrlOverride()"
+            >
+              Clear Override
+            </button>
+            <span id="externalBaseUrlMsg" class="save-msg"></span>
+          </div>
+          <small class="muted">If blank, BarTender auto-detects the external host for display and menu links.</small>
+        </div>
+        <div class="form-group">
           <label>Environment Mode</label>
           <div class="radio-group">
             <label class="radio-label">
@@ -460,6 +481,8 @@ content %}
   const DISPLAY_PORT = "{{ display_port }}";
   const EXTERNAL_DISPLAY_URL = {{ (external_display_url or '') | tojson }};
   const EXTERNAL_MENU_URL = {{ (external_menu_url or '') | tojson }};
+  const AUTO_EXTERNAL_DISPLAY_URL = {{ (auto_external_display_url or '') | tojson }};
+  const AUTO_EXTERNAL_MENU_URL = {{ (auto_external_menu_url or '') | tojson }};
   const DEFAULT_KEG_TYPE = {{ (settings.default_keg_type or '') | tojson }};
   const DEFAULT_KEG_TYPE_CHOICES = {{ (settings.keg_type_choices or []) | tojson }};
   const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
@@ -480,15 +503,56 @@ content %}
   }
 
   function initExternalReadonlyLinks() {
+    updateExternalReadonlyLinks(
+      document.getElementById("externalBaseUrl")
+        ? document.getElementById("externalBaseUrl").value
+        : "",
+    );
+  }
+
+  function updateExternalReadonlyLinks(externalBaseUrl = "") {
     const displayLink = document.getElementById("externalDisplayUrl");
     const menuLink = document.getElementById("externalMenuUrl");
-    if (displayLink && EXTERNAL_DISPLAY_URL) {
-      displayLink.href = EXTERNAL_DISPLAY_URL;
-      displayLink.textContent = EXTERNAL_DISPLAY_URL;
+    const overrideBase = String(externalBaseUrl || "").trim().replace(/\/+$/, "");
+    const autoBase = String(AUTO_EXTERNAL_DISPLAY_URL || "").trim().replace(/\/+$/, "");
+    const base = overrideBase || autoBase;
+
+    if (displayLink && base) {
+      displayLink.href = `${base}/`;
+      displayLink.textContent = `${base}/`;
     }
-    if (menuLink && EXTERNAL_MENU_URL) {
-      menuLink.href = EXTERNAL_MENU_URL;
-      menuLink.textContent = EXTERNAL_MENU_URL;
+    if (menuLink && base) {
+      menuLink.href = `${base}/menu`;
+      menuLink.textContent = `${base}/menu`;
+    }
+  }
+
+  async function clearExternalBaseUrlOverride() {
+    const input = document.getElementById("externalBaseUrl");
+    const msg = document.getElementById("externalBaseUrlMsg");
+    if (!input) return;
+    if (msg) msg.textContent = "";
+
+    if (!window.confirm("Clear external URL override and return to auto-detected links?")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ external_base_url: "" }),
+      });
+      if (!res.ok) {
+        throw new Error(`Clear override failed: ${res.status}`);
+      }
+
+      input.value = "";
+      updateExternalReadonlyLinks("");
+      if (msg) msg.textContent = "✓ External URL override cleared.";
+    } catch (err) {
+      console.error("Unable to clear external URL override", err);
+      if (msg) msg.textContent = "Unable to clear override. Try again.";
     }
   }
 
@@ -823,6 +887,7 @@ content %}
     const body = {
       bar_name: document.getElementById("barName").value,
       bar_logo_url: document.getElementById("barLogoUrl").value,
+      external_base_url: document.getElementById("externalBaseUrl").value,
       default_keg_type: document.getElementById("defaultKegType").value,
       keg_type_choices: collectKegTypeChoices(),
       measurement: measurementInput ? measurementInput.value : "us",
@@ -866,6 +931,8 @@ content %}
         throw new Error(`Save failed: ${res.status}`);
       }
 
+      const savedSettings = await res.json();
+
       document.getElementById("saveMsg").textContent = "✓ Saved!";
       setTimeout(() => {
         document.getElementById("saveMsg").textContent = "";
@@ -874,6 +941,7 @@ content %}
       document.documentElement.dataset.managePos =
         body.dashboard_manage_button_position;
       document.body.dataset.managePos = body.dashboard_manage_button_position;
+      updateExternalReadonlyLinks(savedSettings.external_base_url || "");
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
       document.getElementById("saveMsg").textContent = "Save failed";

@@ -8,7 +8,7 @@ import zipfile
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -82,6 +82,7 @@ DEFAULT_DATA = {
         "theme": "light",
         "bar_name": "My Bar",
         "bar_logo_url": "",
+        "external_base_url": "",
         "api_reference_enabled": True,
         "pour_mode": "manual",
         "environment_mode": "production",
@@ -187,6 +188,9 @@ def load_data() -> dict:
         )
         data["settings"]["bar_logo_url"] = _normalize_logo_url(
             data["settings"].get("bar_logo_url", "")
+        )
+        data["settings"]["external_base_url"] = _normalize_external_base_url(
+            data["settings"].get("external_base_url", "")
         )
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
@@ -366,6 +370,22 @@ def _normalize_logo_url(value) -> str:
     if len(url) > 2048:
         return ""
     return url
+
+
+def _normalize_external_base_url(value) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    parsed = urlsplit(raw)
+    scheme = str(parsed.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        return ""
+    if not parsed.netloc:
+        return ""
+
+    normalized_path = parsed.path.rstrip("/")
+    return urlunsplit((scheme, parsed.netloc, normalized_path, "", ""))
 
 
 def _record_pour_event(
@@ -622,7 +642,13 @@ def _format_host_for_url(hostname: str) -> str:
     return hostname
 
 
-def _external_readonly_base_url() -> str:
+def _external_readonly_base_url(data: dict | None = None) -> str:
+    if isinstance(data, dict):
+        settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+        manual_base = _normalize_external_base_url(settings.get("external_base_url", ""))
+        if manual_base:
+            return manual_base
+
     parsed = urlsplit(request.host_url)
     host = parsed.hostname or "localhost"
     display_port = str(DISPLAY_PORT or "8100").strip()
@@ -633,12 +659,12 @@ def _external_readonly_base_url() -> str:
     return f"{parsed.scheme}://{netloc}"
 
 
-def _external_display_url() -> str:
-    return f"{_external_readonly_base_url()}/"
+def _external_display_url(data: dict | None = None) -> str:
+    return f"{_external_readonly_base_url(data)}/"
 
 
-def _external_menu_url() -> str:
-    return f"{_external_readonly_base_url()}/menu"
+def _external_menu_url(data: dict | None = None) -> str:
+    return f"{_external_readonly_base_url(data)}/menu"
 
 
 def _qr_is_available() -> bool:
@@ -1322,8 +1348,10 @@ def settings():
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         display_port=DISPLAY_PORT,
-        external_display_url=_external_display_url(),
-        external_menu_url=_external_menu_url(),
+        external_display_url=_external_display_url(data),
+        external_menu_url=_external_menu_url(data),
+        auto_external_display_url=_external_display_url(),
+        auto_external_menu_url=_external_menu_url(),
         ingress=INGRESS_PATH,
     )
 
@@ -1394,7 +1422,7 @@ def menu_view():
             "fill_pct": fill_pct,
         })
 
-    menu_path = _external_menu_url()
+    menu_path = _external_menu_url(data)
     qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
@@ -1415,7 +1443,7 @@ def menu_view():
 @app.route("/menu/qr-print")
 def menu_qr_print_view():
     data = load_data()
-    menu_path = _external_menu_url()
+    menu_path = _external_menu_url(data)
     qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
     return render_template(
         "menu_qr_print.html",
@@ -1457,7 +1485,8 @@ def api_menu_qr():
             503,
         )
 
-    menu_url = _external_menu_url()
+    data = load_data()
+    menu_url = _external_menu_url(data)
 
     qr = qr_module.QRCode(box_size=8, border=2)
     qr.add_data(menu_url)
@@ -1518,6 +1547,7 @@ def api_save_settings():
         "theme",
         "bar_name",
         "bar_logo_url",
+        "external_base_url",
         "api_reference_enabled",
         "pour_mode",
         "environment_mode",
@@ -1606,6 +1636,9 @@ def api_save_settings():
     )
     data["settings"]["bar_logo_url"] = _normalize_logo_url(
         data["settings"].get("bar_logo_url", "")
+    )
+    data["settings"]["external_base_url"] = _normalize_external_base_url(
+        data["settings"].get("external_base_url", "")
     )
 
     save_data(data)
