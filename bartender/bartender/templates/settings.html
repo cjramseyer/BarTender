@@ -97,37 +97,35 @@ content %}
           />
           <small class="muted">Shown next to your bar name on dashboard and menu/display pages.</small>
         </div>
-      </div>
-    </details>
-
-    <details class="settings-collapsible">
-      <summary>Keg Types</summary>
-      <div class="settings-collapsible-body">
         <div class="form-group">
-          <label>Current Keg Type Choices</label>
-          <small class="muted">
-            Manage available keg/container types shown in keg dropdowns.
-          </small>
-          <div id="kegTypeChoicesList" class="stack-gap-sm" style="margin-top: 8px"></div>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            style="margin-top: 8px"
-            onclick="addKegTypeChoiceRow()"
-          >
-            + Add Keg Type
-          </button>
-        </div>
-        <div class="form-group">
-          <label>Default Keg Type</label>
-          <select id="defaultKegType" class="form-control"></select>
-          <small class="muted">Used as the default keg type when a new keg is added.</small>
+          <label>Environment Mode</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input
+                type="radio"
+                name="environment_mode"
+                value="sandbox"
+                {% if (settings.environment_mode or 'production') == 'sandbox' %}checked{% endif %}
+              />
+              Sandbox
+            </label>
+            <label class="radio-label">
+              <input
+                type="radio"
+                name="environment_mode"
+                value="production"
+                {% if (settings.environment_mode or 'production') == 'production' %}checked{% endif %}
+              />
+              Production
+            </label>
+          </div>
+          <small class="muted">Default is Production. Sandbox behavior will expand in future updates.</small>
         </div>
       </div>
     </details>
 
     <details class="settings-collapsible">
-      <summary>Appearance and Layout</summary>
+      <summary>Appearance</summary>
       <div class="settings-collapsible-body">
         <div class="form-group">
           <label>Measurement System</label>
@@ -211,7 +209,7 @@ content %}
     </details>
 
     <details class="settings-collapsible">
-      <summary>Features and QR</summary>
+      <summary>Features</summary>
       <div class="settings-collapsible-body">
         <div class="form-group">
           <label class="radio-label">
@@ -222,6 +220,17 @@ content %}
             />
             Enable Bar Stock Feature
           </label>
+        </div>
+        <div class="form-group">
+          <label class="radio-label">
+            <input
+              type="checkbox"
+              id="analyticsEnabled"
+              {% if settings.analytics_enabled is not defined or settings.analytics_enabled %}checked{% endif %}
+            />
+            Enable Analytics Feature
+          </label>
+          <small class="muted">When disabled, Analytics is hidden from the dashboard and dedicated analytics page.</small>
         </div>
         <div class="form-group">
           <label class="radio-label">
@@ -284,7 +293,61 @@ content %}
     </details>
 
     <details class="settings-collapsible">
-      <summary>Analytics Forecasting</summary>
+      <summary>Keg Settings</summary>
+      <div class="settings-collapsible-body">
+        <div class="form-group">
+          <label>Current Keg Type Choices</label>
+          <small class="muted">
+            Manage available keg/container types shown in keg dropdowns.
+          </small>
+          <div id="kegTypeChoicesList" class="stack-gap-sm" style="margin-top: 8px"></div>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            style="margin-top: 8px"
+            onclick="addKegTypeChoiceRow()"
+          >
+            + Add Keg Type
+          </button>
+        </div>
+        <div class="form-group">
+          <label>Default Keg Type</label>
+          <select id="defaultKegType" class="form-control"></select>
+          <small class="muted">Used as the default keg type when a new keg is added.</small>
+        </div>
+      </div>
+    </details>
+
+    <details class="settings-collapsible">
+      <summary>Pour Presets</summary>
+      <div class="settings-collapsible-body">
+        <div class="form-group">
+          <label>Pour Amount Presets</label>
+          <small class="muted">
+            Configure named pour options shown on each tap card.
+          </small>
+          <div id="pourOptionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            style="margin-top: 8px"
+            onclick="addPourOptionRow()"
+          >
+            + Add Pour Option
+          </button>
+        </div>
+        <div class="form-group">
+          <label>Default Pour Preset</label>
+          <select id="defaultPourPreset" class="form-control"></select>
+          <small class="muted">
+            This preset is preselected anywhere pour choices are shown.
+          </small>
+        </div>
+      </div>
+    </details>
+
+    <details class="settings-collapsible">
+      <summary>Analytics</summary>
       <div class="settings-collapsible-body">
         <div class="form-group">
           <label>Low Keg Threshold (%)</label>
@@ -317,34 +380,6 @@ content %}
             value="{{ settings.analytics_days_left_window_days or 14 }}"
           />
           <small class="muted">Used to estimate daily pour rate for depletion forecasting.</small>
-        </div>
-      </div>
-    </details>
-
-    <details class="settings-collapsible">
-      <summary>Pour Presets</summary>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Pour Amount Presets</label>
-          <small class="muted">
-            Configure named pour options shown on each tap card.
-          </small>
-          <div id="pourOptionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            style="margin-top: 8px"
-            onclick="addPourOptionRow()"
-          >
-            + Add Pour Option
-          </button>
-        </div>
-        <div class="form-group">
-          <label>Default Pour Preset</label>
-          <select id="defaultPourPreset" class="form-control"></select>
-          <small class="muted">
-            This preset is preselected anywhere pour choices are shown.
-          </small>
         </div>
       </div>
     </details>
@@ -421,6 +456,7 @@ content %}
   const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
   const DEFAULT_POUR_PRESET = {{ (settings.default_pour_preset or '') | tojson }};
   const DEFAULT_POUR_MODE = {{ (settings.pour_mode or 'manual') | tojson }};
+  const DEFAULT_ENVIRONMENT_MODE = {{ (settings.environment_mode or 'production') | tojson }};
 
   function expandAllSettings() {
     document
@@ -714,6 +750,9 @@ content %}
     const managePosInput = document.querySelector(
       'input[name="dashboard_manage_button_position"]:checked'
     );
+    const environmentModeInput = document.querySelector(
+      'input[name="environment_mode"]:checked'
+    );
 
     const body = {
       bar_name: document.getElementById("barName").value,
@@ -726,10 +765,14 @@ content %}
         ? managePosInput.value
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
+      analytics_enabled: document.getElementById("analyticsEnabled").checked,
       api_reference_enabled: document.getElementById("apiReferenceEnabled").checked,
       pour_mode: document.getElementById("pourMode")
         ? document.getElementById("pourMode").value
         : DEFAULT_POUR_MODE,
+      environment_mode: environmentModeInput
+        ? environmentModeInput.value
+        : DEFAULT_ENVIRONMENT_MODE,
       analytics_low_keg_threshold_percent: parseInt(
         document.getElementById("analyticsLowThreshold").value,
         10,

@@ -3,6 +3,7 @@
   lang="en"
   data-theme="{{ settings.theme }}"
   data-manage-pos="{{ settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right' }}"
+  data-environment-mode="{{ settings.environment_mode or 'production' }}"
   data-app-version="{{ app_version }}"
 >
   <head>
@@ -25,6 +26,9 @@
         {% endif %}
         <span>{{ settings.bar_name }}</span>
       </a>
+      {% if (settings.environment_mode or 'production') == 'sandbox' %}
+      <span class="nav-mode-indicator" title="Sandbox mode is active">Sandbox Mode</span>
+      {% endif %}
       <ul class="nav-links">
         <li><a href="{{ ingress }}/">Dashboard</a></li>
         <li><a href="{{ ingress }}/taps">Taps</a></li>
@@ -163,6 +167,7 @@
     <script>
       window.BARTENDER_INGRESS = {{ ingress | tojson }};
       window.BARTENDER_APP_VERSION = {{ app_version | tojson }};
+      window.BARTENDER_ENVIRONMENT_MODE = {{ (settings.environment_mode or 'production') | tojson }};
       initTheme("{{ settings.theme }}", "{{ ingress }}");
       document.body.dataset.managePos =
         document.documentElement.dataset.managePos || "top-right";

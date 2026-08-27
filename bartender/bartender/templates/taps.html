@@ -81,9 +81,12 @@
         {% if pour_options %}
         <select id="tapPourPreset-{{ tap.id }}" class="form-control form-control-sm">
           {% for option in pour_options %}
+          {% set option_amount_token = '%g' | format(option.amount) %}
+          {% set option_name_token = option.name | replace('|', '/') %}
+          {% set option_value = option_amount_token ~ '|' ~ option.unit ~ '|' ~ option_name_token %}
           <option
-            value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"
-            {% if default_pour_preset == (option.amount | string ~ '|' ~ option.unit ~ '|' ~ (option.name | replace('|', '/'))) %}selected{% endif %}
+            value="{{ option_value }}"
+            {% if default_pour_preset == option_value %}selected{% endif %}
           >
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>

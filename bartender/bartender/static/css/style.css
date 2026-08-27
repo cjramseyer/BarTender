@@ -116,6 +116,20 @@ body {
   flex: 1;
 }
 
+.nav-mode-indicator {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+  color: #fef3c7;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .nav-links a {
   color: var(--nav-text);
   text-decoration: none;

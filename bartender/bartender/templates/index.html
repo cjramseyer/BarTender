@@ -2,11 +2,14 @@
 content %}
 <h1>Dashboard</h1>
 <div class="dashboard-grid">
+  {% set serving_kegs = kegs | rejectattr('line_cleaning_keg') | list %}
+  {% set serving_keg_ids = serving_kegs | map(attribute='id') | list %}
+
   <div class="card">
     <h2>🍺 Taps ({{ taps | length }})</h2>
     {% if taps %}
     <ul class="tap-list">
-      {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
+      {% for tap in taps %} {% set keg = serving_kegs | selectattr('id', 'equalto',
       tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
       keg.percent_full is defined else (100 if keg and keg.status == 'full'
       else 50 if keg and keg.status == 'in_use' else 0) %}
@@ -36,9 +39,12 @@ content %}
         {% if pour_options %}
         <select id="dashboardTapPourPreset-{{ tap.id }}" class="form-control form-control-sm dashboard-pour-select">
           {% for option in pour_options %}
+          {% set option_amount_token = '%g' | format(option.amount) %}
+          {% set option_name_token = option.name | replace('|', '/') %}
+          {% set option_value = option_amount_token ~ '|' ~ option.unit ~ '|' ~ option_name_token %}
           <option
-            value="{{ option.amount }}|{{ option.unit }}|{{ option.name | replace('|', '/') }}"
-            {% if default_pour_preset == (option.amount | string ~ '|' ~ option.unit ~ '|' ~ (option.name | replace('|', '/'))) %}selected{% endif %}
+            value="{{ option_value }}"
+            {% if default_pour_preset == option_value %}selected{% endif %}
           >
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>
@@ -74,12 +80,17 @@ content %}
   </div>
 
   <div class="card">
-    {% set connected_keg_ids = taps | map(attribute='keg_id') | reject('equalto', none) | list %}
-    <h2>🛢 Kegs ({{ connected_keg_ids | length }})</h2>
+    {% set connected_keg_ids = namespace(values=[]) %}
+    {% for tap in taps %}
+      {% if tap.keg_id in serving_keg_ids %}
+        {% set connected_keg_ids.values = connected_keg_ids.values + [tap.keg_id] %}
+      {% endif %}
+    {% endfor %}
+    <h2>🛢 Kegs ({{ connected_keg_ids.values | length }})</h2>
     {% set in_use_count = namespace(value=0) %}
     {% set cleaning_count = namespace(value=0) %}
-    {% for keg in kegs %}
-      {% if keg.id in connected_keg_ids %}
+    {% for keg in serving_kegs %}
+      {% if keg.id in connected_keg_ids.values %}
         {% set in_use_count.value = in_use_count.value + 1 %}
       {% endif %}
       {% if keg.status == 'cleaning' %}
@@ -89,7 +100,7 @@ content %}
     <div class="stat-row">
       <div class="stat">
         <span class="stat-value"
-          >{{ kegs | selectattr('status', 'equalto', 'full') | list | length
+          >{{ serving_kegs | selectattr('status', 'equalto', 'full') | list | length
           }}</span
         ><span class="stat-label">Full</span>
       </div>
@@ -103,7 +114,7 @@ content %}
       </div>
       <div class="stat">
         <span class="stat-value"
-          >{{ kegs | selectattr('status', 'equalto', 'empty') | list | length
+          >{{ serving_kegs | selectattr('status', 'equalto', 'empty') | list | length
           }}</span
         ><span class="stat-label">Empty</span>
       </div>
@@ -111,8 +122,8 @@ content %}
     <h3 style="margin: 0.4rem 0 0.6rem">Tapped Kegs</h3>
     <ul class="stock-summary">
       {% set tapped_keg_count = namespace(value=0) %}
-      {% for keg in kegs %}
-        {% if keg.id in connected_keg_ids %}
+      {% for keg in serving_kegs %}
+        {% if keg.id in connected_keg_ids.values %}
           {% set tapped_keg_count.value = tapped_keg_count.value + 1 %}
           <li>
             <strong>{{ keg.name or 'Unnamed Keg' }}</strong>
@@ -133,8 +144,20 @@ content %}
     </div>
   </div>
 
+  {% if settings.analytics_enabled is not defined or settings.analytics_enabled %}
   <div class="card">
     <h2>📈 Pour Analytics</h2>
+    <div class="dashboard-manage-row">
+      <a
+        class="btn btn-sm dashboard-manage-btn"
+        href="{{ ingress }}/analytics"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Opens Analytics in a new tab"
+        >Open Analytics</a
+      >
+      <span class="muted" style="margin-left: 0.5rem; align-self: center">Opens in a new tab</span>
+    </div>
     <details class="analytics-panel">
       <summary class="btn btn-sm btn-secondary">View Analytics</summary>
       <div class="analytics-panel-body">
@@ -167,7 +190,7 @@ content %}
         {% if dashboard_analytics.forecast_items %}
         <p class="muted">Estimated depletion:</p>
         <ul class="stock-summary">
-          {% for keg in dashboard_analytics.forecast_items %}
+          {% for keg in dashboard_analytics.forecast_items[:3] %}
           <li>{{ keg.name }} - about {{ keg.days_remaining }} days left</li>
           {% endfor %}
         </ul>
@@ -175,6 +198,7 @@ content %}
       </div>
     </details>
   </div>
+  {% endif %}
 
   {% if on_deck_kegs %}
   <div class="card">

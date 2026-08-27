@@ -1,0 +1,136 @@
+{% extends "base.html" %} {% block title %}Analytics{% endblock %} {% block content %}
+<h1>📈 Analytics</h1>
+<div class="card">
+  <h2>Overview</h2>
+  <p class="muted" style="margin-bottom: 0.5rem">
+    Low keg threshold: {{ dashboard_analytics.low_keg_threshold_percent }}%. Days left method: trailing window over {{ dashboard_analytics.days_left_window_days }} days.
+  </p>
+  <div class="stat-row">
+    <div class="stat">
+      <span class="stat-value">{{ dashboard_analytics.recent_pour_count }}</span>
+      <span class="stat-label">Pours (7 Days)</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ dashboard_analytics.recent_pour_volume }}</span>
+      <span class="stat-label">{{ dashboard_analytics.recent_pour_unit }} (7 Days)</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ dashboard_analytics.total_pour_count }}</span>
+      <span class="stat-label">Pours (All Time)</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ dashboard_analytics.total_pour_volume }}</span>
+      <span class="stat-label">{{ dashboard_analytics.total_pour_unit }} (All Time)</span>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="card">
+    <h2>Near-Empty Kegs</h2>
+    {% if dashboard_analytics.low_volume_kegs %}
+    <ul class="stock-summary">
+      {% for keg in dashboard_analytics.low_volume_kegs %}
+      <li>{{ keg.name }} - {{ keg.fill_pct }}% remaining ({{ keg.current_volume }} {{ keg.volume_unit }})</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No kegs are currently below the threshold.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Forecasted Depletion</h2>
+    {% if dashboard_analytics.forecast_items %}
+    <ul class="stock-summary">
+      {% for keg in dashboard_analytics.forecast_items %}
+      <li>{{ keg.name }} - {{ keg.current_volume }} {{ keg.volume_unit }} left, about {{ keg.days_remaining }} days</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Not enough pour history yet to build forecasts.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Top Taps</h2>
+    {% if dashboard_analytics.top_taps %}
+    <ul class="stock-summary">
+      {% for tap in dashboard_analytics.top_taps %}
+      <li>
+        Tap {{ tap.tap_number if tap.tap_number is not none else tap.tap_id }}
+        {% if tap.label %}- {{ tap.label }}{% endif %}
+        - {{ tap.volume }} {{ tap.volume_unit }} poured
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No tap pour activity yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Top Kegs</h2>
+    {% if dashboard_analytics.top_kegs %}
+    <ul class="stock-summary">
+      {% for keg in dashboard_analytics.top_kegs %}
+      <li>{{ keg.name }} - {{ keg.volume }} {{ keg.volume_unit }} poured</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No keg pour activity yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Top Presets</h2>
+    {% if dashboard_analytics.top_presets %}
+    <ul class="stock-summary">
+      {% for preset in dashboard_analytics.top_presets %}
+      <li>{{ preset.name }} - {{ preset.count }} pours</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No preset usage yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Recent Pour Events</h2>
+  {% if dashboard_analytics.recent_events %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Tap</th>
+        <th>Keg</th>
+        <th>Amount</th>
+        <th>Preset</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in dashboard_analytics.recent_events %}
+      <tr>
+        <td>{{ event.created_at }}</td>
+        <td>
+          {% if event.tap_number is not none %}
+          Tap {{ event.tap_number }}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+        <td>{{ event.keg_name }}</td>
+        <td>{{ event.amount }} {{ event.unit }}</td>
+        <td>{{ event.preset_name or '—' }}</td>
+        <td>{{ event.source | replace('_', ' ') | title }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No recent pour events recorded.</p>
+  {% endif %}
+</div>
+{% endblock %}
