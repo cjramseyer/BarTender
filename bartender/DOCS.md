@@ -19,6 +19,22 @@ Manage your home bar with a web UI built into Home Assistant.
 
 Use **Settings -> Read-Only External URLs** to copy generated external links.
 
+## External API Integrations (POS/Hardware)
+
+- External API listener: `8110/tcp`
+- Token auth header support:
+  - `Authorization: Bearer <token>`
+  - `X-API-Token: <token>`
+- Scoped tokens:
+  - Read token for `GET`/`HEAD`/`OPTIONS`
+  - Write token for `POST`/`PUT`/`DELETE` (also works for reads)
+  - Legacy shared token supported for compatibility
+- Optional IP/CIDR allowlist for trusted client networks.
+- Configurable per-minute rate limiting.
+- Use **Settings -> Features -> Test External API Access** to validate config.
+- Admin validation endpoint: `POST /api/settings/external-auth/test`
+- Admin UI remains on Home Assistant ingress.
+
 ## Features
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
@@ -29,7 +45,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
-- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, pour mode, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode
+- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode
 - **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
 - **Analytics** — Dashboard summaries for recent pours, near-empty kegs, and depletion forecasting

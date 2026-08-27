@@ -24,7 +24,7 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - **Beer Catalog** — Manage reusable beer records (name, type, brewer, ABV/IBU, brewed date, notes)
 - **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line
-- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, pour mode, keg type choices/default, and pour defaults
+- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode, keg type choices/default, and pour defaults
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, and low-volume alerts
@@ -32,7 +32,8 @@ BarTender is a Home Assistant add-on for managing your bar — track kegs, taps,
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
 - **API Reference + Tester** — In-app endpoint documentation with a request tester for GET/POST/PUT/DELETE calls
-- **Ingress** — Runs behind the Home Assistant ingress proxy; no port exposure required
+- **Ingress** — Admin UI runs behind the Home Assistant ingress proxy
+- **External Integrations API** — Dedicated external API listener for POS/hardware integrations (port `8110`)
 
 ## Recent Changes
 
@@ -82,42 +83,59 @@ No required configuration. Optional options can be set in the add-on configurati
 | -------- | ------- | ----------------------------------------------- |
 | _(none)_ | —       | All settings are managed from within the web UI |
 
+### Network Ports
+
+- `8099` (ingress-only) — Admin web UI and internal API via Home Assistant ingress.
+- `8100` (exposed) — Read-only display/menu endpoints.
+- `8110` (exposed) — External API listener for integrations.
+
+External API security is configured in **Settings -> Features**:
+
+- Scoped token authentication (`Authorization: Bearer <token>` or `X-API-Token`).
+  - Read token: GET/HEAD/OPTIONS
+  - Write token: POST/PUT/DELETE (also valid for read)
+  - Legacy shared token supported for compatibility.
+- Optional IP/CIDR allowlist.
+- Configurable per-minute rate limiting.
+- Built-in **Test External API Access** button for validation.
+
 ## REST API
 
 The add-on exposes a JSON REST API at the ingress URL.
 
-| Method | Endpoint                      | Description                                      |
-| ------ | ----------------------------- | ------------------------------------------------ |
-| GET    | `/api/settings`               | Get current settings                             |
-| POST   | `/api/settings`               | Update settings                                  |
-| GET    | `/api/stock`                  | List all bar stock items                         |
-| POST   | `/api/stock`                  | Add a stock item                                 |
-| PUT    | `/api/stock/<id>`             | Update a stock item                              |
-| DELETE | `/api/stock/<id>`             | Delete a stock item                              |
-| GET    | `/api/beers`                  | List all beers                                   |
-| POST   | `/api/beers`                  | Add a beer                                       |
-| PUT    | `/api/beers/<id>`             | Update a beer                                    |
-| DELETE | `/api/beers/<id>`             | Delete a beer                                    |
-| GET    | `/api/kegs`                   | List all kegs                                    |
-| POST   | `/api/kegs`                   | Add a keg                                        |
-| PUT    | `/api/kegs/<id>`              | Update a keg                                     |
-| POST   | `/api/kegs/<id>/fill`         | Fill/refill a keg                                |
-| POST   | `/api/kegs/<id>/pour`         | Record a pour and reduce current volume          |
-| DELETE | `/api/kegs/<id>`              | Delete a keg                                     |
-| GET    | `/api/taps`                   | List all taps                                    |
-| POST   | `/api/taps`                   | Add a tap                                        |
-| PUT    | `/api/taps/<id>`              | Update a tap                                     |
-| POST   | `/api/taps/<id>/pour`         | Record a preset/manual pour against assigned keg |
-| DELETE | `/api/taps/<id>`              | Delete a tap                                     |
-| GET    | `/api/export/json`            | Export portable versioned JSON backup            |
-| GET    | `/api/export/archive`         | Export ZIP archive backup                        |
-| GET    | `/api/export/csv`             | Legacy alias for archive ZIP export              |
-| POST   | `/api/import/archive/preview` | Preview archive import result (replace or merge) |
-| POST   | `/api/import/archive`         | Import ZIP archive backup (replace or merge)     |
-| POST   | `/api/import/json/preview`    | Preview JSON import result (replace or merge)    |
-| POST   | `/api/import/json`            | Import JSON backup (replace or merge)            |
-| GET    | `/api/menu/qr`                | Generate printable menu QR code PNG              |
-| GET    | `/api/menu/qr/health`         | Check runtime QR dependency readiness            |
+| Method | Endpoint                           | Description                                               |
+| ------ | ---------------------------------- | --------------------------------------------------------- |
+| GET    | `/api/settings`                    | Get current settings                                      |
+| POST   | `/api/settings`                    | Update settings                                           |
+| POST   | `/api/settings/external-auth/test` | Validate external API auth/allowlist/rate-limit readiness |
+| GET    | `/api/stock`                       | List all bar stock items                                  |
+| POST   | `/api/stock`                       | Add a stock item                                          |
+| PUT    | `/api/stock/<id>`                  | Update a stock item                                       |
+| DELETE | `/api/stock/<id>`                  | Delete a stock item                                       |
+| GET    | `/api/beers`                       | List all beers                                            |
+| POST   | `/api/beers`                       | Add a beer                                                |
+| PUT    | `/api/beers/<id>`                  | Update a beer                                             |
+| DELETE | `/api/beers/<id>`                  | Delete a beer                                             |
+| GET    | `/api/kegs`                        | List all kegs                                             |
+| POST   | `/api/kegs`                        | Add a keg                                                 |
+| PUT    | `/api/kegs/<id>`                   | Update a keg                                              |
+| POST   | `/api/kegs/<id>/fill`              | Fill/refill a keg                                         |
+| POST   | `/api/kegs/<id>/pour`              | Record a pour and reduce current volume                   |
+| DELETE | `/api/kegs/<id>`                   | Delete a keg                                              |
+| GET    | `/api/taps`                        | List all taps                                             |
+| POST   | `/api/taps`                        | Add a tap                                                 |
+| PUT    | `/api/taps/<id>`                   | Update a tap                                              |
+| POST   | `/api/taps/<id>/pour`              | Record a preset/manual pour against assigned keg          |
+| DELETE | `/api/taps/<id>`                   | Delete a tap                                              |
+| GET    | `/api/export/json`                 | Export portable versioned JSON backup                     |
+| GET    | `/api/export/archive`              | Export ZIP archive backup                                 |
+| GET    | `/api/export/csv`                  | Legacy alias for archive ZIP export                       |
+| POST   | `/api/import/archive/preview`      | Preview archive import result (replace or merge)          |
+| POST   | `/api/import/archive`              | Import ZIP archive backup (replace or merge)              |
+| POST   | `/api/import/json/preview`         | Preview JSON import result (replace or merge)             |
+| POST   | `/api/import/json`                 | Import JSON backup (replace or merge)                     |
+| GET    | `/api/menu/qr`                     | Generate printable menu QR code PNG                       |
+| GET    | `/api/menu/qr/health`              | Check runtime QR dependency readiness                     |
 
 Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
 

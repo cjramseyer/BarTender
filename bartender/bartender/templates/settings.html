@@ -2,425 +2,793 @@
 content %}
 <h1>⚙ Settings</h1>
 <div class="settings-header-actions">
-  <button type="button" class="btn btn-sm btn-secondary" onclick="expandAllSettings()">Expand All</button>
-  <button type="button" class="btn btn-sm btn-secondary" onclick="collapseAllSettings()">Collapse All</button>
+  <button
+    type="button"
+    class="btn btn-sm btn-secondary"
+    onclick="expandAllSettings()"
+  >
+    Expand All
+  </button>
+  <button
+    type="button"
+    class="btn btn-sm btn-secondary"
+    onclick="collapseAllSettings()"
+  >
+    Collapse All
+  </button>
 </div>
 
 <div class="settings-grid">
-<div class="card settings-card">
-  <details class="settings-collapsible" open>
-    <summary>📺 Read-Only External URLs</summary>
-    <div class="settings-collapsible-body">
-      <p class="muted">Use these external links for read-only access (served from port {{ display_port }}).</p>
-      <p class="muted" style="margin-top: 1rem">API Reference</p>
-      <div class="settings-url-row">
-        <a
-          id="apiReferenceUrl"
-          class="settings-url-link"
-          href="{{ ingress }}/api-reference"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ ingress }}/api-reference</a
-        >
-      </div>
-      <p class="muted" style="margin-top: 0.35rem">Display URL</p>
-      <div class="settings-url-row">
-        <a
-          id="externalDisplayUrl"
-          class="settings-url-link"
-          href="{{ external_display_url }}"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ external_display_url }}</a
-        >
-        <button
-          type="button"
-          class="btn btn-sm btn-secondary"
-          onclick="copyExternalUrl('externalDisplayUrl', this)"
-        >
-          Copy
-        </button>
-      </div>
-      <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
-      <div class="settings-url-row">
-        <a
-          id="externalMenuUrl"
-          class="settings-url-link"
-          href="{{ external_menu_url }}"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ external_menu_url }}</a
-        >
-        <button
-          type="button"
-          class="btn btn-sm btn-secondary"
-          onclick="copyExternalUrl('externalMenuUrl', this)"
-        >
-          Copy
-        </button>
-      </div>
-      <p class="muted" style="margin-top: 0.35rem">
-        QR Status:
-        {% if qr_ready %}
-        <strong style="color: #15803d">Ready</strong>
-        {% else %}
-        <strong style="color: #b45309">Unavailable</strong>
-        {% endif %}
-      </p>
-    </div>
-  </details>
-</div>
-
-<div class="card settings-card">
-  <form id="settingsForm" onsubmit="saveSettings(event)">
+  <div class="card settings-card">
     <details class="settings-collapsible" open>
-      <summary>General</summary>
+      <summary>📺 Read-Only External URLs</summary>
       <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Bar Name</label>
-          <input
-            type="text"
-            id="barName"
-            class="form-control"
-            value="{{ settings.bar_name }}"
-            required
-          />
+        <p class="muted">
+          Use these external links for read-only access (served from port {{
+          display_port }}).
+        </p>
+        <p class="muted" style="margin-top: 1rem">API Reference</p>
+        <div class="settings-url-row">
+          <a
+            id="apiReferenceUrl"
+            class="settings-url-link"
+            href="{{ ingress }}/api-reference"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ ingress }}/api-reference</a
+          >
         </div>
-        <div class="form-group">
-          <label>Bar Logo URL (optional)</label>
-          <input
-            type="url"
-            id="barLogoUrl"
-            class="form-control"
-            value="{{ settings.bar_logo_url or '' }}"
-            placeholder="https://example.com/logo.png"
-          />
-          <small class="muted">Shown next to your bar name on dashboard and menu/display pages.</small>
-        </div>
-      </div>
-    </details>
-
-    <details class="settings-collapsible">
-      <summary>Keg Types</summary>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Current Keg Type Choices</label>
-          <small class="muted">
-            Manage available keg/container types shown in keg dropdowns.
-          </small>
-          <div id="kegTypeChoicesList" class="stack-gap-sm" style="margin-top: 8px"></div>
+        <p class="muted" style="margin-top: 0.35rem">Display URL</p>
+        <div class="settings-url-row">
+          <a
+            id="externalDisplayUrl"
+            class="settings-url-link"
+            href="{{ external_display_url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ external_display_url }}</a
+          >
           <button
             type="button"
-            class="btn btn-secondary btn-sm"
-            style="margin-top: 8px"
-            onclick="addKegTypeChoiceRow()"
+            class="btn btn-sm btn-secondary"
+            onclick="copyExternalUrl('externalDisplayUrl', this)"
           >
-            + Add Keg Type
+            Copy
           </button>
         </div>
-        <div class="form-group">
-          <label>Default Keg Type</label>
-          <select id="defaultKegType" class="form-control"></select>
-          <small class="muted">Used as the default keg type when a new keg is added.</small>
+        <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
+        <div class="settings-url-row">
+          <a
+            id="externalMenuUrl"
+            class="settings-url-link"
+            href="{{ external_menu_url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ external_menu_url }}</a
+          >
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary"
+            onclick="copyExternalUrl('externalMenuUrl', this)"
+          >
+            Copy
+          </button>
         </div>
+        <p class="muted" style="margin-top: 0.35rem">
+          QR Status: {% if qr_ready %}
+          <strong style="color: #15803d">Ready</strong>
+          {% else %}
+          <strong style="color: #b45309">Unavailable</strong>
+          {% endif %}
+        </p>
       </div>
     </details>
+  </div>
 
-    <details class="settings-collapsible">
-      <summary>Appearance and Layout</summary>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Measurement System</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="measurement"
-                value="us"
-                {% if (settings.measurement or 'us') == 'us' %}checked{% endif %}
-              />
-              US (gallons, oz)
-            </label>
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="measurement"
-                value="metric"
-                {% if (settings.measurement or 'us') == 'metric' %}checked{% endif %}
-              />
-              Metric (liters, ml)
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Theme</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="theme"
-                value="light"
-                {% if (settings.theme or 'light') == 'light' %}checked{% endif %}
-              />
-              ☀ Light
-            </label>
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="theme"
-                value="dark"
-                {% if (settings.theme or 'light') == 'dark' %}checked{% endif %}
-              />
-              🌙 Dark
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Dashboard Manage Button Position</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="dashboard_manage_button_position"
-                value="top-right"
-                {% if (settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right') == 'top-right' %}checked{% endif %}
-              />
-              Top Right
-            </label>
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="dashboard_manage_button_position"
-                value="bottom-left"
-                {% if (settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right') == 'bottom-left' %}checked{% endif %}
-              />
-              Bottom Left
-            </label>
-            <label class="radio-label">
-              <input
-                type="radio"
-                name="dashboard_manage_button_position"
-                value="bottom-right"
-                {% if (settings.dashboard_manage_button_position or settings.manage_button_position or 'top-right') == 'bottom-right' %}checked{% endif %}
-              />
-              Bottom Right
-            </label>
-          </div>
-        </div>
-      </div>
-    </details>
-
-    <details class="settings-collapsible">
-      <summary>Features and QR</summary>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label class="radio-label">
+  <div class="card settings-card">
+    <form id="settingsForm" onsubmit="saveSettings(event)">
+      <details class="settings-collapsible" open>
+        <summary>General</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Bar Name</label>
             <input
-              type="checkbox"
-              id="barStockEnabled"
-              {% if settings.bar_stock_enabled %}checked{% endif %}
+              type="text"
+              id="barName"
+              class="form-control"
+              value="{{ settings.bar_name }}"
+              required
             />
-            Enable Bar Stock Feature
-          </label>
-        </div>
-        <div class="form-group">
-          <label class="radio-label">
+          </div>
+          <div class="form-group">
+            <label>Bar Logo URL (optional)</label>
             <input
-              type="checkbox"
-              id="apiReferenceEnabled"
-              {% if settings.api_reference_enabled %}checked{% endif %}
+              type="url"
+              id="barLogoUrl"
+              class="form-control"
+              value="{{ settings.bar_logo_url or '' }}"
+              placeholder="https://example.com/logo.png"
             />
-            Show API Reference in Navigation
-          </label>
-          <small class="muted">When disabled, API Reference is hidden from the top nav.</small>
-        </div>
-        <div class="form-group">
-          <label>Pour Mode</label>
-          <select id="pourMode" class="form-control">
-            <option value="manual" {% if (settings.pour_mode or 'manual') == 'manual' %}selected{% endif %}>Manual</option>
-            <option value="pos" {% if (settings.pour_mode or 'manual') == 'pos' %}selected{% endif %}>POS (API)</option>
-            <option value="inline_device" {% if (settings.pour_mode or 'manual') == 'inline_device' %}selected{% endif %} disabled>Inline Device (Coming Soon)</option>
-          </select>
-          <small class="muted">Non-manual modes hide the pour button in the UI.</small>
-        </div>
-        {% if qr_ready %}
-        <div class="form-group">
-          <label>Printable Menu QR Code</label>
-          <select id="menuQrMode" class="form-control">
-            <option value="off" {% if (settings.menu_qr_mode or 'both') == 'off' %}selected{% endif %}>Off</option>
-            <option value="display" {% if (settings.menu_qr_mode or 'both') == 'display' %}selected{% endif %}>Display only</option>
-            <option value="print" {% if (settings.menu_qr_mode or 'both') == 'print' %}selected{% endif %}>Print only</option>
-            <option value="both" {% if (settings.menu_qr_mode or 'both') == 'both' %}selected{% endif %}>Display and print</option>
-          </select>
-          <small class="muted">
-            Controls where the QR code appears on the printable menu page.
-          </small>
-          <div style="margin-top: 0.65rem">
-            <a
-              class="btn btn-secondary btn-sm"
-              href="{{ ingress }}/menu/qr-print"
-              target="_blank"
-              rel="noopener noreferrer"
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.45rem;
+              "
             >
-              Print QR Code Page
-            </a>
+              <input
+                type="file"
+                id="barLogoFile"
+                class="form-control"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              />
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="uploadBarLogo()"
+              >
+                Upload Logo
+              </button>
+            </div>
+            <span id="barLogoUploadMsg" class="save-msg"></span>
+            <small class="muted"
+              >Use a URL or upload an image file (PNG, JPG, GIF, WEBP, SVG; max
+              2 MB). Shown next to your bar name on dashboard and menu/display
+              pages.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>External Base URL (optional)</label>
+            <input
+              type="url"
+              id="externalBaseUrl"
+              class="form-control"
+              value="{{ settings.external_base_url or '' }}"
+              placeholder="https://my-host.example.com"
+            />
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.45rem;
+              "
+            >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="clearExternalBaseUrlOverride()"
+              >
+                Clear Override
+              </button>
+              <span id="externalBaseUrlMsg" class="save-msg"></span>
+            </div>
+            <small class="muted"
+              >If blank, BarTender auto-detects the external host for display
+              and menu links.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>Environment Mode</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                {% if (settings.environment_mode or 'production') == 'sandbox'
+                %}
+                <input
+                  type="radio"
+                  name="environment_mode"
+                  value="sandbox"
+                  checked
+                />
+                {% else %}
+                <input type="radio" name="environment_mode" value="sandbox" />
+                {% endif %} Sandbox
+              </label>
+              <label class="radio-label">
+                {% if (settings.environment_mode or 'production') ==
+                'production' %}
+                <input
+                  type="radio"
+                  name="environment_mode"
+                  value="production"
+                  checked
+                />
+                {% else %}
+                <input
+                  type="radio"
+                  name="environment_mode"
+                  value="production"
+                />
+                {% endif %} Production
+              </label>
+            </div>
+            <small class="muted"
+              >Default is Production. Sandbox behavior will expand in future
+              updates.</small
+            >
           </div>
         </div>
-        {% else %}
-        <div class="form-group settings-warning-block">
-          <label>Printable Menu QR Code</label>
-          <p class="muted" style="margin-top: 0.35rem">
-            QR options are unavailable on this system.
-          </p>
-          <p class="muted" style="margin-top: 0.25rem">
-            Install requirements to enable QR generation: <code>pip install -r requirements.txt</code>
-          </p>
-          {% if qr_error %}
-          <p class="muted" style="margin-top: 0.25rem">Details: {{ qr_error }}</p>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Appearance</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Measurement System</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                {% if (settings.measurement or 'us') == 'us' %}
+                <input type="radio" name="measurement" value="us" checked />
+                {% else %}
+                <input type="radio" name="measurement" value="us" />
+                {% endif %} US (gallons, oz)
+              </label>
+              <label class="radio-label">
+                {% if (settings.measurement or 'us') == 'metric' %}
+                <input type="radio" name="measurement" value="metric" checked />
+                {% else %}
+                <input type="radio" name="measurement" value="metric" />
+                {% endif %} Metric (liters, ml)
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Theme</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                {% if (settings.theme or 'light') == 'light' %}
+                <input type="radio" name="theme" value="light" checked />
+                {% else %}
+                <input type="radio" name="theme" value="light" />
+                {% endif %} ☀ Light
+              </label>
+              <label class="radio-label">
+                {% if (settings.theme or 'light') == 'dark' %}
+                <input type="radio" name="theme" value="dark" checked />
+                {% else %}
+                <input type="radio" name="theme" value="dark" />
+                {% endif %} 🌙 Dark
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Dashboard Manage Button Position</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                {% if (settings.dashboard_manage_button_position or
+                settings.manage_button_position or 'top-right') == 'top-right'
+                %}
+                <input
+                  type="radio"
+                  name="dashboard_manage_button_position"
+                  value="top-right"
+                  checked
+                />
+                {% else %}
+                <input
+                  type="radio"
+                  name="dashboard_manage_button_position"
+                  value="top-right"
+                />
+                {% endif %} Top Right
+              </label>
+              <label class="radio-label">
+                {% if (settings.dashboard_manage_button_position or
+                settings.manage_button_position or 'top-right') == 'bottom-left'
+                %}
+                <input
+                  type="radio"
+                  name="dashboard_manage_button_position"
+                  value="bottom-left"
+                  checked
+                />
+                {% else %}
+                <input
+                  type="radio"
+                  name="dashboard_manage_button_position"
+                  value="bottom-left"
+                />
+                {% endif %} Bottom Left
+              </label>
+              <label class="radio-label">
+                {% if (settings.dashboard_manage_button_position or
+                settings.manage_button_position or 'top-right') ==
+                'bottom-right' %}
+                <input
+                  type="radio"
+                  name="dashboard_manage_button_position"
+                  value="bottom-right"
+                  checked
+                />
+                {% else %}
+                <input
+                  type="radio"
+                  name="dashboard_manage_button_position"
+                  value="bottom-right"
+                />
+                {% endif %} Bottom Right
+              </label>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Features</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.bar_stock_enabled %}
+              <input type="checkbox" id="barStockEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="barStockEnabled" />
+              {% endif %} Enable Bar Stock Feature
+            </label>
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.analytics_enabled is not defined or
+              settings.analytics_enabled %}
+              <input type="checkbox" id="analyticsEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="analyticsEnabled" />
+              {% endif %} Enable Analytics Feature
+            </label>
+            <small class="muted"
+              >When disabled, Analytics is hidden from the dashboard and
+              dedicated analytics page.</small
+            >
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.api_reference_enabled %}
+              <input type="checkbox" id="apiReferenceEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="apiReferenceEnabled" />
+              {% endif %} Show API Reference in Navigation
+            </label>
+            <small class="muted"
+              >When disabled, API Reference is hidden from the top nav.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>External API Integration Access</label>
+            <p class="muted" style="margin-top: 0.25rem">
+              External API listener runs on port {{ external_api_port }} for POS
+              and hardware integrations.
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Provide token in header Authorization: Bearer YOUR_TOKEN or
+              X-API-Token: YOUR_TOKEN.
+            </p>
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.5rem;
+              "
+            >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="testExternalApiAccessSettings()"
+              >
+                Test External API Access
+              </button>
+              <span id="externalApiTestMsg" class="save-msg"></span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.external_api_token_auth_enabled is not defined or
+              settings.external_api_token_auth_enabled %}
+              <input type="checkbox" id="externalApiTokenAuthEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="externalApiTokenAuthEnabled" />
+              {% endif %} Require Token Authentication for External API
+            </label>
+          </div>
+          <div class="form-group">
+            <label>External API Read Token</label>
+            <input
+              type="password"
+              id="externalApiReadToken"
+              class="form-control"
+              value="{{ settings.external_api_read_token or '' }}"
+              placeholder="Used for read-only API calls (GET/HEAD/OPTIONS)"
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-group">
+            <label>External API Write Token</label>
+            <input
+              type="password"
+              id="externalApiWriteToken"
+              class="form-control"
+              value="{{ settings.external_api_write_token or '' }}"
+              placeholder="Used for write API calls (POST/PUT/DELETE)"
+              autocomplete="off"
+            />
+            <small class="muted"
+              >Write token can also be used for read requests.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>Legacy Shared Token (optional)</label>
+            <input
+              type="password"
+              id="externalApiToken"
+              class="form-control"
+              value="{{ settings.external_api_token or '' }}"
+              placeholder="Compatibility token for both read and write requests"
+              autocomplete="off"
+            />
+            <small class="muted"
+              >Optional. Keep blank if using scoped read/write tokens
+              only.</small
+            >
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.external_api_allowlist_enabled %}
+              <input type="checkbox" id="externalApiAllowlistEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="externalApiAllowlistEnabled" />
+              {% endif %} Restrict External API by IP/CIDR Allowlist
+            </label>
+          </div>
+          <div class="form-group">
+            <label>External API IP/CIDR Allowlist</label>
+            <textarea
+              id="externalApiAllowlist"
+              class="form-control"
+              rows="4"
+              placeholder="Example:\n192.168.1.10\n192.168.1.0/24"
+            >
+{{ settings.external_api_allowlist or '' }}</textarea>
+            <small class="muted"
+              >Use newline, comma, or space separated IPs/CIDRs.</small
+            >
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.external_api_rate_limit_enabled is not defined or
+              settings.external_api_rate_limit_enabled %}
+              <input type="checkbox" id="externalApiRateLimitEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="externalApiRateLimitEnabled" />
+              {% endif %} Enable External API Rate Limiting
+            </label>
+          </div>
+          <div class="form-group">
+            <label>External API Rate Limit (requests per minute)</label>
+            <input
+              type="number"
+              id="externalApiRateLimitPerMinute"
+              class="form-control"
+              min="1"
+              max="5000"
+              step="1"
+              value="{{ settings.external_api_rate_limit_per_minute or 120 }}"
+            />
+          </div>
+          <div class="form-group">
+            <label>Pour Mode</label>
+            <select id="pourMode" class="form-control">
+              {% if (settings.pour_mode or 'manual') == 'manual' %}
+              <option value="manual" selected>Manual</option>
+              {% else %}
+              <option value="manual">Manual</option>
+              {% endif %} {% if (settings.pour_mode or 'manual') == 'pos' %}
+              <option value="pos" selected>POS (API)</option>
+              {% else %}
+              <option value="pos">POS (API)</option>
+              {% endif %} {% if (settings.pour_mode or 'manual') ==
+              'inline_device' %}
+              <option value="inline_device" selected disabled>
+                Inline Device (Coming Soon)
+              </option>
+              {% else %}
+              <option value="inline_device" disabled>
+                Inline Device (Coming Soon)
+              </option>
+              {% endif %}
+            </select>
+            <small class="muted"
+              >Non-manual modes hide the pour button in the UI.</small
+            >
+          </div>
+          {% if qr_ready %}
+          <div class="form-group">
+            <label>Printable Menu QR Code</label>
+            <select id="menuQrMode" class="form-control">
+              {% if (settings.menu_qr_mode or 'both') == 'off' %}
+              <option value="off" selected>Off</option>
+              {% else %}
+              <option value="off">Off</option>
+              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'display'
+              %}
+              <option value="display" selected>Display only</option>
+              {% else %}
+              <option value="display">Display only</option>
+              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print' %}
+              <option value="print" selected>Print only</option>
+              {% else %}
+              <option value="print">Print only</option>
+              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'both' %}
+              <option value="both" selected>Display and print</option>
+              {% else %}
+              <option value="both">Display and print</option>
+              {% endif %}
+            </select>
+            <small class="muted">
+              Controls where the QR code appears on the printable menu page.
+            </small>
+            <div style="margin-top: 0.65rem">
+              <a
+                class="btn btn-secondary btn-sm"
+                href="{{ ingress }}/menu/qr-print"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Print QR Code Page
+              </a>
+            </div>
+          </div>
+          {% else %}
+          <div class="form-group settings-warning-block">
+            <label>Printable Menu QR Code</label>
+            <p class="muted" style="margin-top: 0.35rem">
+              QR options are unavailable on this system.
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Install requirements to enable QR generation:
+              <code>pip install -r requirements.txt</code>
+            </p>
+            {% if qr_error %}
+            <p class="muted" style="margin-top: 0.25rem">
+              Details: {{ qr_error }}
+            </p>
+            {% endif %}
+          </div>
           {% endif %}
         </div>
-        {% endif %}
-      </div>
-    </details>
+      </details>
 
-    <details class="settings-collapsible">
-      <summary>Analytics Forecasting</summary>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Low Keg Threshold (%)</label>
-          <input
-            type="number"
-            id="analyticsLowThreshold"
-            class="form-control"
-            min="1"
-            max="100"
-            step="1"
-            value="{{ settings.analytics_low_keg_threshold_percent or 25 }}"
-          />
-          <small class="muted">Kegs at or below this percent are considered low.</small>
+      <details class="settings-collapsible">
+        <summary>Keg Settings</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Current Keg Type Choices</label>
+            <small class="muted">
+              Manage available keg/container types shown in keg dropdowns.
+            </small>
+            <div
+              id="kegTypeChoicesList"
+              class="stack-gap-sm"
+              style="margin-top: 8px"
+            ></div>
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 8px;
+              "
+            >
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                onclick="addKegTypeChoiceRow()"
+              >
+                + Add Keg Type
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-danger"
+                onclick="resetKegTypesToDefaults()"
+              >
+                Reset Keg Types
+              </button>
+              <span id="kegTypeResetMsg" class="save-msg"></span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Default Keg Type</label>
+            <select id="defaultKegType" class="form-control"></select>
+            <small class="muted"
+              >Used as the default keg type when a new keg is added.</small
+            >
+          </div>
         </div>
-        <div class="form-group">
-          <label>Days Left Calculation Method</label>
-          <select id="analyticsDaysMethod" class="form-control">
-            <option value="trailing_window" {% if (settings.analytics_days_left_method or 'trailing_window') == 'trailing_window' %}selected{% endif %}>Trailing pour-rate window</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Days Left Trailing Window (days)</label>
-          <input
-            type="number"
-            id="analyticsDaysWindow"
-            class="form-control"
-            min="3"
-            max="90"
-            step="1"
-            value="{{ settings.analytics_days_left_window_days or 14 }}"
-          />
-          <small class="muted">Used to estimate daily pour rate for depletion forecasting.</small>
-        </div>
-      </div>
-    </details>
+      </details>
 
+      <details class="settings-collapsible">
+        <summary>Pour Presets</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Pour Amount Presets</label>
+            <small class="muted">
+              Configure named pour options shown on each tap card.
+            </small>
+            <div
+              id="pourOptionsList"
+              class="stack-gap-sm"
+              style="margin-top: 8px"
+            ></div>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              style="margin-top: 8px"
+              onclick="addPourOptionRow()"
+            >
+              + Add Pour Option
+            </button>
+          </div>
+          <div class="form-group">
+            <label>Default Pour Preset</label>
+            <select id="defaultPourPreset" class="form-control"></select>
+            <small class="muted">
+              This preset is preselected anywhere pour choices are shown.
+            </small>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Analytics</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Low Keg Threshold (%)</label>
+            <input
+              type="number"
+              id="analyticsLowThreshold"
+              class="form-control"
+              min="1"
+              max="100"
+              step="1"
+              value="{{ settings.analytics_low_keg_threshold_percent or 25 }}"
+            />
+            <small class="muted"
+              >Kegs at or below this percent are considered low.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>Days Left Calculation Method</label>
+            <select id="analyticsDaysMethod" class="form-control">
+              {% if (settings.analytics_days_left_method or 'trailing_window')
+              == 'trailing_window' %}
+              <option value="trailing_window" selected>
+                Trailing pour-rate window
+              </option>
+              {% else %}
+              <option value="trailing_window">Trailing pour-rate window</option>
+              {% endif %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Days Left Trailing Window (days)</label>
+            <input
+              type="number"
+              id="analyticsDaysWindow"
+              class="form-control"
+              min="3"
+              max="90"
+              step="1"
+              value="{{ settings.analytics_days_left_window_days or 14 }}"
+            />
+            <small class="muted"
+              >Used to estimate daily pour rate for depletion
+              forecasting.</small
+            >
+          </div>
+        </div>
+      </details>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <span id="saveMsg" class="save-msg"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="card settings-card">
     <details class="settings-collapsible">
-      <summary>Pour Presets</summary>
+      <summary>📤 Export Data</summary>
       <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Pour Amount Presets</label>
-          <small class="muted">
-            Configure named pour options shown on each tap card.
-          </small>
-          <div id="pourOptionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            style="margin-top: 8px"
-            onclick="addPourOptionRow()"
+        <p class="muted">
+          Download your full bar data as a versioned JSON backup or ZIP archive.
+        </p>
+        <div class="export-buttons">
+          <a class="btn btn-secondary" href="{{ ingress }}/api/export/json"
+            >Export Portable JSON</a
           >
-            + Add Pour Option
-          </button>
-        </div>
-        <div class="form-group">
-          <label>Default Pour Preset</label>
-          <select id="defaultPourPreset" class="form-control"></select>
-          <small class="muted">
-            This preset is preselected anywhere pour choices are shown.
-          </small>
+          <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
+            >Export Archive (.zip)</a
+          >
         </div>
       </div>
     </details>
+  </div>
 
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary">Save Settings</button>
-      <span id="saveMsg" class="save-msg"></span>
-    </div>
-  </form>
-</div>
-
-<div class="card settings-card">
-  <details class="settings-collapsible">
-    <summary>📤 Export Data</summary>
-    <div class="settings-collapsible-body">
-      <p class="muted">
-        Download your full bar data as a versioned JSON backup or ZIP archive.
-      </p>
-      <div class="export-buttons">
-        <a class="btn btn-secondary" href="{{ ingress }}/api/export/json"
-          >Export Portable JSON</a
-        >
-        <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
-          >Export Archive (.zip)</a
-        >
+  <div class="card settings-card">
+    <details class="settings-collapsible">
+      <summary>📥 Import Data</summary>
+      <div class="settings-collapsible-body">
+        <p class="muted">
+          Import a previously exported ZIP archive or portable JSON backup.
+        </p>
+        <form id="importForm" onsubmit="importArchive(event)">
+          <div class="form-group">
+            <label for="importArchiveFile">Backup File</label>
+            <input
+              type="file"
+              id="importArchiveFile"
+              accept=".zip,application/zip,.json,application/json"
+              class="form-control"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label>Import Mode</label>
+            <select id="importMode" class="form-control">
+              <option value="replace" selected>
+                Replace all existing data
+              </option>
+              <option value="merge">Merge with existing data</option>
+            </select>
+            <small class="muted">
+              Replace overwrites all data. Merge keeps existing entries and
+              upserts by ID.
+            </small>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-secondary">
+              Import Backup
+            </button>
+            <span id="importMsg" class="save-msg"></span>
+          </div>
+        </form>
       </div>
-    </div>
-  </details>
+    </details>
   </div>
-
-<div class="card settings-card">
-  <details class="settings-collapsible">
-    <summary>📥 Import Data</summary>
-    <div class="settings-collapsible-body">
-      <p class="muted">Import a previously exported ZIP archive or portable JSON backup.</p>
-      <form id="importForm" onsubmit="importArchive(event)">
-        <div class="form-group">
-          <label for="importArchiveFile">Backup File</label>
-          <input
-            type="file"
-            id="importArchiveFile"
-            accept=".zip,application/zip,.json,application/json"
-            class="form-control"
-            required
-          />
-        </div>
-        <div class="form-group">
-          <label>Import Mode</label>
-          <select id="importMode" class="form-control">
-            <option value="replace" selected>Replace all existing data</option>
-            <option value="merge">Merge with existing data</option>
-          </select>
-          <small class="muted">
-            Replace overwrites all data. Merge keeps existing entries and upserts by ID.
-          </small>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-secondary">Import Backup</button>
-          <span id="importMsg" class="save-msg"></span>
-        </div>
-      </form>
-    </div>
-  </details>
-  </div>
- </div>
+</div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
   const DISPLAY_PORT = "{{ display_port }}";
-  const EXTERNAL_DISPLAY_URL = {{ (external_display_url or '') | tojson }};
-  const EXTERNAL_MENU_URL = {{ (external_menu_url or '') | tojson }};
-  const DEFAULT_KEG_TYPE = {{ (settings.default_keg_type or '') | tojson }};
-  const DEFAULT_KEG_TYPE_CHOICES = {{ (settings.keg_type_choices or []) | tojson }};
-  const DEFAULT_POUR_OPTIONS = {{ (settings.pour_options or []) | tojson }};
-  const DEFAULT_POUR_PRESET = {{ (settings.default_pour_preset or '') | tojson }};
-  const DEFAULT_POUR_MODE = {{ (settings.pour_mode or 'manual') | tojson }};
+  const EXTERNAL_DISPLAY_URL = JSON.parse(
+    `{{ (external_display_url or '') | tojson }}`,
+  );
+  const EXTERNAL_MENU_URL = JSON.parse(
+    `{{ (external_menu_url or '') | tojson }}`,
+  );
+  const AUTO_EXTERNAL_DISPLAY_URL = JSON.parse(
+    `{{ (auto_external_display_url or '') | tojson }}`,
+  );
+  const AUTO_EXTERNAL_MENU_URL = JSON.parse(
+    `{{ (auto_external_menu_url or '') | tojson }}`,
+  );
+  const DEFAULT_KEG_TYPE = JSON.parse(
+    `{{ (settings.default_keg_type or '') | tojson }}`,
+  );
+  const DEFAULT_KEG_TYPE_CHOICES = JSON.parse(
+    `{{ (settings.keg_type_choices or []) | tojson }}`,
+  );
+  const DEFAULT_POUR_OPTIONS = JSON.parse(
+    `{{ (settings.pour_options or []) | tojson }}`,
+  );
+  const DEFAULT_POUR_PRESET = JSON.parse(
+    `{{ (settings.default_pour_preset or '') | tojson }}`,
+  );
+  const DEFAULT_POUR_MODE = JSON.parse(
+    `{{ (settings.pour_mode or 'manual') | tojson }}`,
+  );
+  const DEFAULT_ENVIRONMENT_MODE = JSON.parse(
+    `{{ (settings.environment_mode or 'production') | tojson }}`,
+  );
 
   function expandAllSettings() {
     document
@@ -435,15 +803,138 @@ content %}
   }
 
   function initExternalReadonlyLinks() {
+    updateExternalReadonlyLinks(
+      document.getElementById("externalBaseUrl")
+        ? document.getElementById("externalBaseUrl").value
+        : "",
+    );
+  }
+
+  function updateExternalReadonlyLinks(externalBaseUrl = "") {
     const displayLink = document.getElementById("externalDisplayUrl");
     const menuLink = document.getElementById("externalMenuUrl");
-    if (displayLink && EXTERNAL_DISPLAY_URL) {
-      displayLink.href = EXTERNAL_DISPLAY_URL;
-      displayLink.textContent = EXTERNAL_DISPLAY_URL;
+    const overrideBase = String(externalBaseUrl || "")
+      .trim()
+      .replace(/\/+$/, "");
+    const autoBase = String(AUTO_EXTERNAL_DISPLAY_URL || "")
+      .trim()
+      .replace(/\/+$/, "");
+    const base = overrideBase || autoBase;
+
+    if (displayLink && base) {
+      displayLink.href = `${base}/`;
+      displayLink.textContent = `${base}/`;
     }
-    if (menuLink && EXTERNAL_MENU_URL) {
-      menuLink.href = EXTERNAL_MENU_URL;
-      menuLink.textContent = EXTERNAL_MENU_URL;
+    if (menuLink && base) {
+      menuLink.href = `${base}/menu`;
+      menuLink.textContent = `${base}/menu`;
+    }
+  }
+
+  async function clearExternalBaseUrlOverride() {
+    const input = document.getElementById("externalBaseUrl");
+    const msg = document.getElementById("externalBaseUrlMsg");
+    if (!input) return;
+    if (msg) msg.textContent = "";
+
+    if (
+      !window.confirm(
+        "Clear external URL override and return to auto-detected links?",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ external_base_url: "" }),
+      });
+      if (!res.ok) {
+        throw new Error(`Clear override failed: ${res.status}`);
+      }
+
+      input.value = "";
+      updateExternalReadonlyLinks("");
+      if (msg) msg.textContent = "✓ External URL override cleared.";
+    } catch (err) {
+      console.error("Unable to clear external URL override", err);
+      if (msg) msg.textContent = "Unable to clear override. Try again.";
+    }
+  }
+
+  async function uploadBarLogo() {
+    const fileInput = document.getElementById("barLogoFile");
+    const logoUrlInput = document.getElementById("barLogoUrl");
+    const msg = document.getElementById("barLogoUploadMsg");
+    const file =
+      fileInput?.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+    if (msg) msg.textContent = "";
+    if (!file) {
+      if (msg) msg.textContent = "Select an image file first.";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    if (msg) msg.textContent = "Uploading...";
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/logo/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `Upload failed: ${res.status}`);
+      }
+
+      if (logoUrlInput) {
+        logoUrlInput.value = body.bar_logo_url || "";
+      }
+      if (fileInput) {
+        fileInput.value = "";
+      }
+      if (msg) msg.textContent = "✓ Logo uploaded. Save to keep this setting.";
+    } catch (err) {
+      console.error("Unable to upload logo", err);
+      if (msg) msg.textContent = err?.message || "Upload failed";
+    }
+  }
+
+  async function testExternalApiAccessSettings() {
+    const msg = document.getElementById("externalApiTestMsg");
+    if (msg) msg.textContent = "Testing...";
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/external-auth/test`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Test failed: ${res.status}`);
+      }
+
+      const body = await res.json();
+      const warningCount = Array.isArray(body.warnings)
+        ? body.warnings.length
+        : 0;
+      if (body.ok) {
+        if (msg) {
+          msg.textContent = `✓ Ready (${body.external_api_base_url})`;
+        }
+      } else {
+        const warningPreview = Array.isArray(body.warnings)
+          ? body.warnings.slice(0, 2).join(" ")
+          : "Check external API settings.";
+        if (msg) {
+          msg.textContent = `Needs attention (${warningCount}): ${warningPreview}`;
+        }
+      }
+    } catch (err) {
+      console.error("External API test failed", err);
+      if (msg) msg.textContent = "Unable to test external API settings.";
     }
   }
 
@@ -471,9 +962,9 @@ content %}
     row.innerHTML = `
       <div class="form-group">
         <label>Name</label>
-        <input type="text" class="form-control pour-option-name" value="${
-          (option.name || "").replace(/"/g, "&quot;")
-        }" placeholder="e.g. Pint" />
+        <input type="text" class="form-control pour-option-name" value="${(
+          option.name || ""
+        ).replace(/"/g, "&quot;")}" placeholder="e.g. Pint" />
       </div>
       <div class="form-group">
         <label>Amount</label>
@@ -522,18 +1013,18 @@ content %}
 
   function addPourOptionRow(option = null, opts = {}) {
     const { refresh = true } = opts;
-    document.getElementById("pourOptionsList").appendChild(
-      createPourOptionRow(option || {}),
-    );
+    document
+      .getElementById("pourOptionsList")
+      .appendChild(createPourOptionRow(option || {}));
     if (refresh) {
       refreshDefaultPourPresetOptions();
     }
   }
 
   function addKegTypeChoiceRow(value = "") {
-    document.getElementById("kegTypeChoicesList").appendChild(
-      createKegTypeChoiceRow(value),
-    );
+    document
+      .getElementById("kegTypeChoicesList")
+      .appendChild(createKegTypeChoiceRow(value));
     refreshDefaultKegTypeOptions();
   }
 
@@ -562,6 +1053,64 @@ content %}
       return;
     }
     choices.forEach((choice) => addKegTypeChoiceRow(choice));
+  }
+
+  function replaceKegTypeChoices(choices = [], defaultChoice = "") {
+    const list = document.getElementById("kegTypeChoicesList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (!Array.isArray(choices) || !choices.length) {
+      addKegTypeChoiceRow("1/6 bbl (5.2 gal)");
+    } else {
+      choices.forEach((choice) => addKegTypeChoiceRow(choice));
+    }
+
+    refreshDefaultKegTypeOptions();
+    const defaultSelect = document.getElementById("defaultKegType");
+    if (!defaultSelect || !defaultChoice) return;
+
+    const match = Array.from(defaultSelect.options).find(
+      (option) =>
+        option.value.toLowerCase() === String(defaultChoice).toLowerCase(),
+    );
+    if (match) {
+      defaultSelect.value = match.value;
+    }
+  }
+
+  async function resetKegTypesToDefaults() {
+    const msg = document.getElementById("kegTypeResetMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset keg types to built-in defaults? This will replace custom keg type choices.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/keg-types/reset`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Reset failed: ${res.status}`);
+      }
+
+      const body = await res.json();
+      replaceKegTypeChoices(
+        Array.isArray(body.keg_type_choices) ? body.keg_type_choices : [],
+        body.default_keg_type || "",
+      );
+
+      if (msg) {
+        msg.textContent = "✓ Keg types reset to defaults.";
+      }
+    } catch (err) {
+      console.error("Unable to reset keg types", err);
+      if (msg) {
+        msg.textContent = "Unable to reset keg types. Try again.";
+      }
+    }
   }
 
   function collectKegTypeChoices() {
@@ -609,7 +1158,8 @@ content %}
     );
     if (hasPrevious) {
       select.value = Array.from(select.options).find(
-        (option) => option.value.toLowerCase() === String(previous).toLowerCase(),
+        (option) =>
+          option.value.toLowerCase() === String(previous).toLowerCase(),
       ).value;
     } else {
       select.value = select.options[0].value;
@@ -617,7 +1167,9 @@ content %}
   }
 
   function loadPourOptions() {
-    const options = Array.isArray(DEFAULT_POUR_OPTIONS) ? DEFAULT_POUR_OPTIONS : [];
+    const options = Array.isArray(DEFAULT_POUR_OPTIONS)
+      ? DEFAULT_POUR_OPTIONS
+      : [];
     if (!options.length) {
       addPourOptionRow({ name: "Pint", amount: 16, unit: "oz" });
       return;
@@ -708,16 +1260,20 @@ content %}
   async function saveSettings(e) {
     e.preventDefault();
     const measurementInput = document.querySelector(
-      'input[name="measurement"]:checked'
+      'input[name="measurement"]:checked',
     );
     const themeInput = document.querySelector('input[name="theme"]:checked');
     const managePosInput = document.querySelector(
-      'input[name="dashboard_manage_button_position"]:checked'
+      'input[name="dashboard_manage_button_position"]:checked',
+    );
+    const environmentModeInput = document.querySelector(
+      'input[name="environment_mode"]:checked',
     );
 
     const body = {
       bar_name: document.getElementById("barName").value,
       bar_logo_url: document.getElementById("barLogoUrl").value,
+      external_base_url: document.getElementById("externalBaseUrl").value,
       default_keg_type: document.getElementById("defaultKegType").value,
       keg_type_choices: collectKegTypeChoices(),
       measurement: measurementInput ? measurementInput.value : "us",
@@ -726,15 +1282,41 @@ content %}
         ? managePosInput.value
         : "top-right",
       bar_stock_enabled: document.getElementById("barStockEnabled").checked,
-      api_reference_enabled: document.getElementById("apiReferenceEnabled").checked,
+      analytics_enabled: document.getElementById("analyticsEnabled").checked,
+      api_reference_enabled: document.getElementById("apiReferenceEnabled")
+        .checked,
+      external_api_token_auth_enabled: document.getElementById(
+        "externalApiTokenAuthEnabled",
+      ).checked,
+      external_api_token: document.getElementById("externalApiToken").value,
+      external_api_read_token: document.getElementById("externalApiReadToken")
+        .value,
+      external_api_write_token: document.getElementById("externalApiWriteToken")
+        .value,
+      external_api_allowlist_enabled: document.getElementById(
+        "externalApiAllowlistEnabled",
+      ).checked,
+      external_api_allowlist: document.getElementById("externalApiAllowlist")
+        .value,
+      external_api_rate_limit_enabled: document.getElementById(
+        "externalApiRateLimitEnabled",
+      ).checked,
+      external_api_rate_limit_per_minute: parseInt(
+        document.getElementById("externalApiRateLimitPerMinute").value,
+        10,
+      ),
       pour_mode: document.getElementById("pourMode")
         ? document.getElementById("pourMode").value
         : DEFAULT_POUR_MODE,
+      environment_mode: environmentModeInput
+        ? environmentModeInput.value
+        : DEFAULT_ENVIRONMENT_MODE,
       analytics_low_keg_threshold_percent: parseInt(
         document.getElementById("analyticsLowThreshold").value,
         10,
       ),
-      analytics_days_left_method: document.getElementById("analyticsDaysMethod").value,
+      analytics_days_left_method: document.getElementById("analyticsDaysMethod")
+        .value,
       analytics_days_left_window_days: parseInt(
         document.getElementById("analyticsDaysWindow").value,
         10,
@@ -757,6 +1339,8 @@ content %}
         throw new Error(`Save failed: ${res.status}`);
       }
 
+      const savedSettings = await res.json();
+
       document.getElementById("saveMsg").textContent = "✓ Saved!";
       setTimeout(() => {
         document.getElementById("saveMsg").textContent = "";
@@ -765,6 +1349,27 @@ content %}
       document.documentElement.dataset.managePos =
         body.dashboard_manage_button_position;
       document.body.dataset.managePos = body.dashboard_manage_button_position;
+      if (document.getElementById("externalApiToken")) {
+        document.getElementById("externalApiToken").value =
+          savedSettings.external_api_token || "";
+      }
+      if (document.getElementById("externalApiReadToken")) {
+        document.getElementById("externalApiReadToken").value =
+          savedSettings.external_api_read_token || "";
+      }
+      if (document.getElementById("externalApiWriteToken")) {
+        document.getElementById("externalApiWriteToken").value =
+          savedSettings.external_api_write_token || "";
+      }
+      if (document.getElementById("externalApiAllowlist")) {
+        document.getElementById("externalApiAllowlist").value =
+          savedSettings.external_api_allowlist || "";
+      }
+      if (document.getElementById("externalApiRateLimitPerMinute")) {
+        document.getElementById("externalApiRateLimitPerMinute").value =
+          savedSettings.external_api_rate_limit_per_minute || 120;
+      }
+      updateExternalReadonlyLinks(savedSettings.external_base_url || "");
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
       document.getElementById("saveMsg").textContent = "Save failed";
@@ -777,9 +1382,14 @@ content %}
     const fileInput = document.getElementById("importArchiveFile");
     const modeInput = document.getElementById("importMode");
     const msg = document.getElementById("importMsg");
-    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    const file =
+      fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
     const mode = modeInput ? modeInput.value : "replace";
-    const isJson = !!(file && file.name && file.name.toLowerCase().endsWith(".json"));
+    const isJson = !!(
+      file &&
+      file.name &&
+      file.name.toLowerCase().endsWith(".json")
+    );
     const previewUrl = isJson
       ? `${INGRESS}/api/import/json/preview`
       : `${INGRESS}/api/import/archive/preview`;

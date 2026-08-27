@@ -58,7 +58,12 @@
     <main class="container qr-print-card card">
       <div class="menu-brand-row" style="justify-content: center">
         {% if settings.bar_logo_url %}
-        <img src="{{ settings.bar_logo_url }}" alt="{{ settings.bar_name }} logo" class="brand-logo brand-logo-lg" loading="lazy" />
+        <img
+          src="{{ settings.bar_logo_url }}"
+          alt="{{ settings.bar_name }} logo"
+          class="brand-logo brand-logo-lg"
+          loading="lazy"
+        />
         {% endif %}
         <h1>{{ settings.bar_name }}</h1>
       </div>
@@ -73,16 +78,25 @@
       <p class="muted">Scan to open the tap and packaged beer menu</p>
       <p class="muted">{{ menu_path }}</p>
       <div class="qr-print-actions">
-        <button class="btn btn-primary" onclick="window.print()">Print QR</button>
-        <a class="btn btn-secondary" href="{{ menu_path }}" target="_blank" rel="noopener noreferrer">Open Menu</a>
+        <button class="btn btn-primary" onclick="window.print()">
+          Print QR
+        </button>
+        <a
+          class="btn btn-secondary"
+          href="{{ menu_path }}"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Open Menu</a
+        >
       </div>
       {% else %}
       <p class="muted">QR generation is currently unavailable.</p>
-      <p class="muted">Install requirements with: <code>pip install -r requirements.txt</code></p>
+      <p class="muted">
+        Install requirements with: <code>pip install -r requirements.txt</code>
+      </p>
       {% if qr_error %}
       <p class="muted">Details: {{ qr_error }}</p>
-      {% endif %}
-      {% endif %}
+      {% endif %} {% endif %}
     </main>
   </body>
 </html>

@@ -8,10 +8,12 @@ import json
 import os
 from pathlib import Path
 
-from flask import Flask, render_template
+from flask import Flask, render_template, send_file
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
+UPLOADS_DIR = DATA_DIR / "uploads"
+LOGO_FILENAME_PREFIX = "bar-logo"
 
 display_app = Flask(__name__, template_folder="templates")
 
@@ -68,6 +70,17 @@ def _normalize_beer_packaging(value) -> str:
     return "kegged"
 
 
+def _get_uploaded_logo_file_path() -> Path | None:
+    if not UPLOADS_DIR.exists():
+        return None
+    candidates = sorted(
+        UPLOADS_DIR.glob(f"{LOGO_FILENAME_PREFIX}.*"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
 @display_app.route("/")
 def index():
     data = load_data()
@@ -122,6 +135,14 @@ def menu():
         on_tap=on_tap,
         packaged_beers=packaged_beers,
     )
+
+
+@display_app.route("/media/bar-logo")
+def media_bar_logo():
+    logo_path = _get_uploaded_logo_file_path()
+    if logo_path is None or not logo_path.exists():
+        return "", 404
+    return send_file(logo_path)
 
 
 if __name__ == "__main__":
