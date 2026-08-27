@@ -6,6 +6,7 @@ import io
 import csv
 import zipfile
 import re
+import mimetypes
 import ipaddress
 import secrets
 import math
@@ -36,6 +37,7 @@ from flask import (
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
+UPLOADS_DIR = DATA_DIR / "uploads"
 INGRESS_PATH = os.environ.get("INGRESS_PATH", "")
 DISPLAY_PORT = os.environ.get("DISPLAY_PORT", "8100")
 EXTERNAL_API_MODE = str(os.environ.get("EXTERNAL_API_MODE", "")).strip().lower() in (
@@ -48,6 +50,15 @@ EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
 DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE = 120
 _EXTERNAL_API_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
 _EXTERNAL_API_RATE_LIMIT_LOCK = threading.Lock()
+MAX_LOGO_UPLOAD_BYTES = 2 * 1024 * 1024
+ALLOWED_LOGO_MIME_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "image/svg+xml": ".svg",
+}
+LOGO_FILENAME_PREFIX = "bar-logo"
 
 
 def _read_addon_version() -> str:
@@ -495,6 +506,62 @@ def _normalize_logo_url(value) -> str:
     if len(url) > 2048:
         return ""
     return url
+
+
+def _uploaded_logo_candidates() -> list[Path]:
+    if not UPLOADS_DIR.exists():
+        return []
+    return sorted(
+        UPLOADS_DIR.glob(f"{LOGO_FILENAME_PREFIX}.*"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _get_uploaded_logo_file_path() -> Path | None:
+    candidates = _uploaded_logo_candidates()
+    if not candidates:
+        return None
+    return candidates[0]
+
+
+def _remove_uploaded_logos() -> None:
+    for path in _uploaded_logo_candidates():
+        try:
+            path.unlink()
+        except OSError:
+            continue
+
+
+def _build_uploaded_logo_url() -> str:
+    cache_bust = int(time.time())
+    return f"media/bar-logo?v={cache_bust}"
+
+
+def _infer_logo_extension(uploaded_file, content: bytes) -> str | None:
+    mime_type = str(uploaded_file.mimetype or "").strip().lower()
+    if mime_type in ALLOWED_LOGO_MIME_TYPES:
+        return ALLOWED_LOGO_MIME_TYPES[mime_type]
+
+    guessed_type, _ = mimetypes.guess_type(str(uploaded_file.filename or ""))
+    guessed_type = str(guessed_type or "").strip().lower()
+    if guessed_type in ALLOWED_LOGO_MIME_TYPES:
+        return ALLOWED_LOGO_MIME_TYPES[guessed_type]
+
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if content.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if content.startswith((b"GIF87a", b"GIF89a")):
+        return ".gif"
+    if content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+        return ".webp"
+
+    preview = content[:512].lstrip()
+    if preview.lower().startswith(b"<svg") or preview.lower().startswith(b"<?xml"):
+        return ".svg"
+
+    return None
 
 
 def _normalize_external_base_url(value) -> str:
@@ -1920,6 +1987,47 @@ def api_save_settings():
 
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/settings/logo/upload", methods=["POST"])
+def api_upload_bar_logo():
+    uploaded_file = request.files.get("file")
+    if uploaded_file is None or not str(uploaded_file.filename or "").strip():
+        return jsonify({"error": "No logo file provided."}), 400
+
+    content = uploaded_file.read()
+    if not content:
+        return jsonify({"error": "Uploaded logo is empty."}), 400
+    if len(content) > MAX_LOGO_UPLOAD_BYTES:
+        return jsonify({"error": "Logo file is too large (max 2 MB)."}), 413
+
+    extension = _infer_logo_extension(uploaded_file, content)
+    if extension is None:
+        return jsonify({"error": "Unsupported logo format. Use PNG, JPG, GIF, WEBP, or SVG."}), 415
+
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    _remove_uploaded_logos()
+    logo_path = UPLOADS_DIR / f"{LOGO_FILENAME_PREFIX}{extension}"
+    with open(logo_path, "wb") as f:
+        f.write(content)
+
+    data = load_data()
+    data["settings"]["bar_logo_url"] = _build_uploaded_logo_url()
+    save_data(data)
+
+    return jsonify({
+        "ok": True,
+        "bar_logo_url": data["settings"]["bar_logo_url"],
+        "size_bytes": len(content),
+    })
+
+
+@app.route("/media/bar-logo", methods=["GET"])
+def media_bar_logo():
+    logo_path = _get_uploaded_logo_file_path()
+    if logo_path is None or not logo_path.exists():
+        return jsonify({"error": "Bar logo not found."}), 404
+    return send_file(logo_path)
 
 
 @app.route("/api/settings/external-auth/test", methods=["POST"])

@@ -109,8 +109,32 @@ content %}
               value="{{ settings.bar_logo_url or '' }}"
               placeholder="https://example.com/logo.png"
             />
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.45rem;
+              "
+            >
+              <input
+                type="file"
+                id="barLogoFile"
+                class="form-control"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              />
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="uploadBarLogo()"
+              >
+                Upload Logo
+              </button>
+            </div>
+            <span id="barLogoUploadMsg" class="save-msg"></span>
             <small class="muted"
-              >Shown next to your bar name on dashboard and menu/display
+              >Use a URL or upload an image file (PNG, JPG, GIF, WEBP, SVG; max
+              2 MB). Shown next to your bar name on dashboard and menu/display
               pages.</small
             >
           </div>
@@ -837,6 +861,46 @@ content %}
     } catch (err) {
       console.error("Unable to clear external URL override", err);
       if (msg) msg.textContent = "Unable to clear override. Try again.";
+    }
+  }
+
+  async function uploadBarLogo() {
+    const fileInput = document.getElementById("barLogoFile");
+    const logoUrlInput = document.getElementById("barLogoUrl");
+    const msg = document.getElementById("barLogoUploadMsg");
+    const file =
+      fileInput?.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+    if (msg) msg.textContent = "";
+    if (!file) {
+      if (msg) msg.textContent = "Select an image file first.";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    if (msg) msg.textContent = "Uploading...";
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/logo/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `Upload failed: ${res.status}`);
+      }
+
+      if (logoUrlInput) {
+        logoUrlInput.value = body.bar_logo_url || "";
+      }
+      if (fileInput) {
+        fileInput.value = "";
+      }
+      if (msg) msg.textContent = "✓ Logo uploaded. Save to keep this setting.";
+    } catch (err) {
+      console.error("Unable to upload logo", err);
+      if (msg) msg.textContent = err?.message || "Upload failed";
     }
   }
 
