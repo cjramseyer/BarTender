@@ -88,17 +88,9 @@
           {% for option in pour_options %} {% set option_amount_token = '%g' |
           format(option.amount) %} {% set option_name_token = option.name |
           replace('|', '/') %} {% set option_value = option_amount_token ~ '|' ~
-          option.unit ~ '|' ~ option_name_token %}
-          <option
-            value="{{ option_value }}"
-            {%
-            if
-            default_pour_preset=""
-            ="option_value"
-            %}selected{%
-            endif
-            %}
-          >
+          option.unit ~ '|' ~ option_name_token %} {% set selected_attr = '
+          selected' if default_pour_preset == option_value else '' %}
+          <option value="{{ option_value }}" {{ selected_attr }}>
             {{ option.name }} ({{ option.amount }} {{ option.unit }})
           </option>
           {% endfor %}
