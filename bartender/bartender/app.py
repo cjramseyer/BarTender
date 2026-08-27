@@ -1627,10 +1627,19 @@ def kegs():
 @app.route("/beers")
 def beers():
     data = load_data()
+    beer_type_choices = sorted(
+        {
+            str(beer.get("type", "")).strip()
+            for beer in data.get("beers", [])
+            if str(beer.get("type", "")).strip()
+        },
+        key=lambda value: value.lower(),
+    )
     return render_template(
         "beers.html",
         settings=data["settings"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
+        beer_type_choices=beer_type_choices,
         ingress=INGRESS_PATH,
     )
 
@@ -2336,6 +2345,7 @@ def api_add_keg():
     keg_type = str(body.get("type", "")).strip() or str(
         data.get("settings", {}).get("default_keg_type", "")
     ).strip()
+    default_keg_size = str(data.get("settings", {}).get("default_keg_type", "")).strip()
     timestamp = datetime.now(timezone.utc).isoformat()
     keg = {
         "id": _next_id(data["kegs"]),
@@ -2344,7 +2354,7 @@ def api_add_keg():
         "beer_name": str(body.get("beer_name", "")).strip(),
         "beer_type": str(body.get("beer_type", "")).strip(),
         "type": keg_type,
-        "size": body.get("size", ""),
+        "size": str(body.get("size", "")).strip() or default_keg_size,
         "custom_size": body.get("custom_size", ""),
         "status": initial_status,
         "beer_brewer": body.get("beer_brewer", body.get("brewery", "")),
@@ -2431,6 +2441,9 @@ def api_add_kegs_bulk():
         keg_type = str(item.get("type", "")).strip() or str(
             simulated_data.get("settings", {}).get("default_keg_type", "")
         ).strip()
+        default_keg_size = str(
+            simulated_data.get("settings", {}).get("default_keg_type", "")
+        ).strip()
         timestamp = datetime.now(timezone.utc).isoformat()
         keg = {
             "id": _next_id(simulated_data["kegs"]),
@@ -2439,7 +2452,7 @@ def api_add_kegs_bulk():
             "beer_name": str(item.get("beer_name", "")).strip(),
             "beer_type": str(item.get("beer_type", "")).strip(),
             "type": keg_type,
-            "size": item.get("size", ""),
+            "size": str(item.get("size", "")).strip() or default_keg_size,
             "custom_size": item.get("custom_size", ""),
             "status": initial_status,
             "beer_brewer": item.get("beer_brewer", item.get("brewery", "")),
