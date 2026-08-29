@@ -893,6 +893,49 @@ def _external_api_listener_base_url() -> str:
     return f"{parsed.scheme}://{netloc}"
 
 
+def _get_request_upload(name: str):
+    upload = request.files.get(name)
+    if upload is not None:
+        return upload
+
+    candidate = request.form.get(name)
+    if candidate is not None and hasattr(candidate, "read"):
+        return candidate
+
+    content_type = str(request.content_type or "")
+    if not content_type.startswith("multipart/form-data"):
+        return None
+
+    raw_body = request.get_data(cache=True, as_text=False)
+    boundary_match = re.search(r"boundary=(?:\"([^\"]+)\"|([^;]+))", content_type, re.IGNORECASE)
+    if not boundary_match:
+        return None
+    boundary = (boundary_match.group(1) or boundary_match.group(2) or "").strip()
+    if not boundary:
+        return None
+
+    marker = b"--" + boundary.encode("utf-8")
+    for chunk in raw_body.split(marker):
+        if not chunk:
+            continue
+        chunk = chunk.lstrip(b"\r\n")
+        if chunk in (b"--", b"--\r\n", b"--\n"):
+            continue
+        header_end = chunk.find(b"\r\n\r\n")
+        if header_end == -1:
+            header_end = chunk.find(b"\n\n")
+        if header_end == -1:
+            continue
+        headers = chunk[:header_end].decode("latin-1", "replace")
+        payload = chunk[header_end + 4 :].rstrip(b"\r\n")
+        if payload.endswith(b"--"):
+            payload = payload[:-2]
+        if f'name="{name}"' in headers or f"name={name}" in headers:
+            if "filename=" in headers:
+                return io.BytesIO(payload)
+    return None
+
+
 def _record_pour_event(
     data: dict,
     keg: dict,
@@ -2817,13 +2860,13 @@ def _parse_beer_csv_rows(file_bytes: bytes):
 
 @app.route("/api/beers/import/csv/preview", methods=["POST"])
 def preview_beer_csv_import():
-    upload = request.files.get("file")
+    upload = _get_request_upload("file")
     if upload is None:
         return jsonify({"error": "No CSV file provided."}), 400
 
     rows, errors = _parse_beer_csv_rows(upload.read())
     return jsonify({
-        "ok": True,
+        "ok": not bool(errors),
         "summary": {"beers": len(rows), "errors": len(errors)},
         "rows": rows,
         "errors": errors,
@@ -2832,7 +2875,7 @@ def preview_beer_csv_import():
 
 @app.route("/api/beers/import/csv", methods=["POST"])
 def import_beer_csv():
-    upload = request.files.get("file")
+    upload = _get_request_upload("file")
     if upload is None:
         return jsonify({"error": "No CSV file provided."}), 400
 
