@@ -3,3 +3,14 @@
 depr/
 bartender/.data/
 bartender/bartender/__pycache__/
+
+# Python build, virtualenv, and test artifacts
+**/.venv/
+**/.tox/
+**/.pytest_cache/
+**/.ruff_cache/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.egg-info/

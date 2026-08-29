@@ -18,16 +18,7 @@
         <select id="user_id" name="user_id" class="form-control" required>
           <option value="">Select a user...</option>
           {% for user in users %}
-          <option
-            value="{{ user.id }}"
-            {%
-            if
-            selected_user_id=""
-            ="user.id"
-            %}selected{%
-            endif
-            %}
-          >
+          <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>
             {{ user.name }} ({{ user.role }})
           </option>
           {% endfor %}

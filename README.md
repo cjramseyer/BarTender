@@ -4,7 +4,7 @@
 [![Release](https://github.com/cjramseyer/BarTender/actions/workflows/deploy.yaml/badge.svg)](https://github.com/cjramseyer/BarTender/actions/workflows/deploy.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This repository is structured as a Home Assistant add-on repository (like keypad-app).
+This repository is a Bar/Beer management app for HomeBrewers and Taprooms
 
 - Add-on source lives in `bartender/`
 - Mobile viewer app lives in `mobile/`
