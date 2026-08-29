@@ -1,0 +1,58 @@
+{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
+%}
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-mark" aria-hidden="true">🍺</div>
+      <h1>Sign in to BarTender</h1>
+      <p class="muted">Choose a team member to continue.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ ingress }}/login" class="auth-form">
+      <div class="form-group">
+        <label for="user_id">Team member</label>
+        <select id="user_id" name="user_id" class="form-control" required>
+          <option value="">Select a user...</option>
+          {% for user in users %}
+          <option
+            value="{{ user.id }}"
+            {%
+            if
+            selected_user_id=""
+            ="user.id"
+            %}selected{%
+            endif
+            %}
+          >
+            {{ user.name }} ({{ user.role }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if require_owner_pin or (selected_user_id and selected_user_id ==
+      'owner' and users|length > 1) %}
+      <div class="form-group">
+        <label for="owner_pin">Owner PIN</label>
+        <input
+          id="owner_pin"
+          name="owner_pin"
+          type="password"
+          class="form-control"
+          placeholder="Enter owner PIN"
+          autocomplete="current-password"
+        />
+      </div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+
+    <div class="auth-footer">
+      <p class="muted">Only configured team members can access the app.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BarTender Login Preview</title>
+    <style>
+      :root {
+        --bg: #f5f6fa;
+        --surface: #ffffff;
+        --surface2: #eef0f5;
+        --border: #d0d5e0;
+        --text: #1a1d27;
+        --text-muted: #6b7280;
+        --primary: #4f79e0;
+        --primary-hover: #3d63c8;
+        --danger: #e03f3f;
+        --secondary: #6b7280;
+        --radius: 8px;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+      [data-theme="dark"] {
+        --bg: #111318;
+        --surface: #1e2333;
+        --surface2: #262c3e;
+        --border: #2e3550;
+        --text: #e8eaf2;
+        --text-muted: #9499b0;
+        --primary: #6b8fef;
+        --primary-hover: #5a7dde;
+        --danger: #e85555;
+        --secondary: #7c8494;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        transition: background 0.2s, color 0.2s;
+      }
+      .auth-shell {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+      }
+      .auth-card {
+        width: min(100%, 460px);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        padding: 2rem 1.5rem;
+      }
+      .auth-header { text-align: center; margin-bottom: 1.25rem; }
+      .auth-mark {
+        width: 64px; height: 64px; display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 50%; background: rgba(79,121,224,0.12); font-size: 2rem; margin-bottom: 0.75rem;
+      }
+      h1 { margin: 0; font-size: 2rem; }
+      .muted { color: var(--text-muted); margin: 0.4rem 0 0; font-size: 0.96rem; }
+      .form-group { margin-bottom: 1rem; }
+      .form-group label {
+        display: block; font-size: 0.87rem; font-weight: 600; margin-bottom: 0.3rem; color: var(--text-muted);
+      }
+      .form-control {
+        width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--surface2); color: var(--text); font-size: 0.95rem;
+      }
+      .auth-form { display: flex; flex-direction: column; gap: 0.5rem; }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+        padding: 0.65rem 1rem; border-radius: var(--radius); border: 1px solid var(--border);
+        background: var(--surface); color: var(--text); cursor: pointer; font-size: 0.95rem; font-weight: 600;
+        text-decoration: none; white-space: nowrap;
+      }
+      .btn-primary {
+        background: var(--primary); color: white; border-color: var(--primary);
+      }
+      .btn-primary:hover { background: var(--primary-hover); }
+      .btn-block { width: 100%; }
+      .auth-footer { margin-top: 1rem; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <div class="auth-shell">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-mark" aria-hidden="true">🍺</div>
+          <h1>Sign in to BarTender</h1>
+          <p class="muted">Choose a team member to continue.</p>
+        </div>
+
+        <form class="auth-form">
+          <div class="form-group">
+            <label for="user_id">Team member</label>
+            <select id="user_id" class="form-control" required>
+              <option value="">Select a user...</option>
+              <option value="owner">Owner (owner)</option>
+              <option value="manager-1">Manager One (manager)</option>
+              <option value="staff-1">Staff One (staff)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        </form>
+
+        <div class="auth-footer">
+          <p class="muted">Only configured team members can access the app.</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const theme = new URLSearchParams(window.location.search).get('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    </script>
+  </body>
+</html>
