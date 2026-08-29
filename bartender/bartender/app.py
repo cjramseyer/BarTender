@@ -101,13 +101,29 @@ app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bartender-dev-secret-change-me")
 
 
+def _normalized_request_path() -> str:
+    raw_path = request.path or "/"
+    ingress_prefix = str(INGRESS_PATH or "").strip()
+    if not ingress_prefix or ingress_prefix == "/":
+        return raw_path
+
+    prefix = ingress_prefix.rstrip("/")
+    if raw_path == prefix or raw_path.startswith(prefix + "/"):
+        return raw_path[len(prefix):] or "/"
+    script_root = str(request.script_root or "").rstrip("/")
+    if script_root and raw_path.startswith(script_root):
+        return raw_path[len(script_root):] or "/"
+    return raw_path
+
+
 @app.before_request
 def require_login_for_web_views():
-    if request.path.startswith("/static/"):
+    normalized_path = _normalized_request_path()
+    if normalized_path.startswith("/static/"):
         return None
-    if request.path in ("/login", "/logout"):
+    if normalized_path in ("/login", "/logout"):
         return None
-    if request.path.startswith("/api/"):
+    if normalized_path.startswith("/api/"):
         return None
     if session.get("user_id"):
         return None
@@ -119,7 +135,7 @@ def enforce_external_api_controls():
     if not EXTERNAL_API_MODE:
         return None
 
-    if not request.path.startswith("/api/"):
+    if not _normalized_request_path().startswith("/api/"):
         return jsonify({"error": "External API listener exposes API routes only."}), 404
 
     data = load_data()

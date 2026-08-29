@@ -56,6 +56,18 @@ def test_valid_user_can_login_from_team_users(tmp_path):
         assert session["user_role"] == "manager"
 
 
+def test_unauthenticated_request_redirects_to_ingress_login_path(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = "/api/hassio_ingress/test-token"
+    app_module.app.config["APPLICATION_ROOT"] = app_module.INGRESS_PATH
+    client = app_module.app.test_client()
+
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/hassio_ingress/test-token/login"
+
+
 def test_owner_requires_pin_when_other_users_exist(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
