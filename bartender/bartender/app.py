@@ -592,24 +592,16 @@ def _ensure_owner_team_user(data: dict) -> None:
         isinstance(user, dict) and str(user.get("role", "")).strip().lower() == "owner"
         for user in users
     )
-    if has_owner:
+    if has_owner or not users:
         data["team_users"] = users
         return
 
-    if not users:
-        users.append({
-            "id": "owner",
-            "name": "Owner",
-            "role": "owner",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-    else:
-        users.insert(0, {
-            "id": "owner",
-            "name": "Owner",
-            "role": "owner",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
+    users.insert(0, {
+        "id": "owner",
+        "name": "Owner",
+        "role": "owner",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
     data["team_users"] = users
 
 
@@ -975,9 +967,12 @@ def _build_dashboard_analytics(data: dict) -> dict:
             continue
         amount_ml = _coerce_float(event.get("amount_ml"), None)
         if amount_ml is None:
+            unit_value = event.get("unit")
+            if not isinstance(unit_value, str):
+                unit_value = None
             amount_ml = _convert_volume(
                 _coerce_float(event.get("amount"), 0.0) or 0.0,
-                event.get("unit"),
+                unit_value,
                 "ml",
             ) or 0.0
         parsed = {
@@ -1498,9 +1493,11 @@ def _apply_pour_to_keg(data: dict, keg: dict, amount: float, pour_unit: str):
 
 
 def _normalize_volume_unit(unit: str | None) -> str:
-    if not unit:
+    if not isinstance(unit, str):
         return ""
     normalized = unit.strip().lower()
+    if not normalized:
+        return ""
     aliases = {
         "floz": "oz",
         "fl oz": "oz",
@@ -1521,11 +1518,14 @@ def _normalize_volume_unit(unit: str | None) -> str:
     return aliases.get(normalized, normalized)
 
 
-def _convert_volume(amount: float, from_unit: str, to_unit: str):
+def _convert_volume(amount: float, from_unit: str | None, to_unit: str):
     source = _normalize_volume_unit(from_unit)
     target = _normalize_volume_unit(to_unit)
     if source == target:
         return amount
+
+    if not source or not target:
+        return None
 
     to_ml = {
         "ml": 1.0,
@@ -2329,7 +2329,31 @@ def api_create_team_user():
     if not name:
         return jsonify({"error": "User name is required."}), 400
 
-    user_id = str(payload.get("id") or payload.get("user_id") or ("owner" if not has_owner else f"user-{abs(hash(name)) % 1000000}")).strip()
+    if not has_owner:
+        owner_placeholder = next(
+            (user for user in users if str(user.get("id", "")).strip().lower() == "owner"),
+            None,
+        )
+        if owner_placeholder is not None:
+            owner_placeholder["name"] = name
+            owner_placeholder["role"] = "owner"
+            owner_placeholder["created_at"] = datetime.now(timezone.utc).isoformat()
+            user = owner_placeholder
+            user_id = "owner"
+        else:
+            user_id = "owner"
+            user = {
+                "id": user_id,
+                "name": name,
+                "role": "owner",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            users.insert(0, user)
+        _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
+        save_data(data)
+        return jsonify({"user": user})
+
+    user_id = str(payload.get("id") or payload.get("user_id") or f"user-{abs(hash(name)) % 1000000}").strip()
     if any(str(existing.get("id", "")).lower() == user_id.lower() for existing in users):
         return jsonify({"error": "A user with that ID already exists."}), 409
 
@@ -2366,11 +2390,11 @@ def api_update_team_user():
         (user for user in users if str(user.get("id", "")).strip().lower() == user_id.lower()),
         None,
     )
-    if matching_user is None:
-        return jsonify({"error": "User not found."}), 404
-
     if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
         return jsonify({"error": "Managers cannot change their own role. Another manager or the owner must do this."}), 403
+
+    if matching_user is None:
+        return jsonify({"error": "User not found."}), 404
 
     if str(matching_user.get("role", "")).strip().lower() == "owner" and current_user.get("role") != "owner":
         return jsonify({"error": "Only the owner can change the owner account."}), 403
