@@ -638,6 +638,44 @@ content %}
       </details>
 
       <details class="settings-collapsible">
+        <summary>Team Access</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Current Team Members</label>
+            <div id="teamUsersList" class="stack-gap-sm" style="margin-top: 8px"></div>
+          </div>
+          <div class="form-group">
+            <label>Invite User</label>
+            <div class="form-row" style="gap: 0.5rem; align-items: end;">
+              <div class="form-group" style="flex: 1; min-width: 180px;">
+                <input
+                  type="text"
+                  id="teamUserName"
+                  class="form-control"
+                  placeholder="Name"
+                />
+              </div>
+              <div class="form-group" style="min-width: 150px;">
+                <select id="teamUserRole" class="form-control">
+                  <option value="staff">Staff</option>
+                  <option value="manager">Manager</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="addTeamUser()">
+                Add User
+              </button>
+            </div>
+            <small class="muted">Owners and managers can manage users. Staff access is restricted to their own account.</small>
+          </div>
+          <div class="form-group">
+            <label>Recent Audit Trail</label>
+            <div id="teamAuditList" class="stack-gap-sm" style="margin-top: 8px"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
         <summary>Analytics</summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
@@ -789,6 +827,83 @@ content %}
   const DEFAULT_ENVIRONMENT_MODE = JSON.parse(
     `{{ (settings.environment_mode or 'production') | tojson }}`,
   );
+  const TEAM_USERS = JSON.parse(
+    `{{ (team_users or []) | tojson }}`,
+  );
+
+  function renderTeamUsers(users = []) {
+    const list = document.getElementById("teamUsersList");
+    const auditList = document.getElementById("teamAuditList");
+    if (!list) return;
+
+    if (!Array.isArray(users) || !users.length) {
+      list.innerHTML = '<p class="muted">No team users yet.</p>';
+      return;
+    }
+
+    list.innerHTML = users
+      .map(
+        (user) => `
+          <div class="settings-user-row" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
+            <div>
+              <strong>${user.name || user.id}</strong>
+              <div class="muted" style="font-size:0.85rem;">${user.role || 'staff'}</div>
+            </div>
+            <span class="badge" style="text-transform: capitalize;">${user.role || 'staff'}</span>
+          </div>
+        `,
+      )
+      .join("");
+
+    if (auditList) {
+      fetch(`${INGRESS}/api/team/audit`, { method: 'GET', headers: { 'Content-Type': 'application/json' }})
+        .then(async (response) => {
+          if (!response.ok) throw new Error('Unable to load audit');
+          const body = await response.json();
+          const entries = Array.isArray(body.audit) ? body.audit : [];
+          if (!entries.length) {
+            auditList.innerHTML = '<p class="muted">No audit events yet.</p>';
+            return;
+          }
+          auditList.innerHTML = entries
+            .slice(0, 5)
+            .map((entry) => `
+              <div class="settings-user-row" style="padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
+                <strong>${entry.action || 'team_action'}</strong>
+                <div class="muted" style="font-size:0.85rem;">${entry.actor_name || entry.actor_id || 'System'} • ${entry.created_at || ''}</div>
+              </div>
+            `)
+            .join("");
+        })
+        .catch(() => {
+          auditList.innerHTML = '<p class="muted">Audit access is restricted.</p>';
+        });
+    }
+  }
+
+  async function addTeamUser() {
+    const name = document.getElementById("teamUserName").value.trim();
+    const role = document.getElementById("teamUserRole").value;
+    if (!name) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, role }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || 'Unable to add user');
+      }
+      document.getElementById('teamUserName').value = '';
+      const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
+      renderTeamUsers(users.users || []);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Unable to add user');
+    }
+  }
 
   function expandAllSettings() {
     document
