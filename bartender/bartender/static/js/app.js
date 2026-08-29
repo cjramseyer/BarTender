@@ -94,7 +94,10 @@ async function submitSetupWizard(event) {
     const usersBody = await usersResponse.json();
     const teamUsers = Array.isArray(usersBody.users) ? usersBody.users : [];
     const hasOwner = teamUsers.some(
-      (user) => String(user.role || "").trim().toLowerCase() === "owner",
+      (user) =>
+        String(user.role || "")
+          .trim()
+          .toLowerCase() === "owner",
     );
 
     if (!hasOwner) {

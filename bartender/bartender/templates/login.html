@@ -1,4 +1,5 @@
-{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content %}
+{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
+%}
 <div class="auth-shell">
   <div class="auth-card">
     <div class="auth-header">
@@ -17,14 +18,33 @@
         <select id="user_id" name="user_id" class="form-control" required>
           <option value="">Select a user...</option>
           {% for user in users %}
-          <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.name }} ({{ user.role }})</option>
+          <option
+            value="{{ user.id }}"
+            {%
+            if
+            selected_user_id=""
+            ="user.id"
+            %}selected{%
+            endif
+            %}
+          >
+            {{ user.name }} ({{ user.role }})
+          </option>
           {% endfor %}
         </select>
       </div>
-      {% if require_owner_pin or (selected_user_id and selected_user_id == 'owner' and users|length > 1) %}
+      {% if require_owner_pin or (selected_user_id and selected_user_id ==
+      'owner' and users|length > 1) %}
       <div class="form-group">
         <label for="owner_pin">Owner PIN</label>
-        <input id="owner_pin" name="owner_pin" type="password" class="form-control" placeholder="Enter owner PIN" autocomplete="current-password" />
+        <input
+          id="owner_pin"
+          name="owner_pin"
+          type="password"
+          class="form-control"
+          placeholder="Enter owner PIN"
+          autocomplete="current-password"
+        />
       </div>
       {% endif %}
       <button type="submit" class="btn btn-primary btn-block">Sign in</button>
