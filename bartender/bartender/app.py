@@ -35,6 +35,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
@@ -97,14 +98,29 @@ STANDARD_KEG_TYPE_CHOICES = [
 ]
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bartender-dev-secret-change-me")
 
 
+def _effective_ingress_path() -> str:
+    for candidate in (
+        INGRESS_PATH,
+        request.headers.get("X-Ingress-Path"),
+        request.headers.get("X-Forwarded-Prefix"),
+        request.script_root,
+    ):
+        raw = str(candidate or "").strip()
+        if not raw or raw == "/":
+            continue
+        return raw.rstrip("/")
+    return ""
+
+
 def _normalized_request_path() -> str:
     raw_path = request.path or "/"
-    ingress_prefix = str(INGRESS_PATH or "").strip()
-    if not ingress_prefix or ingress_prefix == "/":
+    ingress_prefix = _effective_ingress_path()
+    if not ingress_prefix:
         return raw_path
 
     prefix = ingress_prefix.rstrip("/")
@@ -127,6 +143,9 @@ def require_login_for_web_views():
         return None
     if session.get("user_id"):
         return None
+    ingress = _effective_ingress_path()
+    if ingress:
+        return redirect(f"{ingress}/login")
     return redirect(url_for("login_view"))
 
 
@@ -1750,6 +1769,7 @@ def inject_runtime_metadata():
     return {
         "app_version": APP_VERSION,
         "release_highlights": RELEASE_HIGHLIGHTS,
+        "ingress": _effective_ingress_path(),
     }
 
 
@@ -1778,7 +1798,7 @@ def login_view():
                         error=error,
                         selected_user_id=user_id,
                         require_owner_pin=True,
-                        ingress=INGRESS_PATH,
+                        ingress=_effective_ingress_path(),
                     )
 
             session.clear()
@@ -1794,7 +1814,7 @@ def login_view():
         error=error,
         selected_user_id=str(request.form.get("user_id", "") or "").strip() if request.method == "POST" else "",
         require_owner_pin=False,
-        ingress=INGRESS_PATH,
+        ingress=_effective_ingress_path(),
     )
 
 
