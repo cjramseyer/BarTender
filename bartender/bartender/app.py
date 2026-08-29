@@ -2193,6 +2193,210 @@ def api_list_beers():
     return jsonify(beers)
 
 
+@app.route("/api/beers/search")
+def api_search_beers():
+    data = load_data()
+    query = (request.args.get("q") or "").strip().lower()
+    beers = sorted(
+        data.get("beers", []),
+        key=lambda beer: str(beer.get("name", "")).lower(),
+    )
+    if not query:
+        return jsonify(beers[:25])
+
+    filtered = []
+    for beer in beers:
+        haystack = " ".join(
+            [
+                str(beer.get("name", "")),
+                str(beer.get("brewery", "")),
+                str(beer.get("brewer", "")),
+                str(beer.get("type", "")),
+                str(beer.get("notes", "")),
+            ]
+        ).lower()
+        if query in haystack:
+            filtered.append(beer)
+
+    return jsonify(filtered[:25])
+
+
+@app.route("/api/beers/export/csv")
+def export_beers_csv():
+    data = load_data()
+    rows = [BEER_CSV_HEADER]
+    for beer in sorted(data.get("beers", []), key=lambda item: str(item.get("name", "")).lower()):
+        rows.append([
+            beer.get("name", ""),
+            beer.get("type", ""),
+            beer.get("packaging", "kegged"),
+            beer.get("brewer", ""),
+            beer.get("brewery", ""),
+            beer.get("abv", ""),
+            beer.get("ibu", ""),
+            beer.get("brewed_on", ""),
+            beer.get("notes", ""),
+        ])
+    csv_bytes = _rows_to_csv_bytes(rows)
+    return send_file(
+        io.BytesIO(csv_bytes),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="beers.csv",
+    )
+
+
+BEER_CSV_HEADER = [
+    "name",
+    "type",
+    "packaging",
+    "brewer",
+    "brewery",
+    "abv",
+    "ibu",
+    "brewed_on",
+    "notes",
+]
+
+
+def _normalize_csv_header(name: str) -> str:
+    return str(name or "").strip().lower().replace(" ", "_")
+
+
+def _coerce_beer_packaging(value):
+    normalized = str(value or "kegged").strip().lower()
+    aliases = {
+        "kegged": "kegged",
+        "keg": "kegged",
+        "bottled": "bottled_can",
+        "bottle": "bottled_can",
+        "can": "bottled_can",
+        "bottled_can": "bottled_can",
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    return "kegged"
+
+
+def _validate_beer_csv_row(row: dict, row_number: int):
+    beer_name = str(row.get("name", "") or "").strip()
+    if not beer_name:
+        return f"Row {row_number}: Beer name is required."
+
+    packaging = _coerce_beer_packaging(row.get("packaging", "kegged"))
+    if packaging not in {"kegged", "bottled_can"}:
+        return f"Row {row_number}: packaging must be 'kegged' or 'bottled_can'."
+
+    for field in ("abv", "ibu"):
+        raw = str(row.get(field, "") or "").strip()
+        if raw and not re.fullmatch(r"\d+(?:\.\d+)?", raw):
+            return f"Row {row_number}: '{field}' must be numeric or blank."
+
+    return None
+
+
+def _parse_beer_csv_rows(file_bytes: bytes):
+    try:
+        text = file_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = file_bytes.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        return [], ["CSV file is empty or missing a header row."]
+
+    normalized_headers = [_normalize_csv_header(name) for name in reader.fieldnames]
+    unexpected = [name for name in normalized_headers if name not in BEER_CSV_HEADER]
+    if unexpected:
+        return [], [
+            "Unsupported CSV column(s): " + ", ".join(sorted(set(unexpected))) + ". "
+            "Use the exact header set: " + ", ".join(BEER_CSV_HEADER) + "."
+        ]
+
+    missing = [name for name in BEER_CSV_HEADER if name not in normalized_headers and name == "name"]
+    if missing:
+        return [], ["CSV is missing required column 'name'."]
+
+    rows = []
+    errors = []
+    for row_index, row in enumerate(reader, start=2):
+        if not row or not any(str(value or "").strip() for value in row.values()):
+            continue
+
+        normalized = {}
+        for key in BEER_CSV_HEADER:
+            original_value = row.get(next((name for name in reader.fieldnames if _normalize_csv_header(name) == key), key), "")
+            normalized[key] = "" if original_value is None else str(original_value).strip()
+
+        validation_error = _validate_beer_csv_row(normalized, row_index)
+        if validation_error:
+            errors.append(validation_error)
+            continue
+
+        rows.append({
+            "name": normalized.get("name", "").strip(),
+            "type": normalized.get("type", "").strip(),
+            "packaging": _coerce_beer_packaging(normalized.get("packaging", "kegged")),
+            "brewer": normalized.get("brewer", "").strip(),
+            "brewery": normalized.get("brewery", "").strip(),
+            "abv": normalized.get("abv", "").strip(),
+            "ibu": normalized.get("ibu", "").strip(),
+            "brewed_on": normalized.get("brewed_on", "").strip(),
+            "notes": normalized.get("notes", "").strip(),
+        })
+
+    return rows, errors
+
+
+@app.route("/api/beers/import/csv/preview", methods=["POST"])
+def preview_beer_csv_import():
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"error": "No CSV file provided."}), 400
+
+    rows, errors = _parse_beer_csv_rows(upload.read())
+    return jsonify({
+        "ok": True,
+        "summary": {"beers": len(rows), "errors": len(errors)},
+        "rows": rows,
+        "errors": errors,
+    })
+
+
+@app.route("/api/beers/import/csv", methods=["POST"])
+def import_beer_csv():
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"error": "No CSV file provided."}), 400
+
+    rows, errors = _parse_beer_csv_rows(upload.read())
+    if errors:
+        return jsonify({"ok": False, "errors": errors}), 400
+
+    data = load_data()
+    existing_beers = data.setdefault("beers", [])
+    next_id = _next_id(existing_beers)
+    for row in rows:
+        beer = {
+            "id": next_id,
+            "name": row["name"],
+            "type": row["type"],
+            "packaging": row["packaging"],
+            "brewer": row["brewer"],
+            "brewery": row["brewery"],
+            "abv": row["abv"],
+            "ibu": row["ibu"],
+            "brewed_on": row["brewed_on"],
+            "notes": row["notes"],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        existing_beers.append(beer)
+        next_id += 1
+
+    save_data(data)
+    return jsonify({"ok": True, "summary": {"beers": len(rows)}})
+
+
 @app.route("/api/beers", methods=["POST"])
 def api_add_beer():
     data = load_data()

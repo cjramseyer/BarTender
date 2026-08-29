@@ -2,10 +2,34 @@
 %}
 <div class="page-header">
   <h1>🍻 Beers</h1>
-  <button class="btn btn-primary manage-btn" onclick="openAddBeer()">
-    + New Beer
-  </button>
+  <div class="page-header-actions">
+    <button class="btn btn-primary manage-btn" onclick="openAddBeer()">
+      + New Beer
+    </button>
+  </div>
 </div>
+
+<div class="toolbar" style="margin-bottom: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+  <div class="search-box" style="display: flex; gap: 0.5rem; align-items: center; flex: 1; min-width: 280px;">
+    <input
+      id="beerSearchInput"
+      type="search"
+      class="form-control"
+      placeholder="Search by name, brewery, brewer, style..."
+      aria-label="Search beers"
+    />
+    <button class="btn btn-secondary" type="button" onclick="searchBeers()">
+      Search
+    </button>
+  </div>
+  <div class="toolbar-actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+    <a class="btn btn-secondary" href="{{ ingress }}/api/beers/export/csv" target="_blank" rel="noopener noreferrer">Export CSV</a>
+    <label class="btn btn-secondary" for="beerCsvImportFile">Import CSV</label>
+    <input id="beerCsvImportFile" type="file" accept=".csv,text/csv" style="display:none" onchange="importBeerCsvFromFile(event)" />
+  </div>
+</div>
+
+<div id="beerSearchStatus" class="muted" style="margin-bottom: 0.75rem; min-height: 1.25rem;"></div>
 
 <table class="table" id="beersTable">
   <thead>
@@ -22,7 +46,7 @@
       <th>Actions</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody id="beersTableBody">
     {% for beer in beers %}
     <tr data-id="{{ beer.id }}">
       <td>{{ beer.name or '—' }}</td>
@@ -233,6 +257,111 @@
     location.reload();
   }
 
+  function renderBeerRows(beers) {
+    const tableBody = document.getElementById("beersTableBody");
+    if (!tableBody) return;
+
+    if (!beers.length) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="10" class="muted text-center">
+            No beers match your search.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = beers
+      .map(
+        (beer) => `
+          <tr data-id="${beer.id}">
+            <td>${beer.name || "—"}</td>
+            <td>${(beer.packaging || "kegged") === "kegged" ? "Kegged" : "Bottled/Can"}</td>
+            <td>${beer.type || "—"}</td>
+            <td>${beer.brewer || "—"}</td>
+            <td>${beer.brewery || "—"}</td>
+            <td>${beer.abv ? `${beer.abv}%` : "—"}</td>
+            <td>${beer.ibu || "—"}</td>
+            <td>${beer.brewed_on || "—"}</td>
+            <td>${beer.notes || "—"}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="editBeer(${JSON.stringify(beer)})">
+                Edit
+              </button>
+              <button class="btn btn-sm btn-danger" onclick="deleteBeer(${beer.id})">
+                Delete
+              </button>
+            </td>
+          </tr>
+        `,
+      )
+      .join("");
+  }
+
+  async function searchBeers() {
+    const input = document.getElementById("beerSearchInput");
+    const query = input ? input.value.trim() : "";
+    const status = document.getElementById("beerSearchStatus");
+    if (status) status.textContent = "Searching...";
+
+    const response = await fetch(`${INGRESS}/api/beers/search?q=${encodeURIComponent(query)}`);
+    const beers = await response.json();
+    if (!response.ok) {
+      if (status) status.textContent = "Unable to search beers.";
+      return;
+    }
+
+    renderBeerRows(beers || []);
+    if (status) {
+      status.textContent = query ? `Showing ${beers.length} matching beer${beers.length === 1 ? "" : "s"}.` : "Showing recent catalog entries.";
+    }
+  }
+
+  async function importBeerCsvFromFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${INGRESS}/api/beers/import/csv/preview`, {
+      method: "POST",
+      body: formData,
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      const message = result && result.errors && result.errors.length ? result.errors.join("\n") : "Unable to import the CSV file.";
+      alert(message);
+      event.target.value = "";
+      return;
+    }
+
+    const errors = Array.isArray(result.errors) ? result.errors : [];
+    if (errors.length) {
+      alert(errors.join("\n"));
+      event.target.value = "";
+      return;
+    }
+
+    const applyResponse = await fetch(`${INGRESS}/api/beers/import/csv`, {
+      method: "POST",
+      body: formData,
+    });
+    const applyResult = await applyResponse.json();
+    if (!applyResponse.ok) {
+      const message = applyResult && applyResult.errors && applyResult.errors.length ? applyResult.errors.join("\n") : "Unable to apply the CSV import.";
+      alert(message);
+      event.target.value = "";
+      return;
+    }
+
+    alert(`Imported ${applyResult.summary?.beers ?? 0} beer${(applyResult.summary?.beers ?? 0) === 1 ? "" : "s"}.`);
+    event.target.value = "";
+    location.reload();
+  }
+
   async function deleteBeer(id) {
     if (!confirm("Delete this beer?")) return;
     const response = await fetch(`${INGRESS}/api/beers/${id}`, {
@@ -260,6 +389,16 @@
     }
 
     location.reload();
+  }
+
+  const beerSearchInput = document.getElementById("beerSearchInput");
+  if (beerSearchInput) {
+    beerSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        searchBeers();
+      }
+    });
   }
 </script>
 {% endblock %}

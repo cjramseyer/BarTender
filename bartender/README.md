@@ -40,6 +40,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
 - **Beer Catalog** — Manage reusable beer records for consistent keg assignment
+- **Beer CSV Import/Export** — Bulk add or back up catalog entries using a canonical CSV schema with preview validation before apply
 - **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog
 - **Tap Management** — Assign kegs to numbered, labelled tap lines
 - **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
@@ -50,6 +51,35 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
 - **Analytics** — Dashboard summaries for recent pours, near-empty kegs, and depletion forecasting
 - **API Reference + Tester** — Built-in endpoint docs and in-app request tester UI
+
+## Beer Catalog CSV Schema
+
+The Beer Catalog supports a single canonical CSV format for quick bulk updates and backups. The app exports files with the exact header order shown below.
+
+Header row:
+
+```csv
+name,type,packaging,brewer,brewery,abv,ibu,brewed_on,notes
+```
+
+Rules:
+
+- `name` is required for every row.
+- Header names must match exactly, including lowercase spelling.
+- `packaging` must be `kegged` or `bottled_can`.
+- `abv` and `ibu` must be numeric when present.
+- Blank rows are ignored.
+- Unsupported columns or missing required names are rejected in preview before import is applied.
+
+Example:
+
+```csv
+name,type,packaging,brewer,brewery,abv,ibu,brewed_on,notes
+Hazy IPA,IPA,kegged,North Pole,Drift House,6.4,42,2024-01-02,Citrusy
+Session Lager,Lager,bottled_can,West End Brewing,West End,4.8,18,2024-02-03,Clean and crisp
+```
+
+Use the **Export CSV** button in the Beer Catalog to generate a valid file, then re-import it with the **Import CSV** control to bulk-add catalog entries.
 
 ## Recent Changes
 
