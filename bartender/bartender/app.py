@@ -216,6 +216,15 @@ DEFAULT_DATA = {
     "kegs": [],
     "taps": [],
     "pour_events": [],
+    "team_users": [
+        {
+            "id": "owner",
+            "name": "Owner",
+            "role": "owner",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ],
+    "team_audit": [],
 }
 
 
@@ -478,6 +487,49 @@ def _normalize_environment_mode(value) -> str:
     if mode in ("sandbox", "production"):
         return mode
     return "production"
+
+
+def _normalize_team_role(value) -> str:
+    role = str(value or "staff").strip().lower()
+    if role in ("owner", "manager", "staff"):
+        return role
+    return "staff"
+
+
+def _get_current_team_user() -> dict:
+    user_id = str(request.headers.get("X-BarTender-User-Id", "owner") or "owner").strip()
+    role = _normalize_team_role(request.headers.get("X-BarTender-Role", "owner"))
+    name = str(request.headers.get("X-BarTender-Name", user_id or "Owner")).strip() or "Owner"
+    return {"id": user_id or "owner", "name": name, "role": role}
+
+
+def _team_can(role: str, action: str) -> bool:
+    normalized = _normalize_team_role(role)
+    allowed = {
+        "settings": {"owner", "manager"},
+        "team_manage": {"owner", "manager"},
+        "team_view": {"owner", "manager", "staff"},
+        "audit_view": {"owner", "manager"},
+    }
+    return action in allowed and normalized in allowed[action]
+
+
+def _record_team_audit(data: dict, actor: dict, action: str, target: str, details: dict | None = None) -> None:
+    event = {
+        "id": str(int(time.time() * 1000)),
+        "actor_id": actor.get("id", "owner"),
+        "actor_name": actor.get("name", "Owner"),
+        "actor_role": _normalize_team_role(actor.get("role", "owner")),
+        "action": action,
+        "target": target,
+        "details": details or {},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    team_audit = data.setdefault("team_audit", [])
+    if not isinstance(team_audit, list):
+        team_audit = []
+    team_audit.insert(0, event)
+    data["team_audit"] = team_audit[:100]
 
 
 def _normalize_days_left_method(value) -> str:
@@ -1662,6 +1714,7 @@ def settings():
     return render_template(
         "settings.html",
         settings=data["settings"],
+        team_users=data.get("team_users", []),
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         display_port=DISPLAY_PORT,
@@ -1859,7 +1912,25 @@ def api_get_settings():
 @app.route("/api/settings", methods=["POST"])
 def api_save_settings():
     data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
     body = request.get_json(force=True)
+    restricted_owner_only_keys = {
+        "bar_name",
+        "external_api_token",
+        "external_api_read_token",
+        "external_api_write_token",
+    }
+    if current_user.get("role") != "owner":
+        restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
+        if restricted_keys_found:
+            return jsonify({
+                "error": "Insufficient permissions",
+                "restricted_fields": restricted_keys_found,
+            }), 403
+
     allowed = {
         "measurement",
         "theme",
@@ -1994,8 +2065,71 @@ def api_save_settings():
         data["settings"].get("external_api_rate_limit_per_minute")
     )
 
+    _record_team_audit(
+        data,
+        current_user,
+        "settings_updated",
+        "settings",
+        {"bar_name": data["settings"].get("bar_name", "")},
+    )
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/team/users", methods=["GET"])
+def api_get_team_users():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_view"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    users = data.get("team_users", [])
+    if current_user.get("role") == "staff":
+        users = [user for user in users if user.get("id") == current_user.get("id")]
+    return jsonify({"users": users})
+
+
+@app.route("/api/team/users", methods=["POST"])
+def api_create_team_user():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    name = str(payload.get("name", "")).strip()
+    role = _normalize_team_role(payload.get("role"))
+    if not name:
+        return jsonify({"error": "User name is required."}), 400
+
+    user_id = str(payload.get("id") or payload.get("user_id") or f"user-{abs(hash(name)) % 1000000}").strip()
+    users = data.setdefault("team_users", [])
+    if not isinstance(users, list):
+        users = []
+        data["team_users"] = users
+    if any(str(existing.get("id", "")).lower() == user_id.lower() for existing in users):
+        return jsonify({"error": "A user with that ID already exists."}), 409
+
+    user = {
+        "id": user_id,
+        "name": name,
+        "role": role,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    users.append(user)
+    _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
+    save_data(data)
+    return jsonify({"user": user})
+
+
+@app.route("/api/team/audit", methods=["GET"])
+def api_get_team_audit():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "audit_view"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    return jsonify({"audit": data.get("team_audit", [])})
 
 
 @app.route("/api/settings/logo/upload", methods=["POST"])
