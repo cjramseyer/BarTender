@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -184,6 +185,30 @@ def test_manager_can_update_member_role_but_not_owner(tmp_path):
         headers={"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"},
     )
     assert owner_denied.status_code == 403
+
+
+def test_dashboard_analytics_handles_invalid_unit_data(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    recent_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+    data = {
+        "settings": app_module.DEFAULT_DATA["settings"],
+        "kegs": [],
+        "taps": [],
+        "pour_events": [{
+            "created_at": recent_time,
+            "keg_id": "keg-1",
+            "tap_id": "tap-1",
+            "amount": 12,
+            "unit": {"bad": "value"},
+            "source": "manual",
+        }],
+    }
+
+    payload = app_module._build_dashboard_analytics(data)
+
+    assert payload["recent_pour_count"] == 1
+    assert payload["total_pour_count"] == 1
 
 
 def test_audit_retention_days_defaults_and_clips_to_range(tmp_path):
