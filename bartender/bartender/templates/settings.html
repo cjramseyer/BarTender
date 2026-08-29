@@ -645,6 +645,18 @@ content %}
             <div id="teamUsersList" class="stack-gap-sm" style="margin-top: 8px"></div>
           </div>
           <div class="form-group">
+            <label>Owner PIN</label>
+            <input
+              type="password"
+              id="ownerPin"
+              class="form-control"
+              value="{{ settings.owner_pin or '' }}"
+              placeholder="Required when other team members are present"
+              autocomplete="new-password"
+            />
+            <small class="muted">Require this PIN for the owner login when there is more than one team member. Leave blank if you want only the single-owner setup.</small>
+          </div>
+          <div class="form-group">
             <label>Invite User</label>
             <div class="form-row" style="gap: 0.5rem; align-items: end;">
               <div class="form-group" style="flex: 1; min-width: 180px;">
@@ -668,8 +680,27 @@ content %}
             </div>
             <small class="muted">Owners and managers can manage users. Staff access is restricted to their own account.</small>
           </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Audit Trail</summary>
+        <div class="settings-collapsible-body">
           <div class="form-group">
-            <label>Recent Audit Trail</label>
+            <label>Audit Retention (days)</label>
+            <input
+              type="number"
+              id="auditRetentionDays"
+              class="form-control"
+              min="1"
+              max="180"
+              step="1"
+              value="{{ settings.audit_retention_days or 30 }}"
+            />
+            <small class="muted">Keep audit entries for 1–180 days. Default is 30 days.</small>
+          </div>
+          <div class="form-group">
+            <label>All Audit Events</label>
             <div id="teamAuditList" class="stack-gap-sm" style="margin-top: 8px"></div>
           </div>
         </div>
@@ -849,7 +880,15 @@ content %}
               <strong>${user.name || user.id}</strong>
               <div class="muted" style="font-size:0.85rem;">${user.role || 'staff'}</div>
             </div>
-            <span class="badge" style="text-transform: capitalize;">${user.role || 'staff'}</span>
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; justify-content:flex-end;">
+              <select class="form-control team-role-select" data-user-id="${user.id}" style="min-width: 120px;">
+                <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
+                <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Manager</option>
+                <option value="owner" ${user.role === 'owner' ? 'selected' : ''}>Owner</option>
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="updateTeamMemberRole(this)">Update Role</button>
+              <button type="button" class="btn btn-danger btn-sm" data-user-id="${user.id}" onclick="deleteTeamUser(this)">Delete</button>
+            </div>
           </div>
         `,
       )
@@ -866,11 +905,14 @@ content %}
             return;
           }
           auditList.innerHTML = entries
-            .slice(0, 5)
             .map((entry) => `
               <div class="settings-user-row" style="padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
-                <strong>${entry.action || 'team_action'}</strong>
-                <div class="muted" style="font-size:0.85rem;">${entry.actor_name || entry.actor_id || 'System'} • ${entry.created_at || ''}</div>
+                <div style="display:flex; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
+                  <strong>${entry.action || 'team_action'}</strong>
+                  <span class="badge" style="text-transform: capitalize;">${entry.actor_role || 'staff'}</span>
+                </div>
+                <div class="muted" style="font-size:0.85rem; margin-top:0.25rem;">${entry.actor_name || entry.actor_id || 'System'} • ${entry.created_at || ''}</div>
+                <div class="muted" style="font-size:0.8rem; margin-top:0.35rem;">Target: ${entry.target || 'unknown'}${entry.details && Object.keys(entry.details).length ? ` • Details: ${JSON.stringify(entry.details)}` : ''}</div>
               </div>
             `)
             .join("");
@@ -902,6 +944,55 @@ content %}
     } catch (err) {
       console.error(err);
       alert(err.message || 'Unable to add user');
+    }
+  }
+
+  async function updateTeamMemberRole(button) {
+    const userId = button.dataset.userId;
+    const select = document.querySelector(`.team-role-select[data-user-id="${CSS.escape(userId)}"]`);
+    if (!userId || !select) return;
+
+    const role = select.value;
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', user_id: userId, role }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || 'Unable to update user role');
+      }
+      const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
+      renderTeamUsers(users.users || []);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Unable to update user role');
+    }
+  }
+
+  async function deleteTeamUser(button) {
+    const userId = button.dataset.userId;
+    if (!userId) return;
+
+    const confirmed = window.confirm('Delete this team member?');
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || 'Unable to delete user');
+      }
+      const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
+      renderTeamUsers(users.users || []);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Unable to delete user');
     }
   }
 
@@ -1408,6 +1499,7 @@ content %}
         .value,
       external_api_write_token: document.getElementById("externalApiWriteToken")
         .value,
+      owner_pin: document.getElementById("ownerPin") ? document.getElementById("ownerPin").value : "",
       external_api_allowlist_enabled: document.getElementById(
         "externalApiAllowlistEnabled",
       ).checked,
@@ -1426,6 +1518,10 @@ content %}
       environment_mode: environmentModeInput
         ? environmentModeInput.value
         : DEFAULT_ENVIRONMENT_MODE,
+      audit_retention_days: parseInt(
+        document.getElementById("auditRetentionDays").value,
+        10,
+      ),
       analytics_low_keg_threshold_percent: parseInt(
         document.getElementById("analyticsLowThreshold").value,
         10,

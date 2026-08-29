@@ -32,6 +32,7 @@ from flask import (
     jsonify,
     send_file,
     redirect,
+    session,
     url_for,
 )
 
@@ -97,6 +98,20 @@ STANDARD_KEG_TYPE_CHOICES = [
 
 app = Flask(__name__)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bartender-dev-secret-change-me")
+
+
+@app.before_request
+def require_login_for_web_views():
+    if request.path.startswith("/static/"):
+        return None
+    if request.path in ("/login", "/logout"):
+        return None
+    if request.path.startswith("/api/"):
+        return None
+    if session.get("user_id"):
+        return None
+    return redirect(url_for("login_view"))
 
 
 @app.before_request
@@ -188,6 +203,7 @@ DEFAULT_DATA = {
         "external_api_token": "",
         "external_api_read_token": "",
         "external_api_write_token": "",
+        "owner_pin": "",
         "external_api_allowlist_enabled": False,
         "external_api_allowlist": "",
         "external_api_rate_limit_enabled": True,
@@ -207,6 +223,7 @@ DEFAULT_DATA = {
             {"name": "Pint", "amount": 16, "unit": "oz"},
         ],
         "default_pour_preset": "8|oz|Half Pint",
+        "audit_retention_days": 30,
         "analytics_low_keg_threshold_percent": 25,
         "analytics_days_left_method": "trailing_window",
         "analytics_days_left_window_days": 14,
@@ -242,6 +259,8 @@ def load_data() -> dict:
         else:
             for key, value in DEFAULT_DATA["settings"].items():
                 data["settings"].setdefault(key, value)
+
+        _ensure_owner_team_user(data)
 
         setup_default = str(data["settings"].get("bar_name", "")).strip() not in ("", "My Bar")
         data["settings"]["setup_completed"] = _coerce_bool(
@@ -287,6 +306,10 @@ def load_data() -> dict:
         data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
             data["settings"].get("menu_qr_mode")
         )
+        data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
+            data["settings"].get("audit_retention_days")
+        )
+        _prune_team_audit_by_retention(data)
         data["settings"]["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
             data["settings"].get("analytics_low_keg_threshold_percent")
         )
@@ -497,10 +520,62 @@ def _normalize_team_role(value) -> str:
 
 
 def _get_current_team_user() -> dict:
+    session_user_id = str(session.get("user_id", "") or "").strip()
+    session_role = session.get("user_role")
+    session_name = session.get("user_name")
+    if session_user_id:
+        return {
+            "id": session_user_id,
+            "name": str(session_name or session_user_id),
+            "role": _normalize_team_role(session_role),
+        }
+
     user_id = str(request.headers.get("X-BarTender-User-Id", "owner") or "owner").strip()
     role = _normalize_team_role(request.headers.get("X-BarTender-Role", "owner"))
     name = str(request.headers.get("X-BarTender-Name", user_id or "Owner")).strip() or "Owner"
     return {"id": user_id or "owner", "name": name, "role": role}
+
+
+def _find_team_user_by_identifier(users: list[dict], value: str) -> dict | None:
+    lookup = str(value or "").strip()
+    if not lookup:
+        return None
+    lowered = lookup.lower()
+    for user in users:
+        user_id = str(user.get("id", "")).strip()
+        user_name = str(user.get("name", "")).strip()
+        if user_id.lower() == lowered or user_name.lower() == lowered:
+            return user
+    return None
+
+
+def _ensure_owner_team_user(data: dict) -> None:
+    users = data.get("team_users", [])
+    if not isinstance(users, list):
+        users = []
+    has_owner = any(
+        isinstance(user, dict) and str(user.get("role", "")).strip().lower() == "owner"
+        for user in users
+    )
+    if has_owner:
+        data["team_users"] = users
+        return
+
+    if not users:
+        users.append({
+            "id": "owner",
+            "name": "Owner",
+            "role": "owner",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    else:
+        users.insert(0, {
+            "id": "owner",
+            "name": "Owner",
+            "role": "owner",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    data["team_users"] = users
 
 
 def _team_can(role: str, action: str) -> bool:
@@ -512,6 +587,31 @@ def _team_can(role: str, action: str) -> bool:
         "audit_view": {"owner", "manager"},
     }
     return action in allowed and normalized in allowed[action]
+
+
+def _prune_team_audit_by_retention(data: dict) -> None:
+    team_audit = data.get("team_audit", [])
+    if not isinstance(team_audit, list):
+        data["team_audit"] = []
+        return
+
+    settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+    retention_days = _normalize_audit_retention_days(settings.get("audit_retention_days", 30))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    filtered = []
+    for entry in team_audit:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            entry_created = datetime.fromisoformat(str(entry.get("created_at", "")).replace("Z", "+00:00"))
+        except ValueError:
+            filtered.append(entry)
+            continue
+        if entry_created.tzinfo is None:
+            entry_created = entry_created.replace(tzinfo=timezone.utc)
+        if entry_created >= cutoff:
+            filtered.append(entry)
+    data["team_audit"] = filtered[:1000]
 
 
 def _record_team_audit(data: dict, actor: dict, action: str, target: str, details: dict | None = None) -> None:
@@ -528,8 +628,12 @@ def _record_team_audit(data: dict, actor: dict, action: str, target: str, detail
     team_audit = data.setdefault("team_audit", [])
     if not isinstance(team_audit, list):
         team_audit = []
+    _prune_team_audit_by_retention(data)
+    team_audit = data["team_audit"]
+    if not isinstance(team_audit, list):
+        team_audit = []
     team_audit.insert(0, event)
-    data["team_audit"] = team_audit[:100]
+    data["team_audit"] = team_audit[:1000]
 
 
 def _normalize_days_left_method(value) -> str:
@@ -639,11 +743,25 @@ def _normalize_external_api_token(value) -> str:
     return token
 
 
+def _normalize_owner_pin(value) -> str:
+    pin = str(value or "").strip()
+    if len(pin) > 32:
+        pin = pin[:32]
+    return pin
+
+
 def _normalize_external_api_rate_limit_per_minute(value) -> int:
     parsed = _coerce_int(value, DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE)
     if parsed is None:
         return DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE
     return max(1, min(5000, parsed))
+
+
+def _normalize_audit_retention_days(value) -> int:
+    parsed = _coerce_int(value, 30)
+    if parsed is None:
+        return 30
+    return max(1, min(180, parsed))
 
 
 def _normalize_ip_allowlist_text(value) -> str:
@@ -1619,6 +1737,57 @@ def inject_runtime_metadata():
     }
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login_view():
+    data = load_data()
+    team_users = data.get("team_users", [])
+    error = None
+
+    if request.method == "POST":
+        user_id = str(request.form.get("user_id", "") or "").strip()
+        matched_user = _find_team_user_by_identifier(team_users, user_id)
+        if matched_user is None:
+            error = "User not found. Choose a valid team member."
+        else:
+            selected_role = _normalize_team_role(matched_user.get("role", "staff"))
+            if selected_role == "owner" and len(team_users) > 1:
+                expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
+                supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
+                if not expected_pin or not secrets.compare_digest(expected_pin, supplied_pin):
+                    error = "Owner PIN required when additional team members are configured."
+                    return render_template(
+                        "login.html",
+                        settings=data["settings"],
+                        users=team_users,
+                        error=error,
+                        selected_user_id=user_id,
+                        require_owner_pin=True,
+                        ingress=INGRESS_PATH,
+                    )
+
+            session.clear()
+            session["user_id"] = str(matched_user.get("id", "")).strip() or user_id
+            session["user_role"] = selected_role
+            session["user_name"] = str(matched_user.get("name", session["user_id"]))
+            return redirect(url_for("index"))
+
+    return render_template(
+        "login.html",
+        settings=data["settings"],
+        users=team_users,
+        error=error,
+        selected_user_id=str(request.form.get("user_id", "") or "").strip() if request.method == "POST" else "",
+        require_owner_pin=False,
+        ingress=INGRESS_PATH,
+    )
+
+
+@app.route("/logout")
+def logout_view():
+    session.clear()
+    return redirect(url_for("login_view"))
+
+
 # ---------------------------------------------------------------------------
 # Routes – pages
 # ---------------------------------------------------------------------------
@@ -1922,6 +2091,7 @@ def api_save_settings():
         "external_api_token",
         "external_api_read_token",
         "external_api_write_token",
+        "owner_pin",
     }
     if current_user.get("role") != "owner":
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -1941,10 +2111,12 @@ def api_save_settings():
         "external_api_token",
         "external_api_read_token",
         "external_api_write_token",
+        "owner_pin",
         "external_api_allowlist_enabled",
         "external_api_allowlist",
         "external_api_rate_limit_enabled",
         "external_api_rate_limit_per_minute",
+        "audit_retention_days",
         "api_reference_enabled",
         "pour_mode",
         "environment_mode",
@@ -2050,6 +2222,9 @@ def api_save_settings():
     data["settings"]["external_api_write_token"] = _normalize_external_api_token(
         data["settings"].get("external_api_write_token", "")
     )
+    data["settings"]["owner_pin"] = _normalize_owner_pin(
+        data["settings"].get("owner_pin", "")
+    )
     data["settings"]["external_api_allowlist_enabled"] = _coerce_bool(
         data["settings"].get("external_api_allowlist_enabled"),
         False,
@@ -2063,6 +2238,9 @@ def api_save_settings():
     )
     data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
         data["settings"].get("external_api_rate_limit_per_minute")
+    )
+    data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
+        data["settings"].get("audit_retention_days")
     )
 
     _record_team_audit(
@@ -2097,16 +2275,25 @@ def api_create_team_user():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     payload = request.get_json(silent=True) or {}
-    name = str(payload.get("name", "")).strip()
-    role = _normalize_team_role(payload.get("role"))
-    if not name:
-        return jsonify({"error": "User name is required."}), 400
+    if payload.get("action") == "delete":
+        return api_delete_team_user()
+    if payload.get("action") == "update":
+        return api_update_team_user()
 
-    user_id = str(payload.get("id") or payload.get("user_id") or f"user-{abs(hash(name)) % 1000000}").strip()
+    name = str(payload.get("name", "")).strip()
     users = data.setdefault("team_users", [])
     if not isinstance(users, list):
         users = []
         data["team_users"] = users
+    has_owner = any(
+        isinstance(existing, dict) and str(existing.get("role", "")).strip().lower() == "owner"
+        for existing in users
+    )
+    role = "owner" if not has_owner else _normalize_team_role(payload.get("role"))
+    if not name:
+        return jsonify({"error": "User name is required."}), 400
+
+    user_id = str(payload.get("id") or payload.get("user_id") or ("owner" if not has_owner else f"user-{abs(hash(name)) % 1000000}")).strip()
     if any(str(existing.get("id", "")).lower() == user_id.lower() for existing in users):
         return jsonify({"error": "A user with that ID already exists."}), 409
 
@@ -2120,6 +2307,92 @@ def api_create_team_user():
     _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
     save_data(data)
     return jsonify({"user": user})
+
+
+@app.route("/api/team/users/update", methods=["POST"])
+def api_update_team_user():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    user_id = str(payload.get("user_id") or payload.get("id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "User ID is required."}), 400
+
+    requested_role = _normalize_team_role(payload.get("role"))
+    users = data.get("team_users", [])
+    if not isinstance(users, list):
+        return jsonify({"error": "Team users data is invalid."}), 400
+
+    matching_user = next(
+        (user for user in users if str(user.get("id", "")).strip().lower() == user_id.lower()),
+        None,
+    )
+    if matching_user is None:
+        return jsonify({"error": "User not found."}), 404
+
+    if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
+        return jsonify({"error": "Managers cannot change their own role. Another manager or the owner must do this."}), 403
+
+    if str(matching_user.get("role", "")).strip().lower() == "owner" and current_user.get("role") != "owner":
+        return jsonify({"error": "Only the owner can change the owner account."}), 403
+
+    if current_user.get("role") == "manager" and requested_role == "owner":
+        return jsonify({"error": "Only the owner can promote someone to owner."}), 403
+
+    if current_user.get("role") == "manager" and str(matching_user.get("role", "")).strip().lower() == "owner":
+        return jsonify({"error": "Only the owner can change the owner account."}), 403
+
+    if requested_role == "owner" and current_user.get("role") != "owner":
+        return jsonify({"error": "Only the owner can promote someone to owner."}), 403
+
+    previous_role = str(matching_user.get("role", "staff")).strip().lower()
+    matching_user["role"] = requested_role
+    _record_team_audit(
+        data,
+        current_user,
+        "user_role_updated",
+        user_id,
+        {"from_role": previous_role, "to_role": requested_role},
+    )
+    save_data(data)
+    return jsonify({"user": matching_user})
+
+
+@app.route("/api/team/users", methods=["DELETE"])
+def api_delete_team_user_http_forbidden():
+    return jsonify({"error": "Team member deletion is only supported from the UI."}), 405
+
+
+@app.route("/api/team/users/delete", methods=["POST"])
+def api_delete_team_user():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    user_id = str(payload.get("user_id") or payload.get("id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "User ID is required."}), 400
+
+    users = data.get("team_users", [])
+    if not isinstance(users, list):
+        return jsonify({"error": "Team users data is invalid."}), 400
+
+    remaining = [user for user in users if str(user.get("id", "")).strip() != user_id]
+    if len(remaining) == len(users):
+        return jsonify({"error": "User not found."}), 404
+
+    if str(current_user.get("id", "")).lower() == user_id.lower():
+        return jsonify({"error": "You cannot delete the currently signed-in user."}), 400
+
+    data["team_users"] = remaining
+    _record_team_audit(data, current_user, "user_deleted", user_id, {"deleted_user_id": user_id})
+    save_data(data)
+    return jsonify({"deleted": True, "user_id": user_id})
 
 
 @app.route("/api/team/audit", methods=["GET"])

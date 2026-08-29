@@ -90,6 +90,28 @@ async function submitSetupWizard(event) {
       throw new Error(`Setup save failed: ${response.status}`);
     }
 
+    const usersResponse = await fetch(`${ingress}/api/team/users`);
+    const usersBody = await usersResponse.json();
+    const teamUsers = Array.isArray(usersBody.users) ? usersBody.users : [];
+    const hasOwner = teamUsers.some(
+      (user) => String(user.role || "").trim().toLowerCase() === "owner",
+    );
+
+    if (!hasOwner) {
+      const ownerResponse = await fetch(`${ingress}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Owner",
+          role: "owner",
+        }),
+      });
+      const ownerBody = await ownerResponse.json();
+      if (!ownerResponse.ok) {
+        throw new Error(ownerBody.error || "Unable to create owner user");
+      }
+    }
+
     if (appVersion) {
       localStorage.setItem("bartender_seen_version", appVersion);
     }
