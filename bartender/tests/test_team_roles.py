@@ -115,3 +115,97 @@ def test_owner_can_change_bar_name_and_api_tokens(tmp_path):
     assert payload["bar_name"] == "Owner Bar"
     assert payload["external_api_read_token"] == "read-token"
     assert payload["external_api_write_token"] == "write-token"
+
+
+def test_first_created_user_defaults_to_owner(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({"settings": app_module.DEFAULT_DATA["settings"], "team_users": [], "team_audit": []})
+
+    response = client.post(
+        "/api/team/users",
+        json={"name": "First Operator", "role": "staff"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["user"]["role"] == "owner"
+    assert payload["user"]["id"] == "owner"
+
+
+def test_manager_can_update_member_role_but_not_owner(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": app_module.DEFAULT_DATA["settings"],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "staff-1", "name": "Staff One", "role": "staff", "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [],
+    })
+
+    response = client.post(
+        "/api/team/users",
+        json={"action": "update", "user_id": "staff-1", "role": "manager"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["user"]["role"] == "manager"
+
+    allowed_manager_update = client.post(
+        "/api/team/users",
+        json={"action": "update", "user_id": "staff-1", "role": "manager"},
+        headers={"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"},
+    )
+    assert allowed_manager_update.status_code == 200
+
+    manager_demote_other_manager = client.post(
+        "/api/team/users",
+        json={"action": "update", "user_id": "manager-1", "role": "staff"},
+        headers={"X-BarTender-User-Id": "manager-2", "X-BarTender-Role": "manager"},
+    )
+    assert manager_demote_other_manager.status_code == 200
+
+    self_change_denied = client.post(
+        "/api/team/users",
+        json={"action": "update", "user_id": "manager-2", "role": "staff"},
+        headers={"X-BarTender-User-Id": "manager-2", "X-BarTender-Role": "manager"},
+    )
+    assert self_change_denied.status_code == 403
+
+    owner_denied = client.post(
+        "/api/team/users",
+        json={"action": "update", "user_id": "owner", "role": "staff"},
+        headers={"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"},
+    )
+    assert owner_denied.status_code == 403
+
+
+def test_audit_retention_days_defaults_and_clips_to_range(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": {
+            **app_module.DEFAULT_DATA["settings"],
+            "audit_retention_days": 500,
+        },
+        "team_users": [{"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"}],
+        "team_audit": [],
+    })
+
+    response = client.post(
+        "/api/settings",
+        json={"audit_retention_days": 200},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["audit_retention_days"] == 180
+
+    data = app_module.load_data()
+    assert data["settings"]["audit_retention_days"] == 180
