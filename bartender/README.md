@@ -37,7 +37,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
   - Legacy shared token supported for compatibility
 - Optional IP/CIDR allowlist for trusted client networks.
 - Configurable per-minute rate limiting.
-- Use **Settings -> Features -> Test External API Access** to validate config.
+- Use **Settings -> API Settings -> Test External API Access** to validate config.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
 

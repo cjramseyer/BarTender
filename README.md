@@ -95,7 +95,7 @@ No required configuration. Optional options can be set in the add-on configurati
 - `8100` (exposed) — Read-only display/menu endpoints.
 - `8110` (exposed) — External API listener for integrations.
 
-External API security is configured in **Settings -> Features**:
+External API security is configured in **Settings -> API Settings**:
 
 - Scoped token authentication (`Authorization: Bearer <token>` or `X-API-Token`).
   - Read token: GET/HEAD/OPTIONS

@@ -1,6 +1,6 @@
 # BarTender Core App and Add-on Documentation
 
-Last updated: 2026-08-22
+Last updated: 2026-09-01
 Doc scope: Home Assistant add-on (web app + display service)
 
 ## Overview
@@ -70,6 +70,7 @@ Home Assistant add-on metadata:
 - declared ports:
   - 8099/tcp (management app)
   - 8100/tcp (display app)
+  - 8110/tcp (external integrations API)
 
 Runtime environment variables (set by run.sh):
 
@@ -77,6 +78,8 @@ Runtime environment variables (set by run.sh):
 - DATA_DIR: /data
 - PORT: 8099
 - DISPLAY_PORT: 8100
+- EXTERNAL_API_MODE: enables external API-only listener mode.
+- EXTERNAL_API_PORT: external integrations API port (default 8110).
 
 ## API Reference
 
@@ -108,7 +111,7 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name, bar_logo_url, dashboard_manage_button_position, bar_stock_enabled, api_reference_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset.
+- Accepted keys: measurement, theme, bar_name, bar_logo_url, external_base_url, external_api_token_auth_enabled, external_api_token, external_api_read_token, external_api_write_token, owner_pin, external_api_allowlist_enabled, external_api_allowlist, external_api_rate_limit_enabled, external_api_rate_limit_per_minute, audit_retention_days, api_reference_enabled, pour_mode, environment_mode, setup_completed, dashboard_manage_button_position, bar_stock_enabled, analytics_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset, analytics_low_keg_threshold_percent, analytics_days_left_method, analytics_days_left_window_days.
 - Request example:
 
 ```json
