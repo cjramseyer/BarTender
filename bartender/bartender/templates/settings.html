@@ -87,6 +87,18 @@ content %}
 
   <div class="card settings-card settings-sections-card">
     <form id="settingsForm" onsubmit="saveSettings(event)">
+      {% if owner_pin_recovery_required %}
+      <div class="form-group settings-warning-block" style="margin-bottom: 1rem">
+        <label>Owner Recovery Mode</label>
+        <p class="muted" style="margin-top: 0.35rem">
+          This installation has multiple team members but no owner PIN yet.
+          Save an Owner PIN below to restore normal access.
+        </p>
+        <p class="muted" style="margin-top: 0.25rem">
+          Until a PIN is saved, other pages and non-settings actions stay locked.
+        </p>
+      </div>
+      {% endif %}
       <details class="settings-collapsible" open>
         <summary>General</summary>
         <div class="settings-collapsible-body">
@@ -779,8 +791,19 @@ content %}
 
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Settings</button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          onclick="resetSettingsToDefaults()"
+        >
+          Reset Settings to Defaults
+        </button>
         <span id="saveMsg" class="save-msg"></span>
       </div>
+      <p class="muted" style="margin-top: 0.65rem">
+        This resets settings only. Beers, kegs, taps, team users, and audit history are kept.
+        The app will return to first-time setup defaults.
+      </p>
     </form>
   </div>
 
@@ -798,6 +821,26 @@ content %}
           <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
             >Export Archive (.zip)</a
           >
+        </div>
+        <div class="form-group settings-warning-block" style="margin-top: 1rem">
+          <label>Factory Reset All Data</label>
+          <p class="muted" style="margin-top: 0.35rem">
+            This permanently removes settings, beers, kegs, taps, team users, audit history,
+            and uploaded logos.
+          </p>
+          <p class="muted" style="margin-top: 0.25rem">
+            Export a backup first if you may need to restore this installation later.
+          </p>
+          <div class="form-actions" style="margin-top: 0.75rem">
+            <button
+              type="button"
+              class="btn btn-danger"
+              onclick="factoryResetAllData()"
+            >
+              Factory Reset All Data
+            </button>
+            <span id="factoryResetMsg" class="save-msg"></span>
+          </div>
         </div>
       </div>
     </details>
@@ -1348,6 +1391,68 @@ content %}
       console.error("Unable to reset keg types", err);
       if (msg) {
         msg.textContent = "Unable to reset keg types. Try again.";
+      }
+    }
+  }
+
+  async function resetSettingsToDefaults() {
+    const msg = document.getElementById("saveMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset all settings to built-in defaults? This keeps beers, kegs, taps, team users, and audit history.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/reset`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Reset failed: ${res.status}`);
+      }
+
+      if (msg) {
+        msg.textContent = "✓ Settings reset. Reloading...";
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error("Unable to reset settings", err);
+      if (msg) {
+        msg.textContent = "Reset failed";
+      }
+    }
+  }
+
+  async function factoryResetAllData() {
+    const msg = document.getElementById("factoryResetMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmation = window.prompt(
+      'Type RESET ALL DATA to permanently erase all BarTender data after exporting a backup.',
+      "",
+    );
+    if (confirmation === null) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `Reset failed: ${res.status}`);
+      }
+
+      if (msg) {
+        msg.textContent = "✓ Factory reset complete. Reloading...";
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error("Unable to factory reset data", err);
+      if (msg) {
+        msg.textContent = err.message || "Factory reset failed";
       }
     }
   }
