@@ -296,10 +296,11 @@ DEFAULT_DATA = {
         "keg_type_choices": STANDARD_KEG_TYPE_CHOICES,
         "menu_qr_mode": "both",
         "pour_options": [
-            {"name": "Half Pint", "amount": 8, "unit": "oz"},
             {"name": "Pint", "amount": 16, "unit": "oz"},
+            {"name": "Half Pint", "amount": 8, "unit": "oz"},
+            {"name": "Taste", "amount": 2, "unit": "oz"},
         ],
-        "default_pour_preset": "8|oz|Half Pint",
+        "default_pour_preset": "16|oz|Pint",
         "audit_retention_days": 30,
         "analytics_low_keg_threshold_percent": 25,
         "analytics_days_left_method": "trailing_window",
@@ -1336,12 +1337,14 @@ def _default_volume_unit(measurement: str) -> str:
 def _default_pour_options(measurement: str) -> list[dict]:
     if measurement == "metric":
         return [
-            {"name": "Half Pint", "amount": 237, "unit": "ml"},
             {"name": "Pint", "amount": 473, "unit": "ml"},
+            {"name": "Half Pint", "amount": 237, "unit": "ml"},
+            {"name": "Taste", "amount": 59, "unit": "ml"},
         ]
     return [
-        {"name": "Half Pint", "amount": 8, "unit": "oz"},
         {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Taste", "amount": 2, "unit": "oz"},
     ]
 
 
@@ -1390,6 +1393,13 @@ def _parse_pour_preset_value(value: str):
     return amount, unit, name
 
 
+def _preferred_default_pour_preset(pour_options: list[dict]) -> str:
+    for option in pour_options:
+        if str(option.get("name", "")).strip().lower() == "pint":
+            return _pour_option_value(option)
+    return _pour_option_value(pour_options[0])
+
+
 def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str:
     if not pour_options:
         return ""
@@ -1410,7 +1420,7 @@ def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str
             ):
                 return _pour_option_value(option)
 
-    return _pour_option_value(pour_options[0])
+    return _preferred_default_pour_preset(pour_options)
 
 
 def _normalize_keg_type_choices(raw_choices, default_type: str) -> list[str]:

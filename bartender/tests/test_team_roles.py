@@ -137,6 +137,31 @@ def test_default_keg_type_prefers_corny_and_normalizes_full_size_label(tmp_path)
     assert reloaded["settings"]["default_keg_type"] == "Full Size (1/2 bbl, 15.5 gal)"
 
 
+def test_default_pour_preset_prefers_pint_and_includes_taste(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+
+    assert data["settings"]["default_pour_preset"] == "16|oz|Pint"
+    assert data["settings"]["pour_options"] == [
+        {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Taste", "amount": 2, "unit": "oz"},
+    ]
+
+    data["settings"]["pour_options"] = [
+        {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Taste", "amount": 2, "unit": "oz"},
+    ]
+    data["settings"]["default_pour_preset"] = ""
+    app_module.save_data(data)
+
+    reloaded = app_module.load_data()
+
+    assert reloaded["settings"]["default_pour_preset"] == "16|oz|Pint"
+
+
 def test_first_created_user_defaults_to_owner(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
