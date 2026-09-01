@@ -118,6 +118,148 @@ def test_owner_can_change_bar_name_and_api_tokens(tmp_path):
     assert payload["external_api_write_token"] == "write-token"
 
 
+def test_default_keg_type_prefers_corny_and_normalizes_full_size_label(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+
+    assert data["settings"]["default_keg_type"] == "Corny (5 gal)"
+    assert data["settings"]["keg_type_choices"][0] == "Corny (5 gal)"
+    assert "Full Size (1/2 bbl, 15.5 gal)" in data["settings"]["keg_type_choices"]
+
+    data["settings"]["keg_type_choices"] = ["1/2 bbl (15.5 gal)", "Corny (5 gal)"]
+    data["settings"]["default_keg_type"] = "1/2 bbl (15.5 gal)"
+    app_module.save_data(data)
+
+    reloaded = app_module.load_data()
+
+    assert reloaded["settings"]["keg_type_choices"][0] == "Full Size (1/2 bbl, 15.5 gal)"
+    assert reloaded["settings"]["default_keg_type"] == "Full Size (1/2 bbl, 15.5 gal)"
+
+
+def test_default_pour_preset_prefers_pint_and_includes_taste(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+
+    assert data["settings"]["default_pour_preset"] == "16|oz|Pint"
+    assert data["settings"]["pour_options"] == [
+        {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Taste", "amount": 2, "unit": "oz"},
+    ]
+
+    data["settings"]["pour_options"] = [
+        {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Taste", "amount": 2, "unit": "oz"},
+    ]
+    data["settings"]["default_pour_preset"] = ""
+    app_module.save_data(data)
+
+    reloaded = app_module.load_data()
+
+    assert reloaded["settings"]["default_pour_preset"] == "16|oz|Pint"
+
+
+def test_owner_can_reset_settings_without_clearing_inventory_or_team(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": {
+            **app_module.DEFAULT_DATA["settings"],
+            "bar_name": "Busy Bar",
+            "theme": "dark",
+            "owner_pin": "2468",
+            "setup_completed": True,
+            "default_keg_type": "Full Size (1/2 bbl, 15.5 gal)",
+            "default_pour_preset": "8|oz|Half Pint",
+        },
+        "beers": [{"id": 1, "name": "Amber Ale"}],
+        "kegs": [{"id": 1, "name": "Keg 1"}],
+        "taps": [{"id": 1, "name": "Tap 1"}],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [],
+    })
+
+    response = client.post(
+        "/api/settings/reset",
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["bar_name"] == "My Bar"
+    assert payload["theme"] == "light"
+    assert payload["setup_completed"] is False
+    assert payload["default_keg_type"] == "Corny (5 gal)"
+    assert payload["default_pour_preset"] == "16|oz|Pint"
+
+    reloaded = app_module.load_data()
+    assert len(reloaded["beers"]) == 1
+    assert reloaded["beers"][0]["id"] == 1
+    assert reloaded["beers"][0]["name"] == "Amber Ale"
+    assert len(reloaded["kegs"]) == 1
+    assert reloaded["kegs"][0]["id"] == 1
+    assert reloaded["kegs"][0]["name"] == "Keg 1"
+    assert len(reloaded["taps"]) == 1
+    assert reloaded["taps"][0]["id"] == 1
+    assert reloaded["taps"][0]["name"] == "Tap 1"
+    assert len(reloaded["team_users"]) == 2
+    assert reloaded["team_audit"][0]["action"] == "settings_reset"
+
+
+def test_owner_can_factory_reset_all_data(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    uploaded_logo = app_module.UPLOADS_DIR / "bar-logo.png"
+    uploaded_logo.write_bytes(b"png")
+
+    app_module.save_data({
+        "settings": {
+            **app_module.DEFAULT_DATA["settings"],
+            "bar_name": "Busy Bar",
+            "theme": "dark",
+            "bar_logo_url": "media/bar-logo?v=123",
+            "owner_pin": "2468",
+            "setup_completed": True,
+        },
+        "beers": [{"id": 1, "name": "Amber Ale"}],
+        "kegs": [{"id": 1, "name": "Keg 1"}],
+        "taps": [{"id": 1, "name": "Tap 1"}],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [{"id": "1", "action": "settings_updated"}],
+    })
+
+    response = client.post(
+        "/api/reset",
+        json={"confirmation": "RESET ALL DATA"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["bar_name"] == "My Bar"
+    assert reloaded["settings"]["setup_completed"] is False
+    assert reloaded["beers"] == []
+    assert reloaded["kegs"] == []
+    assert reloaded["taps"] == []
+    assert len(reloaded["team_users"]) == 1
+    assert reloaded["team_users"][0]["role"] == "owner"
+    assert reloaded["team_audit"] == []
+    assert not uploaded_logo.exists()
+
+
 def test_first_created_user_defaults_to_owner(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
