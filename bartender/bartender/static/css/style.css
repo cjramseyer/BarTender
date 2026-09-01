@@ -221,6 +221,35 @@ body {
   gap: 0.35rem;
 }
 
+.nav-menu-section {
+  padding: 0.25rem 0.35rem 0.35rem;
+}
+
+.nav-menu-section-title {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.nav-menu-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nav-menu-checkbox input {
+  width: 0.95rem;
+  height: 0.95rem;
+  accent-color: var(--primary);
+}
+
 .nav-menu-item {
   display: inline-flex;
   align-items: center;
@@ -1145,6 +1174,18 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   margin-bottom: 0;
 }
 
+.settings-side-column {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.settings-panel-title {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+}
+
 .settings-collapsible {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1211,22 +1252,27 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 
   .settings-sections-card {
     grid-column: 1;
-    grid-row: 1 / span 3;
+  }
+
+  .settings-side-column {
+    grid-column: 2;
+    align-content: start;
   }
 
   .settings-external-card {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: auto;
+  }
+
+  .settings-team-card {
+    grid-column: auto;
   }
 
   .settings-export-card {
-    grid-column: 2;
-    grid-row: 2;
+    grid-column: auto;
   }
 
   .settings-import-card {
-    grid-column: 2;
-    grid-row: 3;
+    grid-column: auto;
   }
 }
 

@@ -17,12 +17,40 @@ function closeModal(id) {
   if (modal) modal.classList.remove("is-open");
 }
 
+async function toggleNavSetting(settingName, checkbox) {
+  const ingress = window.BARTENDER_INGRESS || "";
+  const enabled = Boolean(checkbox && checkbox.checked);
+  const payload = {};
+  payload[settingName] = enabled;
+
+  try {
+    const response = await fetch(`${ingress}/api/settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update ${settingName}: ${response.status}`);
+    }
+
+    location.reload();
+  } catch (err) {
+    console.error(err);
+    if (checkbox) {
+      checkbox.checked = !enabled;
+    }
+  }
+}
+
 function setNavDropdownState(menu, isOpen) {
   if (!menu) {
     return;
   }
 
-  const button = menu.querySelector("[data-nav-dropdown-toggle]");
+  const button = menu.querySelector(
+    "[data-nav-dropdown-toggle], [data-nav-user-toggle]",
+  );
   menu.classList.toggle("is-open", isOpen);
   if (button) {
     button.setAttribute("aria-expanded", String(isOpen));
@@ -30,18 +58,24 @@ function setNavDropdownState(menu, isOpen) {
 }
 
 function closeNavDropdowns(exceptMenu) {
-  document.querySelectorAll("[data-nav-dropdown]").forEach((menu) => {
-    if (menu !== exceptMenu) {
-      setNavDropdownState(menu, false);
-    }
-  });
+  document
+    .querySelectorAll("[data-nav-dropdown], [data-nav-user-menu]")
+    .forEach((menu) => {
+      if (menu !== exceptMenu) {
+        setNavDropdownState(menu, false);
+      }
+    });
 }
 
 // Close modal when clicking overlay background
 document.addEventListener("click", (e) => {
-  const dropdownToggle = e.target.closest("[data-nav-dropdown-toggle]");
+  const dropdownToggle = e.target.closest(
+    "[data-nav-dropdown-toggle], [data-nav-user-toggle]",
+  );
   if (dropdownToggle) {
-    const menu = dropdownToggle.closest("[data-nav-dropdown]");
+    const menu = dropdownToggle.closest(
+      "[data-nav-dropdown], [data-nav-user-menu]",
+    );
     if (menu) {
       const isOpen = !menu.classList.contains("is-open");
       closeNavDropdowns(menu);
@@ -50,7 +84,7 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  if (!e.target.closest("[data-nav-dropdown]")) {
+  if (!e.target.closest("[data-nav-dropdown], [data-nav-user-menu]")) {
     closeNavDropdowns();
   }
 

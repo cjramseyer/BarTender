@@ -179,9 +179,12 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "nav-menu-button" in body
+    assert "View" in body
+    assert "Bar Stock" in body
+    assert "API Reference" in body
+    assert "toggleNavSetting" in body
     assert "View Display" in body
     assert "Printable Menu" in body
-    assert "Settings" in body
     assert "nav-avatar-button" in body
     assert "Owner" in body
     assert "Log out" in body
