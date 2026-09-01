@@ -132,6 +132,13 @@ def _normalized_request_path() -> str:
     return raw_path
 
 
+def _owner_pin_recovery_needed(data: dict) -> bool:
+    users = data.get("team_users", [])
+    if not isinstance(users, list) or len(users) <= 1:
+        return False
+    return not _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
+
+
 @app.before_request
 def require_login_for_web_views():
     normalized_path = _normalized_request_path()
@@ -147,6 +154,37 @@ def require_login_for_web_views():
     if ingress:
         return redirect(f"{ingress}/login")
     return redirect(url_for("login_view"))
+
+
+@app.before_request
+def enforce_owner_pin_recovery():
+    session_user_id = str(session.get("user_id", "") or "").strip()
+    if not session_user_id:
+        return None
+    if _normalize_team_role(session.get("user_role")) != "owner":
+        return None
+    if not session.get("owner_pin_recovery_required"):
+        return None
+
+    data = load_data()
+    if not _owner_pin_recovery_needed(data):
+        session.pop("owner_pin_recovery_required", None)
+        return None
+
+    normalized_path = _normalized_request_path()
+    if normalized_path.startswith("/static/"):
+        return None
+    if normalized_path in ("/logout", "/settings", "/api/settings"):
+        return None
+    if normalized_path.startswith("/api/"):
+        return jsonify({
+            "error": "Owner PIN setup required before other actions are available.",
+        }), 423
+
+    ingress = _effective_ingress_path()
+    if ingress:
+        return redirect(f"{ingress}/settings")
+    return redirect(url_for("settings"))
 
 
 @app.before_request
@@ -1829,25 +1867,32 @@ def login_view():
             error = "User not found. Choose a valid team member."
         else:
             selected_role = _normalize_team_role(matched_user.get("role", "staff"))
+            owner_pin_recovery_required = False
             if selected_role == "owner" and len(team_users) > 1:
                 expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
-                supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
-                if not expected_pin or not secrets.compare_digest(expected_pin, supplied_pin):
-                    error = "Owner PIN required when additional team members are configured."
-                    return render_template(
-                        "login.html",
-                        settings=data["settings"],
-                        users=team_users,
-                        error=error,
-                        selected_user_id=user_id,
-                        require_owner_pin=True,
-                        ingress=_effective_ingress_path(),
-                    )
+                if expected_pin:
+                    supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
+                    if not secrets.compare_digest(expected_pin, supplied_pin):
+                        error = "Owner PIN required when additional team members are configured."
+                        return render_template(
+                            "login.html",
+                            settings=data["settings"],
+                            users=team_users,
+                            error=error,
+                            selected_user_id=user_id,
+                            require_owner_pin=True,
+                            ingress=_effective_ingress_path(),
+                        )
+                else:
+                    owner_pin_recovery_required = True
 
             session.clear()
             session["user_id"] = str(matched_user.get("id", "")).strip() or user_id
             session["user_role"] = selected_role
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
+            if owner_pin_recovery_required:
+                session["owner_pin_recovery_required"] = True
+                return redirect(url_for("settings"))
             return redirect(url_for("index"))
 
     return render_template(
@@ -1963,6 +2008,7 @@ def settings():
         "settings.html",
         settings=data["settings"],
         team_users=data.get("team_users", []),
+        owner_pin_recovery_required=bool(session.get("owner_pin_recovery_required")),
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
         display_port=DISPLAY_PORT,
@@ -2304,6 +2350,8 @@ def api_save_settings():
     data["settings"]["owner_pin"] = _normalize_owner_pin(
         data["settings"].get("owner_pin", "")
     )
+    if data["settings"]["owner_pin"]:
+        session.pop("owner_pin_recovery_required", None)
     data["settings"]["external_api_allowlist_enabled"] = _coerce_bool(
         data["settings"].get("external_api_allowlist_enabled"),
         False,

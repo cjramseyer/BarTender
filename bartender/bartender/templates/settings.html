@@ -87,6 +87,18 @@ content %}
 
   <div class="card settings-card settings-sections-card">
     <form id="settingsForm" onsubmit="saveSettings(event)">
+      {% if owner_pin_recovery_required %}
+      <div class="form-group settings-warning-block" style="margin-bottom: 1rem">
+        <label>Owner Recovery Mode</label>
+        <p class="muted" style="margin-top: 0.35rem">
+          This installation has multiple team members but no owner PIN yet.
+          Save an Owner PIN below to restore normal access.
+        </p>
+        <p class="muted" style="margin-top: 0.25rem">
+          Until a PIN is saved, other pages and non-settings actions stay locked.
+        </p>
+      </div>
+      {% endif %}
       <details class="settings-collapsible" open>
         <summary>General</summary>
         <div class="settings-collapsible-body">

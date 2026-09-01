@@ -83,6 +83,7 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 
 ## Recent Changes
 
+- Added owner PIN recovery for upgraded installs: if multiple team users exist but no owner PIN was ever configured, the owner can sign in once, is redirected to Settings, and must save an Owner PIN before other actions are re-enabled.
 - Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
 - Added first-time setup wizard requiring a bar name before initial use.
 - Added pour mode settings and conditional pour control visibility.
