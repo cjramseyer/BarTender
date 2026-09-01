@@ -1,6 +1,7 @@
 ---
 name: Release Assets
 
+# yamllint disable-line rule:truthy
 on:
   release:
     types:
