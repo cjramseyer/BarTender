@@ -85,37 +85,6 @@ content %}
             >
           </div>
           <div class="form-group">
-            <label>External Base URL (optional)</label>
-            <input
-              type="url"
-              id="externalBaseUrl"
-              class="form-control"
-              value="{{ settings.external_base_url or '' }}"
-              placeholder="https://my-host.example.com"
-            />
-            <div
-              style="
-                display: flex;
-                gap: 0.5rem;
-                flex-wrap: wrap;
-                margin-top: 0.45rem;
-              "
-            >
-              <button
-                type="button"
-                class="btn btn-sm btn-secondary"
-                onclick="clearExternalBaseUrlOverride()"
-              >
-                Clear Override
-              </button>
-              <span id="externalBaseUrlMsg" class="save-msg"></span>
-            </div>
-            <small class="muted"
-              >If blank, BarTender auto-detects the external host for display
-              and menu links.</small
-            >
-          </div>
-          <div class="form-group">
             <label>Environment Mode</label>
             <div class="radio-group">
               <label class="radio-label">
@@ -715,6 +684,37 @@ content %}
             Use these external links for read-only access (served from port {{
             display_port }}).
           </p>
+          <div class="form-group" style="margin-top: 1rem">
+            <label>External Base URL (optional)</label>
+            <input
+              type="url"
+              id="externalBaseUrl"
+              class="form-control"
+              value="{{ settings.external_base_url or '' }}"
+              placeholder="https://my-host.example.com"
+            />
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.45rem;
+              "
+            >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="clearExternalBaseUrlOverride()"
+              >
+                Clear Override
+              </button>
+              <span id="externalBaseUrlMsg" class="save-msg"></span>
+            </div>
+            <small class="muted"
+              >If blank, BarTender auto-detects the external host for display,
+              menu, and external API links.</small
+            >
+          </div>
           <p class="muted" style="margin-top: 1rem">API Reference</p>
           <div class="settings-url-row">
             <a
@@ -725,6 +725,24 @@ content %}
               rel="noopener noreferrer"
               >{{ ingress }}/api-reference</a
             >
+          </div>
+          <p class="muted" style="margin-top: 0.35rem">External API Endpoint</p>
+          <div class="settings-url-row">
+            <a
+              id="externalApiUrl"
+              class="settings-url-link"
+              href="{{ external_api_base_url }}/api"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ external_api_base_url }}/api</a
+            >
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="copyExternalUrl('externalApiUrl', this)"
+            >
+              Copy
+            </button>
           </div>
           <p class="muted" style="margin-top: 0.35rem">Display URL</p>
           <div class="settings-url-row">
