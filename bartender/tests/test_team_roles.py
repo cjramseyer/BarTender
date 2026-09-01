@@ -213,6 +213,53 @@ def test_owner_can_reset_settings_without_clearing_inventory_or_team(tmp_path):
     assert reloaded["team_audit"][0]["action"] == "settings_reset"
 
 
+def test_owner_can_factory_reset_all_data(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    uploaded_logo = app_module.UPLOADS_DIR / "bar-logo.png"
+    uploaded_logo.write_bytes(b"png")
+
+    app_module.save_data({
+        "settings": {
+            **app_module.DEFAULT_DATA["settings"],
+            "bar_name": "Busy Bar",
+            "theme": "dark",
+            "bar_logo_url": "media/bar-logo?v=123",
+            "owner_pin": "2468",
+            "setup_completed": True,
+        },
+        "beers": [{"id": 1, "name": "Amber Ale"}],
+        "kegs": [{"id": 1, "name": "Keg 1"}],
+        "taps": [{"id": 1, "name": "Tap 1"}],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [{"id": "1", "action": "settings_updated"}],
+    })
+
+    response = client.post(
+        "/api/reset",
+        json={"confirmation": "RESET ALL DATA"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["bar_name"] == "My Bar"
+    assert reloaded["settings"]["setup_completed"] is False
+    assert reloaded["beers"] == []
+    assert reloaded["kegs"] == []
+    assert reloaded["taps"] == []
+    assert len(reloaded["team_users"]) == 1
+    assert reloaded["team_users"][0]["role"] == "owner"
+    assert reloaded["team_audit"] == []
+    assert not uploaded_logo.exists()
+
+
 def test_first_created_user_defaults_to_owner(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

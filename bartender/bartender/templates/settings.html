@@ -822,6 +822,26 @@ content %}
             >Export Archive (.zip)</a
           >
         </div>
+        <div class="form-group settings-warning-block" style="margin-top: 1rem">
+          <label>Factory Reset All Data</label>
+          <p class="muted" style="margin-top: 0.35rem">
+            This permanently removes settings, beers, kegs, taps, team users, audit history,
+            and uploaded logos.
+          </p>
+          <p class="muted" style="margin-top: 0.25rem">
+            Export a backup first if you may need to restore this installation later.
+          </p>
+          <div class="form-actions" style="margin-top: 0.75rem">
+            <button
+              type="button"
+              class="btn btn-danger"
+              onclick="factoryResetAllData()"
+            >
+              Factory Reset All Data
+            </button>
+            <span id="factoryResetMsg" class="save-msg"></span>
+          </div>
+        </div>
       </div>
     </details>
   </div>
@@ -1400,6 +1420,39 @@ content %}
       console.error("Unable to reset settings", err);
       if (msg) {
         msg.textContent = "Reset failed";
+      }
+    }
+  }
+
+  async function factoryResetAllData() {
+    const msg = document.getElementById("factoryResetMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmation = window.prompt(
+      'Type RESET ALL DATA to permanently erase all BarTender data after exporting a backup.',
+      "",
+    );
+    if (confirmation === null) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `Reset failed: ${res.status}`);
+      }
+
+      if (msg) {
+        msg.textContent = "✓ Factory reset complete. Reloading...";
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error("Unable to factory reset data", err);
+      if (msg) {
+        msg.textContent = err.message || "Factory reset failed";
       }
     }
   }

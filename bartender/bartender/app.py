@@ -178,7 +178,7 @@ def enforce_owner_pin_recovery():
     normalized_path = _normalized_request_path()
     if normalized_path.startswith("/static/"):
         return None
-    if normalized_path in ("/logout", "/settings", "/api/settings", "/api/settings/reset"):
+    if normalized_path in ("/logout", "/settings", "/api/settings", "/api/settings/reset", "/api/reset"):
         return None
     if normalized_path.startswith("/api/"):
         return jsonify({
@@ -729,6 +729,10 @@ def _normalize_low_keg_threshold(value) -> int:
 
 def _default_settings_snapshot() -> dict:
     return json.loads(json.dumps(DEFAULT_DATA["settings"]))
+
+
+def _default_data_snapshot() -> dict:
+    return json.loads(json.dumps(DEFAULT_DATA))
 
 
 def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = False) -> None:
@@ -2422,6 +2426,35 @@ def api_reset_settings_to_defaults():
     )
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/reset", methods=["POST"])
+def api_factory_reset_all_data():
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    confirmation = str(payload.get("confirmation", "")).strip()
+    if confirmation != "RESET ALL DATA":
+        return jsonify({
+            "error": "Confirmation phrase required.",
+            "required_confirmation": "RESET ALL DATA",
+        }), 400
+
+    _remove_uploaded_logos()
+    reset_data = _default_data_snapshot()
+    save_data(reset_data)
+
+    session.pop("owner_pin_recovery_required", None)
+    session["user_id"] = "owner"
+    session["user_role"] = "owner"
+    session["user_name"] = "Owner"
+
+    return jsonify({
+        "ok": True,
+        "message": "All BarTender data has been reset to factory defaults.",
+    })
 
 
 @app.route("/api/team/users", methods=["GET"])
