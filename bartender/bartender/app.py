@@ -1968,6 +1968,8 @@ def inject_runtime_metadata():
         "app_version": APP_VERSION,
         "release_highlights": RELEASE_HIGHLIGHTS,
         "ingress": _effective_ingress_path(),
+        "current_user_name": str(session.get("user_name", "") or "").strip(),
+        "current_user_role": _normalize_team_role(session.get("user_role")),
     }
 
 

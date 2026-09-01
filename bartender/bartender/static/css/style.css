@@ -151,6 +151,23 @@ body {
   flex-shrink: 0;
 }
 
+.nav-secondary-btn {
+  flex-shrink: 0;
+}
+
+.nav-user-shell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.nav-user-meta {
+  color: var(--nav-text);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 /* Container */
 .container {
   max-width: 1100px;

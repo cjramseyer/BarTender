@@ -49,8 +49,8 @@ function initAppPrompts(appVersion) {
   }
 
   const seenVersion = localStorage.getItem("bartender_seen_version");
-  if (seenVersion !== currentVersion) {
-    openModal("updateNoticeModal");
+  if (seenVersion === currentVersion) {
+    return;
   }
 }
 

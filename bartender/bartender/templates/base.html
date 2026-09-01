@@ -63,6 +63,15 @@
         </li>
         {% endif %}
       </ul>
+      {% if settings.setup_completed %}
+      <button
+        type="button"
+        class="btn btn-sm btn-secondary nav-secondary-btn"
+        onclick="openModal('updateNoticeModal')"
+      >
+        What's New
+      </button>
+      {% endif %}
       <a
         class="btn btn-sm btn-secondary nav-display-btn"
         href="{{ ingress }}/display"
@@ -77,6 +86,14 @@
         rel="noopener noreferrer"
         >Printable Menu</a
       >
+      {% if current_user_name %}
+      <div class="nav-user-shell">
+        <span class="nav-user-meta"
+          >{{ current_user_name }}{% if current_user_role %} ({{ current_user_role }}){% endif %}</span
+        >
+        <a class="btn btn-sm btn-secondary" href="{{ ingress }}/logout">Logout</a>
+      </div>
+      {% endif %}
     </nav>
 
     <main class="container">{% block content %}{% endblock %}</main>
