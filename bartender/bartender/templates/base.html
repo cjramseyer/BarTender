@@ -63,20 +63,78 @@
         </li>
         {% endif %}
       </ul>
-      <a
-        class="btn btn-sm btn-secondary nav-display-btn"
-        href="{{ ingress }}/display"
-        target="_blank"
-        rel="noopener noreferrer"
-        >View Display</a
-      >
-      <a
-        class="btn btn-sm btn-secondary nav-display-btn"
-        href="{{ ingress }}/menu"
-        target="_blank"
-        rel="noopener noreferrer"
-        >Printable Menu</a
-      >
+      <div class="nav-actions">
+        {% if settings.setup_completed %}
+        <button
+          type="button"
+          class="btn btn-sm btn-secondary nav-secondary-btn"
+          onclick="openModal('updateNoticeModal')"
+        >
+          What's New
+        </button>
+        {% endif %}
+        <div class="nav-menu-shell" data-nav-dropdown>
+          <button
+            type="button"
+            class="nav-menu-button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            data-nav-dropdown-toggle
+            aria-label="Open quick actions menu"
+          >
+            <span aria-hidden="true" class="nav-menu-icon">☰</span>
+            <span class="nav-menu-label">Menu</span>
+          </button>
+          <div class="nav-menu-panel" role="menu">
+            <a
+              class="nav-menu-item"
+              href="{{ ingress }}/display"
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              >View Display</a
+            >
+            <a
+              class="nav-menu-item"
+              href="{{ ingress }}/menu"
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              >Printable Menu</a
+            >
+            <a class="nav-menu-item" href="{{ ingress }}/settings" role="menuitem"
+              >Settings</a
+            >
+          </div>
+        </div>
+        {% if current_user_name %}
+        {% set user_initial = ((current_user_name or 'User')[:1]) | upper %}
+        <div class="nav-user-menu" data-nav-user-menu>
+          <button
+            type="button"
+            class="nav-avatar-button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            data-nav-user-toggle
+          >
+            <span class="nav-avatar-circle" aria-hidden="true"
+              >{{ user_initial }}</span
+            >
+            <span class="nav-avatar-name">{{ current_user_name }}</span>
+            <span class="nav-avatar-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div class="nav-user-panel" role="menu">
+            <div class="nav-user-panel-name">{{ current_user_name }}</div>
+            <a
+              class="btn btn-sm btn-secondary nav-user-logout"
+              href="{{ ingress }}/logout"
+              role="menuitem"
+              >Log out</a
+            >
+          </div>
+        </div>
+        {% endif %}
+      </div>
     </nav>
 
     <main class="container">{% block content %}{% endblock %}</main>
