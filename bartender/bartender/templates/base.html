@@ -85,6 +85,25 @@
             <span class="nav-menu-label">Menu</span>
           </button>
           <div class="nav-menu-panel" role="menu">
+            <div class="nav-menu-section">
+              <div class="nav-menu-section-title">View</div>
+              <label class="nav-menu-checkbox">
+                <input
+                  type="checkbox"
+                  {% if settings.bar_stock_enabled %}checked{% endif %}
+                  onchange="toggleNavSetting('bar_stock_enabled', this)"
+                />
+                <span>Bar Stock</span>
+              </label>
+              <label class="nav-menu-checkbox">
+                <input
+                  type="checkbox"
+                  {% if settings.api_reference_enabled %}checked{% endif %}
+                  onchange="toggleNavSetting('api_reference_enabled', this)"
+                />
+                <span>API Reference</span>
+              </label>
+            </div>
             <a
               class="nav-menu-item"
               href="{{ ingress }}/display"

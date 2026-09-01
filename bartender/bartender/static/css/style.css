@@ -221,6 +221,35 @@ body {
   gap: 0.35rem;
 }
 
+.nav-menu-section {
+  padding: 0.25rem 0.35rem 0.35rem;
+}
+
+.nav-menu-section-title {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.nav-menu-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nav-menu-checkbox input {
+  width: 0.95rem;
+  height: 0.95rem;
+  accent-color: var(--primary);
+}
+
 .nav-menu-item {
   display: inline-flex;
   align-items: center;

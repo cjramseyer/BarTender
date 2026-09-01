@@ -17,6 +17,32 @@ function closeModal(id) {
   if (modal) modal.classList.remove("is-open");
 }
 
+async function toggleNavSetting(settingName, checkbox) {
+  const ingress = window.BARTENDER_INGRESS || "";
+  const enabled = Boolean(checkbox && checkbox.checked);
+  const payload = {};
+  payload[settingName] = enabled;
+
+  try {
+    const response = await fetch(`${ingress}/api/settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update ${settingName}: ${response.status}`);
+    }
+
+    location.reload();
+  } catch (err) {
+    console.error(err);
+    if (checkbox) {
+      checkbox.checked = !enabled;
+    }
+  }
+}
+
 function setNavDropdownState(menu, isOpen) {
   if (!menu) {
     return;
