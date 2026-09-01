@@ -1174,6 +1174,18 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   margin-bottom: 0;
 }
 
+.settings-side-column {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.settings-panel-title {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+}
+
 .settings-collapsible {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1240,22 +1252,27 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 
   .settings-sections-card {
     grid-column: 1;
-    grid-row: 1 / span 3;
+  }
+
+  .settings-side-column {
+    grid-column: 2;
+    align-content: start;
   }
 
   .settings-external-card {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: auto;
+  }
+
+  .settings-team-card {
+    grid-column: auto;
   }
 
   .settings-export-card {
-    grid-column: 2;
-    grid-row: 2;
+    grid-column: auto;
   }
 
   .settings-import-card {
-    grid-column: 2;
-    grid-row: 3;
+    grid-column: auto;
   }
 }
 

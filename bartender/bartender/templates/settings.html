@@ -19,72 +19,6 @@ content %}
 </div>
 
 <div class="settings-grid">
-  <div class="card settings-card settings-external-card">
-    <details class="settings-collapsible" open>
-      <summary>📺 External URLs</summary>
-      <div class="settings-collapsible-body">
-        <p class="muted">
-          Use these external links for read-only access (served from port {{
-          display_port }}).
-        </p>
-        <p class="muted" style="margin-top: 1rem">API Reference</p>
-        <div class="settings-url-row">
-          <a
-            id="apiReferenceUrl"
-            class="settings-url-link"
-            href="{{ ingress }}/api-reference"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ ingress }}/api-reference</a
-          >
-        </div>
-        <p class="muted" style="margin-top: 0.35rem">Display URL</p>
-        <div class="settings-url-row">
-          <a
-            id="externalDisplayUrl"
-            class="settings-url-link"
-            href="{{ external_display_url }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ external_display_url }}</a
-          >
-          <button
-            type="button"
-            class="btn btn-sm btn-secondary"
-            onclick="copyExternalUrl('externalDisplayUrl', this)"
-          >
-            Copy
-          </button>
-        </div>
-        <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
-        <div class="settings-url-row">
-          <a
-            id="externalMenuUrl"
-            class="settings-url-link"
-            href="{{ external_menu_url }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ external_menu_url }}</a
-          >
-          <button
-            type="button"
-            class="btn btn-sm btn-secondary"
-            onclick="copyExternalUrl('externalMenuUrl', this)"
-          >
-            Copy
-          </button>
-        </div>
-        <p class="muted" style="margin-top: 0.35rem">
-          QR Status: {% if qr_ready %}
-          <strong style="color: #15803d">Ready</strong>
-          {% else %}
-          <strong style="color: #b45309">Unavailable</strong>
-          {% endif %}
-        </p>
-      </div>
-    </details>
-  </div>
-
   <div class="card settings-card settings-sections-card">
     <form id="settingsForm" onsubmit="saveSettings(event)">
       {% if owner_pin_recovery_required %}
@@ -323,12 +257,6 @@ content %}
               </label>
             </div>
           </div>
-        </div>
-      </details>
-
-      <details class="settings-collapsible">
-        <summary>Features</summary>
-        <div class="settings-collapsible-body">
           <div class="form-group">
             <label class="radio-label">
               {% if settings.bar_stock_enabled %}
@@ -337,20 +265,6 @@ content %}
               <input type="checkbox" id="barStockEnabled" />
               {% endif %} Enable Bar Stock Feature
             </label>
-          </div>
-          <div class="form-group">
-            <label class="radio-label">
-              {% if settings.analytics_enabled is not defined or
-              settings.analytics_enabled %}
-              <input type="checkbox" id="analyticsEnabled" checked />
-              {% else %}
-              <input type="checkbox" id="analyticsEnabled" />
-              {% endif %} Enable Analytics Feature
-            </label>
-            <small class="muted"
-              >When disabled, Analytics is hidden from the dashboard and
-              dedicated analytics page.</small
-            >
           </div>
           <div class="form-group">
             <label class="radio-label">
@@ -364,6 +278,121 @@ content %}
               >When disabled, API Reference is hidden from the top nav.</small
             >
           </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Keg Settings</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Current Keg Type Choices</label>
+            <small class="muted">
+              Manage available keg/container types shown in keg dropdowns.
+            </small>
+            <div
+              id="kegTypeChoicesList"
+              class="stack-gap-sm"
+              style="margin-top: 8px"
+            ></div>
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 8px;
+              "
+            >
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                onclick="addKegTypeChoiceRow()"
+              >
+                + Add Keg Type
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-danger"
+                onclick="resetKegTypesToDefaults()"
+              >
+                Reset Keg Types
+              </button>
+              <span id="kegTypeResetMsg" class="save-msg"></span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Default Keg Type</label>
+            <select id="defaultKegType" class="form-control"></select>
+            <small class="muted"
+              >Used as the default keg type when a new keg is added.</small
+            >
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Pour Presets</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Pour Amount Presets</label>
+            <small class="muted">
+              Configure named pour options shown on each tap card.
+            </small>
+            <div
+              id="pourOptionsList"
+              class="stack-gap-sm"
+              style="margin-top: 8px"
+            ></div>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              style="margin-top: 8px"
+              onclick="addPourOptionRow()"
+            >
+              + Add Pour Option
+            </button>
+          </div>
+          <div class="form-group">
+            <label>Default Pour Preset</label>
+            <select id="defaultPourPreset" class="form-control"></select>
+            <small class="muted">
+              This preset is preselected anywhere pour choices are shown.
+            </small>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>Audit Trail</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Audit Retention (days)</label>
+            <input
+              type="number"
+              id="auditRetentionDays"
+              class="form-control"
+              min="1"
+              max="180"
+              step="1"
+              value="{{ settings.audit_retention_days or 30 }}"
+            />
+            <small class="muted"
+              >Keep audit entries for 1–180 days. Default is 30 days.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>All Audit Events</label>
+            <div
+              id="teamAuditList"
+              class="stack-gap-sm"
+              style="margin-top: 8px"
+            ></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
+        <summary>API Settings</summary>
+        <div class="settings-collapsible-body">
           <div class="form-group">
             <label>External API Integration Access</label>
             <p class="muted" style="margin-top: 0.25rem">
@@ -570,178 +599,22 @@ content %}
       </details>
 
       <details class="settings-collapsible">
-        <summary>Keg Settings</summary>
-        <div class="settings-collapsible-body">
-          <div class="form-group">
-            <label>Current Keg Type Choices</label>
-            <small class="muted">
-              Manage available keg/container types shown in keg dropdowns.
-            </small>
-            <div
-              id="kegTypeChoicesList"
-              class="stack-gap-sm"
-              style="margin-top: 8px"
-            ></div>
-            <div
-              style="
-                display: flex;
-                gap: 0.5rem;
-                flex-wrap: wrap;
-                margin-top: 8px;
-              "
-            >
-              <button
-                type="button"
-                class="btn btn-secondary btn-sm"
-                onclick="addKegTypeChoiceRow()"
-              >
-                + Add Keg Type
-              </button>
-              <button
-                type="button"
-                class="btn btn-sm btn-danger"
-                onclick="resetKegTypesToDefaults()"
-              >
-                Reset Keg Types
-              </button>
-              <span id="kegTypeResetMsg" class="save-msg"></span>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Default Keg Type</label>
-            <select id="defaultKegType" class="form-control"></select>
-            <small class="muted"
-              >Used as the default keg type when a new keg is added.</small
-            >
-          </div>
-        </div>
-      </details>
-
-      <details class="settings-collapsible">
-        <summary>Pour Presets</summary>
-        <div class="settings-collapsible-body">
-          <div class="form-group">
-            <label>Pour Amount Presets</label>
-            <small class="muted">
-              Configure named pour options shown on each tap card.
-            </small>
-            <div
-              id="pourOptionsList"
-              class="stack-gap-sm"
-              style="margin-top: 8px"
-            ></div>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              style="margin-top: 8px"
-              onclick="addPourOptionRow()"
-            >
-              + Add Pour Option
-            </button>
-          </div>
-          <div class="form-group">
-            <label>Default Pour Preset</label>
-            <select id="defaultPourPreset" class="form-control"></select>
-            <small class="muted">
-              This preset is preselected anywhere pour choices are shown.
-            </small>
-          </div>
-        </div>
-      </details>
-
-      <details class="settings-collapsible">
-        <summary>Team Access</summary>
-        <div class="settings-collapsible-body">
-          <div class="form-group">
-            <label>Current Team Members</label>
-            <div
-              id="teamUsersList"
-              class="stack-gap-sm"
-              style="margin-top: 8px"
-            ></div>
-          </div>
-          <div class="form-group">
-            <label>Owner PIN</label>
-            <input
-              type="password"
-              id="ownerPin"
-              class="form-control"
-              value="{{ settings.owner_pin or '' }}"
-              placeholder="Required when other team members are present"
-              autocomplete="new-password"
-            />
-            <small class="muted"
-              >Require this PIN for the owner login when there is more than one
-              team member. Leave blank if you want only the single-owner
-              setup.</small
-            >
-          </div>
-          <div class="form-group">
-            <label>Invite User</label>
-            <div class="form-row" style="gap: 0.5rem; align-items: end">
-              <div class="form-group" style="flex: 1; min-width: 180px">
-                <input
-                  type="text"
-                  id="teamUserName"
-                  class="form-control"
-                  placeholder="Name"
-                />
-              </div>
-              <div class="form-group" style="min-width: 150px">
-                <select id="teamUserRole" class="form-control">
-                  <option value="staff">Staff</option>
-                  <option value="manager">Manager</option>
-                  <option value="owner">Owner</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                class="btn btn-secondary btn-sm"
-                onclick="addTeamUser()"
-              >
-                Add User
-              </button>
-            </div>
-            <small class="muted"
-              >Owners and managers can manage users. Staff access is restricted
-              to their own account.</small
-            >
-          </div>
-        </div>
-      </details>
-
-      <details class="settings-collapsible">
-        <summary>Audit Trail</summary>
-        <div class="settings-collapsible-body">
-          <div class="form-group">
-            <label>Audit Retention (days)</label>
-            <input
-              type="number"
-              id="auditRetentionDays"
-              class="form-control"
-              min="1"
-              max="180"
-              step="1"
-              value="{{ settings.audit_retention_days or 30 }}"
-            />
-            <small class="muted"
-              >Keep audit entries for 1–180 days. Default is 30 days.</small
-            >
-          </div>
-          <div class="form-group">
-            <label>All Audit Events</label>
-            <div
-              id="teamAuditList"
-              class="stack-gap-sm"
-              style="margin-top: 8px"
-            ></div>
-          </div>
-        </div>
-      </details>
-
-      <details class="settings-collapsible">
         <summary>Analytics</summary>
         <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.analytics_enabled is not defined or
+              settings.analytics_enabled %}
+              <input type="checkbox" id="analyticsEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="analyticsEnabled" />
+              {% endif %} Enable Analytics Feature
+            </label>
+            <small class="muted"
+              >When disabled, Analytics is hidden from the dashboard and
+              dedicated analytics page.</small
+            >
+          </div>
           <div class="form-group">
             <label>Low Keg Threshold (%)</label>
             <input
@@ -804,7 +677,161 @@ content %}
         This resets settings only. Beers, kegs, taps, team users, and audit history are kept.
         The app will return to first-time setup defaults.
       </p>
+
+      <details class="settings-collapsible" style="margin-top: 1rem">
+        <summary>Factory Reset</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group settings-warning-block">
+            <label>Factory Reset All Data</label>
+            <p class="muted" style="margin-top: 0.35rem">
+              This permanently removes settings, beers, kegs, taps, team users,
+              audit history, and uploaded logos.
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Export a backup first if you may need to restore this installation later.
+            </p>
+            <div class="form-actions" style="margin-top: 0.75rem">
+              <button
+                type="button"
+                class="btn btn-danger"
+                onclick="factoryResetAllData()"
+              >
+                Factory Reset All Data
+              </button>
+              <span id="factoryResetMsg" class="save-msg"></span>
+            </div>
+          </div>
+        </div>
+      </details>
     </form>
+  </div>
+
+  <div class="settings-side-column">
+    <div class="card settings-card settings-external-card">
+      <details class="settings-collapsible" open>
+        <summary>📺 External URLs</summary>
+        <div class="settings-collapsible-body">
+          <p class="muted">
+            Use these external links for read-only access (served from port {{
+            display_port }}).
+          </p>
+          <p class="muted" style="margin-top: 1rem">API Reference</p>
+          <div class="settings-url-row">
+            <a
+              id="apiReferenceUrl"
+              class="settings-url-link"
+              href="{{ ingress }}/api-reference"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ ingress }}/api-reference</a
+            >
+          </div>
+          <p class="muted" style="margin-top: 0.35rem">Display URL</p>
+          <div class="settings-url-row">
+            <a
+              id="externalDisplayUrl"
+              class="settings-url-link"
+              href="{{ external_display_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ external_display_url }}</a
+            >
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="copyExternalUrl('externalDisplayUrl', this)"
+            >
+              Copy
+            </button>
+          </div>
+          <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
+          <div class="settings-url-row">
+            <a
+              id="externalMenuUrl"
+              class="settings-url-link"
+              href="{{ external_menu_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ external_menu_url }}</a
+            >
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="copyExternalUrl('externalMenuUrl', this)"
+            >
+              Copy
+            </button>
+          </div>
+          <p class="muted" style="margin-top: 0.35rem">
+            QR Status: {% if qr_ready %}
+            <strong style="color: #15803d">Ready</strong>
+            {% else %}
+            <strong style="color: #b45309">Unavailable</strong>
+            {% endif %}
+          </p>
+        </div>
+      </details>
+    </div>
+
+  <div class="card settings-card settings-team-card">
+    <h2 class="settings-panel-title">Team Access</h2>
+    <div class="settings-collapsible-body">
+      <div class="form-group">
+        <label>Current Team Members</label>
+        <div
+          id="teamUsersList"
+          class="stack-gap-sm"
+          style="margin-top: 8px"
+        ></div>
+      </div>
+      <div class="form-group">
+        <label>Owner PIN</label>
+        <input
+          type="password"
+          id="ownerPin"
+          class="form-control"
+          value="{{ settings.owner_pin or '' }}"
+          placeholder="Required when other team members are present"
+          autocomplete="new-password"
+        />
+        <small class="muted"
+          >Require this PIN for the owner login when there is more than one
+          team member. Leave blank if you want only the single-owner
+          setup.</small
+        >
+      </div>
+      <div class="form-group">
+        <label>Invite User</label>
+        <div class="form-row" style="gap: 0.5rem; align-items: end">
+          <div class="form-group" style="flex: 1; min-width: 180px">
+            <input
+              type="text"
+              id="teamUserName"
+              class="form-control"
+              placeholder="Name"
+            />
+          </div>
+          <div class="form-group" style="min-width: 150px">
+            <select id="teamUserRole" class="form-control">
+              <option value="staff">Staff</option>
+              <option value="manager">Manager</option>
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            onclick="addTeamUser()"
+          >
+            Add User
+          </button>
+        </div>
+        <small class="muted"
+          >Owners and managers can manage users. Staff access is restricted
+          to their own account.</small
+        >
+      </div>
+    </div>
   </div>
 
   <div class="card settings-card settings-export-card">
@@ -821,26 +848,6 @@ content %}
           <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
             >Export Archive (.zip)</a
           >
-        </div>
-        <div class="form-group settings-warning-block" style="margin-top: 1rem">
-          <label>Factory Reset All Data</label>
-          <p class="muted" style="margin-top: 0.35rem">
-            This permanently removes settings, beers, kegs, taps, team users, audit history,
-            and uploaded logos.
-          </p>
-          <p class="muted" style="margin-top: 0.25rem">
-            Export a backup first if you may need to restore this installation later.
-          </p>
-          <div class="form-actions" style="margin-top: 0.75rem">
-            <button
-              type="button"
-              class="btn btn-danger"
-              onclick="factoryResetAllData()"
-            >
-              Factory Reset All Data
-            </button>
-            <span id="factoryResetMsg" class="save-msg"></span>
-          </div>
         </div>
       </div>
     </details>
@@ -886,6 +893,7 @@ content %}
         </form>
       </div>
     </details>
+  </div>
   </div>
 </div>
 {% endblock %} {% block scripts %}
