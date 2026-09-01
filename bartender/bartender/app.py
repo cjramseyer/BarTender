@@ -87,15 +87,19 @@ RELEASE_HIGHLIGHTS = [
 ]
 
 STANDARD_KEG_TYPE_CHOICES = [
+    "Corny (5 gal)",
     "1/6 bbl (5.2 gal)",
     "1/4 bbl (7.75 gal)",
-    "1/2 bbl (15.5 gal)",
-    "Corny (5 gal)",
+    "Full Size (1/2 bbl, 15.5 gal)",
     "20 L",
     "30 L",
     "50 L",
     "Custom",
 ]
+
+LEGACY_KEG_TYPE_ALIASES = {
+    "1/2 bbl (15.5 gal)": "Full Size (1/2 bbl, 15.5 gal)",
+}
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
@@ -1415,14 +1419,14 @@ def _normalize_keg_type_choices(raw_choices, default_type: str) -> list[str]:
 
     if isinstance(raw_choices, list):
         for item in raw_choices:
-            value = str(item or "").strip()
+            value = _normalize_builtin_keg_type_label(item)
             key = value.lower()
             if not value or key in seen:
                 continue
             seen.add(key)
             choices.append(value)
 
-    fallback = str(default_type or "").strip()
+    fallback = _normalize_builtin_keg_type_label(default_type)
     fallback_key = fallback.lower()
     if fallback and fallback_key not in seen:
         choices.append(fallback)
@@ -1433,8 +1437,20 @@ def _normalize_keg_type_choices(raw_choices, default_type: str) -> list[str]:
     return STANDARD_KEG_TYPE_CHOICES.copy()
 
 
+def _normalize_builtin_keg_type_label(value) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+
+    for legacy_value, canonical_value in LEGACY_KEG_TYPE_ALIASES.items():
+        if normalized.lower() == legacy_value.lower():
+            return canonical_value
+
+    return normalized
+
+
 def _normalize_default_keg_type(raw_default: str, choices: list[str]) -> str:
-    default_value = str(raw_default or "").strip()
+    default_value = _normalize_builtin_keg_type_label(raw_default)
     if not choices:
         return default_value
 
@@ -1442,7 +1458,7 @@ def _normalize_default_keg_type(raw_default: str, choices: list[str]) -> str:
         return choices[0]
 
     for item in choices:
-        if item.lower() == default_value.lower():
+        if _normalize_builtin_keg_type_label(item).lower() == default_value.lower():
             return item
 
     return choices[0]
@@ -3037,7 +3053,7 @@ def api_delete_beer(beer_id: int):
 # API – Kegs
 # ---------------------------------------------------------------------------
 
-KEG_SIZES_US = ["1/6 bbl (5.2 gal)", "1/4 bbl (7.75 gal)", "1/2 bbl (15.5 gal)", "Corny (5 gal)", "Custom"]
+KEG_SIZES_US = ["Corny (5 gal)", "1/6 bbl (5.2 gal)", "1/4 bbl (7.75 gal)", "Full Size (1/2 bbl, 15.5 gal)", "Custom"]
 KEG_SIZES_METRIC = ["20 L", "30 L", "50 L", "Custom"]
 KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
 API_REFERENCE_ENDPOINTS = [
@@ -3104,10 +3120,12 @@ def api_add_keg():
     if selected_beer and not _is_beer_kegged(selected_beer):
         return jsonify({"error": "Only kegged beers can be assigned to kegs."}), 409
 
-    keg_type = str(body.get("type", "")).strip() or str(
+    keg_type = _normalize_builtin_keg_type_label(body.get("type", "")) or _normalize_builtin_keg_type_label(
         data.get("settings", {}).get("default_keg_type", "")
-    ).strip()
-    default_keg_size = str(data.get("settings", {}).get("default_keg_type", "")).strip()
+    )
+    default_keg_size = _normalize_builtin_keg_type_label(
+        data.get("settings", {}).get("default_keg_type", "")
+    )
     timestamp = datetime.now(timezone.utc).isoformat()
     keg = {
         "id": _next_id(data["kegs"]),
@@ -3116,7 +3134,7 @@ def api_add_keg():
         "beer_name": str(body.get("beer_name", "")).strip(),
         "beer_type": str(body.get("beer_type", "")).strip(),
         "type": keg_type,
-        "size": str(body.get("size", "")).strip() or default_keg_size,
+        "size": _normalize_builtin_keg_type_label(body.get("size", "")) or default_keg_size,
         "custom_size": body.get("custom_size", ""),
         "status": initial_status,
         "beer_brewer": body.get("beer_brewer", body.get("brewery", "")),
@@ -3200,12 +3218,12 @@ def api_add_kegs_bulk():
         if selected_beer and not _is_beer_kegged(selected_beer):
             return jsonify({"error": "Only kegged beers can be assigned to kegs.", "index": index}), 409
 
-        keg_type = str(item.get("type", "")).strip() or str(
+        keg_type = _normalize_builtin_keg_type_label(item.get("type", "")) or _normalize_builtin_keg_type_label(
             simulated_data.get("settings", {}).get("default_keg_type", "")
-        ).strip()
-        default_keg_size = str(
+        )
+        default_keg_size = _normalize_builtin_keg_type_label(
             simulated_data.get("settings", {}).get("default_keg_type", "")
-        ).strip()
+        )
         timestamp = datetime.now(timezone.utc).isoformat()
         keg = {
             "id": _next_id(simulated_data["kegs"]),
@@ -3214,7 +3232,7 @@ def api_add_kegs_bulk():
             "beer_name": str(item.get("beer_name", "")).strip(),
             "beer_type": str(item.get("beer_type", "")).strip(),
             "type": keg_type,
-            "size": str(item.get("size", "")).strip() or default_keg_size,
+            "size": _normalize_builtin_keg_type_label(item.get("size", "")) or default_keg_size,
             "custom_size": item.get("custom_size", ""),
             "status": initial_status,
             "beer_brewer": item.get("beer_brewer", item.get("brewery", "")),

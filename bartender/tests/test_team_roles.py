@@ -118,6 +118,25 @@ def test_owner_can_change_bar_name_and_api_tokens(tmp_path):
     assert payload["external_api_write_token"] == "write-token"
 
 
+def test_default_keg_type_prefers_corny_and_normalizes_full_size_label(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+
+    assert data["settings"]["default_keg_type"] == "Corny (5 gal)"
+    assert data["settings"]["keg_type_choices"][0] == "Corny (5 gal)"
+    assert "Full Size (1/2 bbl, 15.5 gal)" in data["settings"]["keg_type_choices"]
+
+    data["settings"]["keg_type_choices"] = ["1/2 bbl (15.5 gal)", "Corny (5 gal)"]
+    data["settings"]["default_keg_type"] = "1/2 bbl (15.5 gal)"
+    app_module.save_data(data)
+
+    reloaded = app_module.load_data()
+
+    assert reloaded["settings"]["keg_type_choices"][0] == "Full Size (1/2 bbl, 15.5 gal)"
+    assert reloaded["settings"]["default_keg_type"] == "Full Size (1/2 bbl, 15.5 gal)"
+
+
 def test_first_created_user_defaults_to_owner(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
