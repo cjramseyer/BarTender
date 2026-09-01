@@ -11,6 +11,12 @@ This repository is a Bar/Beer management app for HomeBrewers and Taprooms
 
 BarTender is a Home Assistant add-on for managing your bar — track kegs, taps, and bar stock from a clean web UI with ingress support.
 
+## Dashboard Preview
+
+Sample dashboard with seeded data:
+
+![BarTender dashboard with sample data](docs/assets/screenshots/sample-data/dashboard-desktop.png)
+
 ## Repository Layout
 
 - `repository.yaml` - Home Assistant add-on repository index file
