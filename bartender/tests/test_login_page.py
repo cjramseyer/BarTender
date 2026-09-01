@@ -178,8 +178,13 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert "/logout" in body
-    assert "Owner (owner)" in body
+    assert "nav-menu-button" in body
+    assert "View Display" in body
+    assert "Printable Menu" in body
+    assert "Settings" in body
+    assert "nav-avatar-button" in body
+    assert "Owner" in body
+    assert "Log out" in body
 
 
 def test_logout_clears_session_and_redirects_to_login(tmp_path):

@@ -17,8 +17,43 @@ function closeModal(id) {
   if (modal) modal.classList.remove("is-open");
 }
 
+function setNavDropdownState(menu, isOpen) {
+  if (!menu) {
+    return;
+  }
+
+  const button = menu.querySelector("[data-nav-dropdown-toggle]");
+  menu.classList.toggle("is-open", isOpen);
+  if (button) {
+    button.setAttribute("aria-expanded", String(isOpen));
+  }
+}
+
+function closeNavDropdowns(exceptMenu) {
+  document.querySelectorAll("[data-nav-dropdown]").forEach((menu) => {
+    if (menu !== exceptMenu) {
+      setNavDropdownState(menu, false);
+    }
+  });
+}
+
 // Close modal when clicking overlay background
 document.addEventListener("click", (e) => {
+  const dropdownToggle = e.target.closest("[data-nav-dropdown-toggle]");
+  if (dropdownToggle) {
+    const menu = dropdownToggle.closest("[data-nav-dropdown]");
+    if (menu) {
+      const isOpen = !menu.classList.contains("is-open");
+      closeNavDropdowns(menu);
+      setNavDropdownState(menu, isOpen);
+    }
+    return;
+  }
+
+  if (!e.target.closest("[data-nav-dropdown]")) {
+    closeNavDropdowns();
+  }
+
   if (e.target.classList.contains("modal")) {
     if (e.target.dataset.lock === "true") {
       return;
@@ -31,6 +66,12 @@ document.addEventListener("click", (e) => {
       return;
     }
     e.target.classList.remove("is-open");
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeNavDropdowns();
   }
 });
 

@@ -1,4 +1,4 @@
-/* BarTender – CSS with light/dark theme support */
+/* BarTender ΓÇô CSS with light/dark theme support */
 
 :root {
   --bg: #f5f6fa;
@@ -146,8 +146,14 @@ body {
   color: var(--nav-active);
 }
 
-.nav-display-btn {
+.nav-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nav-display-btn {
   flex-shrink: 0;
 }
 
@@ -155,17 +161,202 @@ body {
   flex-shrink: 0;
 }
 
-.nav-user-shell {
+.nav-menu-shell {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
   flex-shrink: 0;
 }
 
-.nav-user-meta {
-  color: var(--nav-text);
-  font-size: 0.82rem;
+.nav-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nav-active);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.nav-menu-button:hover,
+.nav-menu-shell.is-open .nav-menu-button {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.nav-menu-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.nav-menu-label {
+  font-size: 0.88rem;
+  font-weight: 600;
   white-space: nowrap;
+}
+
+.nav-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  min-width: 12rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+  display: none;
+  z-index: 110;
+}
+
+.nav-menu-shell.is-open .nav-menu-panel {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.nav-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.5rem 0.7rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nav-menu-item:hover,
+.nav-menu-item:focus-visible {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.nav-user-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.nav-avatar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem 0.3rem 0.35rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nav-active);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.nav-avatar-button:hover,
+.nav-user-menu.is-open .nav-avatar-button {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.nav-avatar-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.nav-avatar-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nav-avatar-chevron {
+  color: var(--nav-text);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.nav-user-panel {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  min-width: 12rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+  display: none;
+  z-index: 110;
+}
+
+.nav-user-menu.is-open .nav-user-panel {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.nav-user-panel-name {
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.nav-user-logout {
+  justify-content: center;
+}
+
+.nav-user-menu .nav-user-logout {
+  width: 100%;
+}
+
+.nav-user-menu .nav-user-logout.btn-secondary {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.nav-user-menu .nav-user-logout.btn-secondary:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
+}
+
+.nav-user-menu .nav-user-logout.btn {
+  white-space: nowrap;
+}
+
+.nav-user-menu .nav-user-logout,
+.nav-user-menu .nav-user-logout:hover {
+  color: #fff;
+}
+
+.nav-user-menu .nav-user-logout:focus-visible,
+.nav-avatar-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.nav-user-menu .nav-user-logout:focus-visible {
+  outline-color: var(--primary);
 }
 
 /* Container */
