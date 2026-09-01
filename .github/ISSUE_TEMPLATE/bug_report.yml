@@ -1,8 +1,8 @@
 ---
 name: Bug Report
 description: Report a reproducible bug in BarTender.
-title: "[Bug]: "
-labels: ["bug", "triage"]
+title: "[Bugfix] "
+labels: ["bugfix", "priority-medium"]
 assignees:
   - cjramseyer
 body:
