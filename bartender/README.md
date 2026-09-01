@@ -2,6 +2,12 @@
 
 Manage your home bar with a web UI built into Home Assistant.
 
+## Dashboard Preview
+
+Sample dashboard with seeded data:
+
+![BarTender dashboard with sample data](https://raw.githubusercontent.com/cjramseyer/BarTender/main/docs/assets/screenshots/sample-data/dashboard-desktop.png)
+
 ## Installation and Startup
 
 1. In Home Assistant, go to **Settings -> Add-ons -> Add-on Store**.
@@ -31,7 +37,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
   - Legacy shared token supported for compatibility
 - Optional IP/CIDR allowlist for trusted client networks.
 - Configurable per-minute rate limiting.
-- Use **Settings -> Features -> Test External API Access** to validate config.
+- Use **Settings -> API Settings -> Test External API Access** to validate config.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
 
