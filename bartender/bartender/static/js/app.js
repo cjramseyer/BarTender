@@ -61,10 +61,10 @@ function closeNavDropdowns(exceptMenu) {
   document
     .querySelectorAll("[data-nav-dropdown], [data-nav-user-menu]")
     .forEach((menu) => {
-    if (menu !== exceptMenu) {
-      setNavDropdownState(menu, false);
-    }
-  });
+      if (menu !== exceptMenu) {
+        setNavDropdownState(menu, false);
+      }
+    });
 }
 
 // Close modal when clicking overlay background

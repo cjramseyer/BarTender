@@ -22,14 +22,18 @@ content %}
   <div class="card settings-card settings-sections-card">
     <form id="settingsForm" onsubmit="saveSettings(event)">
       {% if owner_pin_recovery_required %}
-      <div class="form-group settings-warning-block" style="margin-bottom: 1rem">
+      <div
+        class="form-group settings-warning-block"
+        style="margin-bottom: 1rem"
+      >
         <label>Owner Recovery Mode</label>
         <p class="muted" style="margin-top: 0.35rem">
-          This installation has multiple team members but no owner PIN yet.
-          Save an Owner PIN below to restore normal access.
+          This installation has multiple team members but no owner PIN yet. Save
+          an Owner PIN below to restore normal access.
         </p>
         <p class="muted" style="margin-top: 0.25rem">
-          Until a PIN is saved, other pages and non-settings actions stay locked.
+          Until a PIN is saved, other pages and non-settings actions stay
+          locked.
         </p>
       </div>
       {% endif %}
@@ -643,8 +647,8 @@ content %}
         <span id="saveMsg" class="save-msg"></span>
       </div>
       <p class="muted" style="margin-top: 0.65rem">
-        This resets settings only. Beers, kegs, taps, team users, and audit history are kept.
-        The app will return to first-time setup defaults.
+        This resets settings only. Beers, kegs, taps, team users, and audit
+        history are kept. The app will return to first-time setup defaults.
       </p>
 
       <details class="settings-collapsible" style="margin-top: 1rem">
@@ -657,7 +661,8 @@ content %}
               audit history, and uploaded logos.
             </p>
             <p class="muted" style="margin-top: 0.25rem">
-              Export a backup first if you may need to restore this installation later.
+              Export a backup first if you may need to restore this installation
+              later.
             </p>
             <div class="form-actions" style="margin-top: 0.75rem">
               <button
@@ -791,127 +796,128 @@ content %}
       </details>
     </div>
 
-  <div class="card settings-card settings-team-card">
-    <h2 class="settings-panel-title">Team Access</h2>
-    <div class="settings-collapsible-body">
-      <div class="form-group">
-        <label>Current Team Members</label>
-        <div
-          id="teamUsersList"
-          class="stack-gap-sm"
-          style="margin-top: 8px"
-        ></div>
-      </div>
-      <div class="form-group">
-        <label>Owner PIN</label>
-        <input
-          type="password"
-          id="ownerPin"
-          class="form-control"
-          value="{{ settings.owner_pin or '' }}"
-          placeholder="Required when other team members are present"
-          autocomplete="new-password"
-        />
-        <small class="muted"
-          >Require this PIN for the owner login when there is more than one
-          team member. Leave blank if you want only the single-owner
-          setup.</small
-        >
-      </div>
-      <div class="form-group">
-        <label>Invite User</label>
-        <div class="form-row" style="gap: 0.5rem; align-items: end">
-          <div class="form-group" style="flex: 1; min-width: 180px">
-            <input
-              type="text"
-              id="teamUserName"
-              class="form-control"
-              placeholder="Name"
-            />
-          </div>
-          <div class="form-group" style="min-width: 150px">
-            <select id="teamUserRole" class="form-control">
-              <option value="staff">Staff</option>
-              <option value="manager">Manager</option>
-              <option value="owner">Owner</option>
-            </select>
-          </div>
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            onclick="addTeamUser()"
-          >
-            Add User
-          </button>
+    <div class="card settings-card settings-team-card">
+      <h2 class="settings-panel-title">Team Access</h2>
+      <div class="settings-collapsible-body">
+        <div class="form-group">
+          <label>Current Team Members</label>
+          <div
+            id="teamUsersList"
+            class="stack-gap-sm"
+            style="margin-top: 8px"
+          ></div>
         </div>
-        <small class="muted"
-          >Owners and managers can manage users. Staff access is restricted
-          to their own account.</small
-        >
+        <div class="form-group">
+          <label>Owner PIN</label>
+          <input
+            type="password"
+            id="ownerPin"
+            class="form-control"
+            value="{{ settings.owner_pin or '' }}"
+            placeholder="Required when other team members are present"
+            autocomplete="new-password"
+          />
+          <small class="muted"
+            >Require this PIN for the owner login when there is more than one
+            team member. Leave blank if you want only the single-owner
+            setup.</small
+          >
+        </div>
+        <div class="form-group">
+          <label>Invite User</label>
+          <div class="form-row" style="gap: 0.5rem; align-items: end">
+            <div class="form-group" style="flex: 1; min-width: 180px">
+              <input
+                type="text"
+                id="teamUserName"
+                class="form-control"
+                placeholder="Name"
+              />
+            </div>
+            <div class="form-group" style="min-width: 150px">
+              <select id="teamUserRole" class="form-control">
+                <option value="staff">Staff</option>
+                <option value="manager">Manager</option>
+                <option value="owner">Owner</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              onclick="addTeamUser()"
+            >
+              Add User
+            </button>
+          </div>
+          <small class="muted"
+            >Owners and managers can manage users. Staff access is restricted to
+            their own account.</small
+          >
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="card settings-card settings-export-card">
-    <details class="settings-collapsible">
-      <summary>📤 Export Data</summary>
-      <div class="settings-collapsible-body">
-        <p class="muted">
-          Download your full bar data as a versioned JSON backup or ZIP archive.
-        </p>
-        <div class="export-buttons">
-          <a class="btn btn-secondary" href="{{ ingress }}/api/export/json"
-            >Export Portable JSON</a
-          >
-          <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
-            >Export Archive (.zip)</a
-          >
+    <div class="card settings-card settings-export-card">
+      <details class="settings-collapsible">
+        <summary>📤 Export Data</summary>
+        <div class="settings-collapsible-body">
+          <p class="muted">
+            Download your full bar data as a versioned JSON backup or ZIP
+            archive.
+          </p>
+          <div class="export-buttons">
+            <a class="btn btn-secondary" href="{{ ingress }}/api/export/json"
+              >Export Portable JSON</a
+            >
+            <a class="btn btn-secondary" href="{{ ingress }}/api/export/archive"
+              >Export Archive (.zip)</a
+            >
+          </div>
         </div>
-      </div>
-    </details>
-  </div>
+      </details>
+    </div>
 
-  <div class="card settings-card settings-import-card">
-    <details class="settings-collapsible">
-      <summary>📥 Import Data</summary>
-      <div class="settings-collapsible-body">
-        <p class="muted">
-          Import a previously exported ZIP archive or portable JSON backup.
-        </p>
-        <form id="importForm" onsubmit="importArchive(event)">
-          <div class="form-group">
-            <label for="importArchiveFile">Backup File</label>
-            <input
-              type="file"
-              id="importArchiveFile"
-              accept=".zip,application/zip,.json,application/json"
-              class="form-control"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label>Import Mode</label>
-            <select id="importMode" class="form-control">
-              <option value="replace" selected>
-                Replace all existing data
-              </option>
-              <option value="merge">Merge with existing data</option>
-            </select>
-            <small class="muted">
-              Replace overwrites all data. Merge keeps existing entries and
-              upserts by ID.
-            </small>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn btn-secondary">
-              Import Backup
-            </button>
-            <span id="importMsg" class="save-msg"></span>
-          </div>
-        </form>
-      </div>
-    </details>
-  </div>
+    <div class="card settings-card settings-import-card">
+      <details class="settings-collapsible">
+        <summary>📥 Import Data</summary>
+        <div class="settings-collapsible-body">
+          <p class="muted">
+            Import a previously exported ZIP archive or portable JSON backup.
+          </p>
+          <form id="importForm" onsubmit="importArchive(event)">
+            <div class="form-group">
+              <label for="importArchiveFile">Backup File</label>
+              <input
+                type="file"
+                id="importArchiveFile"
+                accept=".zip,application/zip,.json,application/json"
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>Import Mode</label>
+              <select id="importMode" class="form-control">
+                <option value="replace" selected>
+                  Replace all existing data
+                </option>
+                <option value="merge">Merge with existing data</option>
+              </select>
+              <small class="muted">
+                Replace overwrites all data. Merge keeps existing entries and
+                upserts by ID.
+              </small>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-secondary">
+                Import Backup
+              </button>
+              <span id="importMsg" class="save-msg"></span>
+            </div>
+          </form>
+        </div>
+      </details>
+    </div>
   </div>
 </div>
 {% endblock %} {% block scripts %}
@@ -1455,7 +1461,7 @@ content %}
     if (msg) msg.textContent = "";
 
     const confirmation = window.prompt(
-      'Type RESET ALL DATA to permanently erase all BarTender data after exporting a backup.',
+      "Type RESET ALL DATA to permanently erase all BarTender data after exporting a backup.",
       "",
     );
     if (confirmation === null) return;

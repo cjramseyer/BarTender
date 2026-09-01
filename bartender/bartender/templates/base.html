@@ -50,8 +50,7 @@
         <li><a href="{{ ingress }}/beers">Beers</a></li>
         {% if settings.bar_stock_enabled %}
         <li><a href="{{ ingress }}/stock">Bar Stock</a></li>
-        {% endif %}
-        {% if settings.api_reference_enabled %}
+        {% endif %} {% if settings.api_reference_enabled %}
         <li>
           <a
             href="{{ ingress }}/api-reference"
@@ -90,7 +89,12 @@
               <label class="nav-menu-checkbox">
                 <input
                   type="checkbox"
-                  {% if settings.bar_stock_enabled %}checked{% endif %}
+                  {%
+                  if
+                  settings.bar_stock_enabled
+                  %}checked{%
+                  endif
+                  %}
                   onchange="toggleNavSetting('bar_stock_enabled', this)"
                 />
                 <span>Bar Stock</span>
@@ -98,7 +102,12 @@
               <label class="nav-menu-checkbox">
                 <input
                   type="checkbox"
-                  {% if settings.api_reference_enabled %}checked{% endif %}
+                  {%
+                  if
+                  settings.api_reference_enabled
+                  %}checked{%
+                  endif
+                  %}
                   onchange="toggleNavSetting('api_reference_enabled', this)"
                 />
                 <span>API Reference</span>
@@ -120,13 +129,16 @@
               role="menuitem"
               >Printable Menu</a
             >
-            <a class="nav-menu-item" href="{{ ingress }}/settings" role="menuitem"
+            <a
+              class="nav-menu-item"
+              href="{{ ingress }}/settings"
+              role="menuitem"
               >Settings</a
             >
           </div>
         </div>
-        {% if current_user_name %}
-        {% set user_initial = ((current_user_name or 'User')[:1]) | upper %}
+        {% if current_user_name %} {% set user_initial = ((current_user_name or
+        'User')[:1]) | upper %}
         <div class="nav-user-menu" data-nav-user-menu>
           <button
             type="button"
