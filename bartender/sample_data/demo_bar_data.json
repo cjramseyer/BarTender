@@ -1,0 +1,242 @@
+{
+  "settings": {
+    "measurement": "us",
+    "theme": "light",
+    "bar_name": "Harbor Tap Demo",
+    "bar_logo_url": "",
+    "external_base_url": "",
+    "external_api_token_auth_enabled": true,
+    "external_api_token": "",
+    "external_api_read_token": "",
+    "external_api_write_token": "",
+    "owner_pin": "",
+    "external_api_allowlist_enabled": false,
+    "external_api_allowlist": "",
+    "external_api_rate_limit_enabled": true,
+    "external_api_rate_limit_per_minute": 120,
+    "api_reference_enabled": true,
+    "pour_mode": "manual",
+    "environment_mode": "production",
+    "setup_completed": true,
+    "dashboard_manage_button_position": "top-right",
+    "bar_stock_enabled": true,
+    "analytics_enabled": true,
+    "default_keg_type": "Corny (5 gal)",
+    "keg_type_choices": [
+      "Corny (5 gal)",
+      "1/6 bbl (5.2 gal)",
+      "1/4 bbl (7.75 gal)",
+      "Full Size (1/2 bbl, 15.5 gal)",
+      "20 L",
+      "30 L",
+      "50 L",
+      "Custom"
+    ],
+    "menu_qr_mode": "both",
+    "pour_options": [
+      {
+        "name": "Pint",
+        "amount": 16,
+        "unit": "oz"
+      },
+      {
+        "name": "Half Pint",
+        "amount": 8,
+        "unit": "oz"
+      },
+      {
+        "name": "Taste",
+        "amount": 2,
+        "unit": "oz"
+      }
+    ],
+    "default_pour_preset": "16|oz|Pint",
+    "audit_retention_days": 30,
+    "analytics_low_keg_threshold_percent": 25,
+    "analytics_days_left_method": "trailing_window",
+    "analytics_days_left_window_days": 14
+  },
+  "bar_stock": [
+    {
+      "id": 1,
+      "name": "Lime Juice",
+      "category": "Mixer",
+      "quantity": 3,
+      "unit": "750 ml",
+      "size_label": "750 ml",
+      "size_value": 750,
+      "size_unit": "ml",
+      "notes": "House margarita rail",
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Simple Syrup",
+      "category": "Syrup",
+      "quantity": 2,
+      "unit": "1 L",
+      "size_label": "1 L",
+      "size_value": 1,
+      "size_unit": "L",
+      "notes": "Fresh batch for cocktails",
+      "updated_at": "2026-09-01T12:00:00Z"
+    }
+  ],
+  "beers": [
+    {
+      "id": 1,
+      "name": "North Ridge IPA",
+      "type": "IPA",
+      "packaging": "kegged",
+      "brewer": "North Ridge Brewing",
+      "brewery": "North Ridge Brewing",
+      "abv": "6.4",
+      "ibu": "58",
+      "brewed_on": "2026-06-01",
+      "notes": "Citrus-forward flagship hazy.",
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "City Lights Lager",
+      "type": "Lager",
+      "packaging": "kegged",
+      "brewer": "City Lights Brewing",
+      "brewery": "City Lights Brewing",
+      "abv": "5.1",
+      "ibu": "18",
+      "brewed_on": "2026-05-11",
+      "notes": "Clean, crisp crowd-pleaser.",
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": 3,
+      "name": "Cherry Blossom Cider",
+      "type": "Cider",
+      "packaging": "bottled_can",
+      "brewer": "Orchard House",
+      "brewery": "Orchard House",
+      "abv": "5.8",
+      "ibu": "",
+      "brewed_on": "2026-04-18",
+      "notes": "Seasonal canned cider for the back bar.",
+      "updated_at": "2026-09-01T12:00:00Z"
+    }
+  ],
+  "kegs": [
+    {
+      "id": 1,
+      "created_at": "2026-08-18T18:00:00Z",
+      "name": "Demo IPA Keg",
+      "beer_id": 1,
+      "beer_name": "North Ridge IPA",
+      "type": "Corny (5 gal)",
+      "size": "Corny (5 gal)",
+      "custom_size": "",
+      "status": "in_use",
+      "beer_brewer": "North Ridge Brewing",
+      "beer_abv": "6.4",
+      "beer_ibu": "58",
+      "beer_brewed_on": "2026-06-01",
+      "line_cleaning_keg": false,
+      "current_volume": 320,
+      "volume_unit": "oz",
+      "notes": "Flagship IPA on the patio line.",
+      "tapped_date": "2026-08-20",
+      "filled_date": "2026-08-18",
+      "percent_full": 50,
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "created_at": "2026-08-28T17:00:00Z",
+      "name": "Lager Mainline",
+      "beer_id": 2,
+      "beer_name": "City Lights Lager",
+      "type": "Full Size (1/2 bbl, 15.5 gal)",
+      "size": "Full Size (1/2 bbl, 15.5 gal)",
+      "custom_size": "",
+      "status": "in_use",
+      "beer_brewer": "City Lights Brewing",
+      "beer_abv": "5.1",
+      "beer_ibu": "18",
+      "beer_brewed_on": "2026-05-11",
+      "line_cleaning_keg": false,
+      "current_volume": 1825,
+      "volume_unit": "oz",
+      "notes": "High-volume lager for the main bar.",
+      "tapped_date": "2026-08-30",
+      "filled_date": "2026-08-28",
+      "percent_full": 92,
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": 3,
+      "created_at": "2026-08-31T16:00:00Z",
+      "name": "Next Up Lager",
+      "beer_id": 2,
+      "beer_name": "City Lights Lager",
+      "type": "Corny (5 gal)",
+      "size": "Corny (5 gal)",
+      "custom_size": "",
+      "status": "full",
+      "beer_brewer": "City Lights Brewing",
+      "beer_abv": "5.1",
+      "beer_ibu": "18",
+      "beer_brewed_on": "2026-05-11",
+      "line_cleaning_keg": false,
+      "on_deck": true,
+      "current_volume": 640,
+      "volume_unit": "oz",
+      "notes": "On deck replacement keg.",
+      "tapped_date": "",
+      "filled_date": "2026-08-31",
+      "percent_full": 100,
+      "updated_at": "2026-09-01T12:00:00Z"
+    }
+  ],
+  "taps": [
+    {
+      "id": 1,
+      "number": 1,
+      "label": "Patio IPA",
+      "keg_id": 1,
+      "notes": "Most popular hop-forward tap.",
+      "updated_at": "2026-09-01T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "number": 2,
+      "label": "House Lager",
+      "keg_id": 2,
+      "notes": "Core lager line.",
+      "updated_at": "2026-09-01T12:00:00Z"
+    }
+  ],
+  "pour_events": [
+    {
+      "created_at": "2026-09-01T10:12:00Z",
+      "keg_id": 1,
+      "tap_id": 1,
+      "amount": 16,
+      "unit": "oz",
+      "source": "manual"
+    },
+    {
+      "created_at": "2026-09-01T10:28:00Z",
+      "keg_id": 1,
+      "tap_id": 1,
+      "amount": 8,
+      "unit": "oz",
+      "source": "manual"
+    },
+    {
+      "created_at": "2026-09-01T11:02:00Z",
+      "keg_id": 2,
+      "tap_id": 2,
+      "amount": 2,
+      "unit": "oz",
+      "source": "manual"
+    }
+  ]
+}
