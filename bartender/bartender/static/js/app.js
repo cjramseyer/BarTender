@@ -22,7 +22,9 @@ function setNavDropdownState(menu, isOpen) {
     return;
   }
 
-  const button = menu.querySelector("[data-nav-dropdown-toggle]");
+  const button = menu.querySelector(
+    "[data-nav-dropdown-toggle], [data-nav-user-toggle]",
+  );
   menu.classList.toggle("is-open", isOpen);
   if (button) {
     button.setAttribute("aria-expanded", String(isOpen));
@@ -30,7 +32,9 @@ function setNavDropdownState(menu, isOpen) {
 }
 
 function closeNavDropdowns(exceptMenu) {
-  document.querySelectorAll("[data-nav-dropdown]").forEach((menu) => {
+  document
+    .querySelectorAll("[data-nav-dropdown], [data-nav-user-menu]")
+    .forEach((menu) => {
     if (menu !== exceptMenu) {
       setNavDropdownState(menu, false);
     }
@@ -39,9 +43,13 @@ function closeNavDropdowns(exceptMenu) {
 
 // Close modal when clicking overlay background
 document.addEventListener("click", (e) => {
-  const dropdownToggle = e.target.closest("[data-nav-dropdown-toggle]");
+  const dropdownToggle = e.target.closest(
+    "[data-nav-dropdown-toggle], [data-nav-user-toggle]",
+  );
   if (dropdownToggle) {
-    const menu = dropdownToggle.closest("[data-nav-dropdown]");
+    const menu = dropdownToggle.closest(
+      "[data-nav-dropdown], [data-nav-user-menu]",
+    );
     if (menu) {
       const isOpen = !menu.classList.contains("is-open");
       closeNavDropdowns(menu);
@@ -50,7 +58,7 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  if (!e.target.closest("[data-nav-dropdown]")) {
+  if (!e.target.closest("[data-nav-dropdown], [data-nav-user-menu]")) {
     closeNavDropdowns();
   }
 

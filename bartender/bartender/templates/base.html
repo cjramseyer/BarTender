@@ -51,7 +51,6 @@
         {% if settings.bar_stock_enabled %}
         <li><a href="{{ ingress }}/stock">Bar Stock</a></li>
         {% endif %}
-        <li><a href="{{ ingress }}/settings">⚙ Settings</a></li>
         {% if settings.api_reference_enabled %}
         <li>
           <a
@@ -237,11 +236,16 @@
       </div>
     </div>
     {% endif %} {% if settings.setup_completed %}
-    <div class="modal" id="updateNoticeModal">
+    <div class="modal" id="updateNoticeModal" data-overlay-close="true">
       <div class="modal-dialog modal-dialog-lg">
         <div class="modal-header">
           <h3>What's new in BarTender {{ app_version }}</h3>
-          <button class="btn btn-icon" onclick="dismissUpdateNotice()">
+          <button
+            type="button"
+            class="btn btn-icon"
+            aria-label="Dismiss what's new notice"
+            onclick="dismissUpdateNotice()"
+          >
             ✕
           </button>
         </div>
@@ -264,7 +268,7 @@
             class="btn btn-primary"
             onclick="dismissUpdateNotice()"
           >
-            Got it
+            Dismiss
           </button>
         </div>
       </div>

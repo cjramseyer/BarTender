@@ -181,7 +181,6 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert "nav-menu-button" in body
     assert "View Display" in body
     assert "Printable Menu" in body
-    assert "Settings" in body
     assert "nav-avatar-button" in body
     assert "Owner" in body
     assert "Log out" in body
