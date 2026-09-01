@@ -791,8 +791,19 @@ content %}
 
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Settings</button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          onclick="resetSettingsToDefaults()"
+        >
+          Reset Settings to Defaults
+        </button>
         <span id="saveMsg" class="save-msg"></span>
       </div>
+      <p class="muted" style="margin-top: 0.65rem">
+        This resets settings only. Beers, kegs, taps, team users, and audit history are kept.
+        The app will return to first-time setup defaults.
+      </p>
     </form>
   </div>
 
@@ -1360,6 +1371,35 @@ content %}
       console.error("Unable to reset keg types", err);
       if (msg) {
         msg.textContent = "Unable to reset keg types. Try again.";
+      }
+    }
+  }
+
+  async function resetSettingsToDefaults() {
+    const msg = document.getElementById("saveMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset all settings to built-in defaults? This keeps beers, kegs, taps, team users, and audit history.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings/reset`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Reset failed: ${res.status}`);
+      }
+
+      if (msg) {
+        msg.textContent = "✓ Settings reset. Reloading...";
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error("Unable to reset settings", err);
+      if (msg) {
+        msg.textContent = "Reset failed";
       }
     }
   }

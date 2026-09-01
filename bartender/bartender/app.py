@@ -178,7 +178,7 @@ def enforce_owner_pin_recovery():
     normalized_path = _normalized_request_path()
     if normalized_path.startswith("/static/"):
         return None
-    if normalized_path in ("/logout", "/settings", "/api/settings"):
+    if normalized_path in ("/logout", "/settings", "/api/settings", "/api/settings/reset"):
         return None
     if normalized_path.startswith("/api/"):
         return jsonify({
@@ -725,6 +725,93 @@ def _normalize_low_keg_threshold(value) -> int:
     if threshold is None:
         return 25
     return max(1, min(100, threshold))
+
+
+def _default_settings_snapshot() -> dict:
+    return json.loads(json.dumps(DEFAULT_DATA["settings"]))
+
+
+def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = False) -> None:
+    settings = data.get("settings")
+    if not isinstance(settings, dict):
+        settings = _default_settings_snapshot()
+        data["settings"] = settings
+
+    if settings.get("dashboard_manage_button_position") not in (
+        "top-right",
+        "bottom-left",
+        "bottom-right",
+    ):
+        settings["dashboard_manage_button_position"] = "top-right"
+
+    settings.pop("manage_button_position", None)
+
+    settings["bar_stock_enabled"] = _coerce_bool(settings.get("bar_stock_enabled"), True)
+    settings["analytics_enabled"] = _coerce_bool(settings.get("analytics_enabled"), True)
+    settings["api_reference_enabled"] = _coerce_bool(settings.get("api_reference_enabled"), True)
+    settings["pour_mode"] = _normalize_pour_mode(settings.get("pour_mode"))
+    settings["environment_mode"] = _normalize_environment_mode(settings.get("environment_mode"))
+    if setup_completed_explicit:
+        settings["setup_completed"] = _coerce_bool(settings.get("setup_completed"), False)
+    elif str(settings.get("bar_name", "")).strip() not in ("", "My Bar"):
+        settings["setup_completed"] = True
+    settings["keg_type_choices"] = _normalize_keg_type_choices(
+        settings.get("keg_type_choices", []),
+        settings.get("default_keg_type", ""),
+    )
+    settings["default_keg_type"] = _normalize_default_keg_type(
+        settings.get("default_keg_type", ""),
+        settings.get("keg_type_choices", []),
+    )
+    settings["menu_qr_mode"] = _normalize_menu_qr_mode(settings.get("menu_qr_mode"))
+    settings["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
+        settings.get("analytics_low_keg_threshold_percent")
+    )
+    settings["analytics_days_left_method"] = _normalize_days_left_method(
+        settings.get("analytics_days_left_method")
+    )
+    settings["analytics_days_left_window_days"] = _normalize_days_left_window_days(
+        settings.get("analytics_days_left_window_days")
+    )
+    settings["pour_options"] = _normalize_pour_options(
+        settings.get("pour_options"),
+        settings.get("measurement", "us"),
+    )
+    settings["default_pour_preset"] = _normalize_default_pour_preset(
+        settings.get("default_pour_preset", ""),
+        settings.get("pour_options", []),
+    )
+    settings["bar_logo_url"] = _normalize_logo_url(settings.get("bar_logo_url", ""))
+    settings["external_base_url"] = _normalize_external_base_url(settings.get("external_base_url", ""))
+    settings["external_api_token_auth_enabled"] = _coerce_bool(
+        settings.get("external_api_token_auth_enabled"),
+        True,
+    )
+    settings["external_api_token"] = _normalize_external_api_token(settings.get("external_api_token", ""))
+    settings["external_api_read_token"] = _normalize_external_api_token(
+        settings.get("external_api_read_token", "")
+    )
+    settings["external_api_write_token"] = _normalize_external_api_token(
+        settings.get("external_api_write_token", "")
+    )
+    settings["owner_pin"] = _normalize_owner_pin(settings.get("owner_pin", ""))
+    settings["external_api_allowlist_enabled"] = _coerce_bool(
+        settings.get("external_api_allowlist_enabled"),
+        False,
+    )
+    settings["external_api_allowlist"] = _normalize_ip_allowlist_text(
+        settings.get("external_api_allowlist", "")
+    )
+    settings["external_api_rate_limit_enabled"] = _coerce_bool(
+        settings.get("external_api_rate_limit_enabled"),
+        True,
+    )
+    settings["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
+        settings.get("external_api_rate_limit_per_minute")
+    )
+    settings["audit_retention_days"] = _normalize_audit_retention_days(
+        settings.get("audit_retention_days")
+    )
 
 
 def _normalize_logo_url(value) -> str:
@@ -2292,109 +2379,9 @@ def api_save_settings():
     if "manage_button_position" in body and "dashboard_manage_button_position" not in body:
         data["settings"]["dashboard_manage_button_position"] = body.get("manage_button_position")
 
-    if data["settings"].get("dashboard_manage_button_position") not in (
-        "top-right",
-        "bottom-left",
-        "bottom-right",
-    ):
-        data["settings"]["dashboard_manage_button_position"] = "top-right"
-
-    data["settings"].pop("manage_button_position", None)
-
-    data["settings"]["bar_stock_enabled"] = _coerce_bool(
-        data["settings"].get("bar_stock_enabled"),
-        True,
-    )
-    data["settings"]["analytics_enabled"] = _coerce_bool(
-        data["settings"].get("analytics_enabled"),
-        True,
-    )
-    data["settings"]["api_reference_enabled"] = _coerce_bool(
-        data["settings"].get("api_reference_enabled"),
-        True,
-    )
-    data["settings"]["pour_mode"] = _normalize_pour_mode(
-        data["settings"].get("pour_mode")
-    )
-    data["settings"]["environment_mode"] = _normalize_environment_mode(
-        data["settings"].get("environment_mode")
-    )
-    if "setup_completed" in body:
-        data["settings"]["setup_completed"] = _coerce_bool(
-            data["settings"].get("setup_completed"),
-            False,
-        )
-    elif str(data["settings"].get("bar_name", "")).strip() not in ("", "My Bar"):
-        data["settings"]["setup_completed"] = True
-    data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
-        data["settings"].get("keg_type_choices", []),
-        data["settings"].get("default_keg_type", ""),
-    )
-    data["settings"]["default_keg_type"] = _normalize_default_keg_type(
-        data["settings"].get("default_keg_type", ""),
-        data["settings"].get("keg_type_choices", []),
-    )
-    data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
-        data["settings"].get("menu_qr_mode")
-    )
-    data["settings"]["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
-        data["settings"].get("analytics_low_keg_threshold_percent")
-    )
-    data["settings"]["analytics_days_left_method"] = _normalize_days_left_method(
-        data["settings"].get("analytics_days_left_method")
-    )
-    data["settings"]["analytics_days_left_window_days"] = _normalize_days_left_window_days(
-        data["settings"].get("analytics_days_left_window_days")
-    )
-    data["settings"]["pour_options"] = _normalize_pour_options(
-        data["settings"].get("pour_options"),
-        data["settings"].get("measurement", "us"),
-    )
-    data["settings"]["default_pour_preset"] = _normalize_default_pour_preset(
-        data["settings"].get("default_pour_preset", ""),
-        data["settings"].get("pour_options", []),
-    )
-    data["settings"]["bar_logo_url"] = _normalize_logo_url(
-        data["settings"].get("bar_logo_url", "")
-    )
-    data["settings"]["external_base_url"] = _normalize_external_base_url(
-        data["settings"].get("external_base_url", "")
-    )
-    data["settings"]["external_api_token_auth_enabled"] = _coerce_bool(
-        data["settings"].get("external_api_token_auth_enabled"),
-        True,
-    )
-    data["settings"]["external_api_token"] = _normalize_external_api_token(
-        data["settings"].get("external_api_token", "")
-    )
-    data["settings"]["external_api_read_token"] = _normalize_external_api_token(
-        data["settings"].get("external_api_read_token", "")
-    )
-    data["settings"]["external_api_write_token"] = _normalize_external_api_token(
-        data["settings"].get("external_api_write_token", "")
-    )
-    data["settings"]["owner_pin"] = _normalize_owner_pin(
-        data["settings"].get("owner_pin", "")
-    )
+    _normalize_settings_in_place(data, setup_completed_explicit="setup_completed" in body)
     if data["settings"]["owner_pin"]:
         session.pop("owner_pin_recovery_required", None)
-    data["settings"]["external_api_allowlist_enabled"] = _coerce_bool(
-        data["settings"].get("external_api_allowlist_enabled"),
-        False,
-    )
-    data["settings"]["external_api_allowlist"] = _normalize_ip_allowlist_text(
-        data["settings"].get("external_api_allowlist", "")
-    )
-    data["settings"]["external_api_rate_limit_enabled"] = _coerce_bool(
-        data["settings"].get("external_api_rate_limit_enabled"),
-        True,
-    )
-    data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
-        data["settings"].get("external_api_rate_limit_per_minute")
-    )
-    data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
-        data["settings"].get("audit_retention_days")
-    )
 
     _record_team_audit(
         data,
@@ -2402,6 +2389,36 @@ def api_save_settings():
         "settings_updated",
         "settings",
         {"bar_name": data["settings"].get("bar_name", "")},
+    )
+    save_data(data)
+    return jsonify(data["settings"])
+
+
+@app.route("/api/settings/reset", methods=["POST"])
+def api_reset_settings_to_defaults():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    previous_settings = data.get("settings", {}) if isinstance(data.get("settings"), dict) else {}
+    data["settings"] = _default_settings_snapshot()
+    _normalize_settings_in_place(data, setup_completed_explicit=True)
+
+    if data["settings"].get("owner_pin"):
+        session.pop("owner_pin_recovery_required", None)
+    else:
+        session["owner_pin_recovery_required"] = _owner_pin_recovery_needed(data)
+
+    _record_team_audit(
+        data,
+        current_user,
+        "settings_reset",
+        "settings",
+        {
+            "from_bar_name": str(previous_settings.get("bar_name", "")),
+            "to_bar_name": str(data["settings"].get("bar_name", "")),
+        },
     )
     save_data(data)
     return jsonify(data["settings"])
