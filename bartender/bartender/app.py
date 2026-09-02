@@ -3717,6 +3717,16 @@ def api_delete_keg(keg_id: int):
 # API – Taps
 # ---------------------------------------------------------------------------
 
+def _find_tap_assigned_to_keg(taps: list[dict], keg_id: int | None, exclude_tap_id: int | None = None) -> dict | None:
+    if keg_id is None:
+        return None
+    for tap in taps:
+        if exclude_tap_id is not None and tap.get("id") == exclude_tap_id:
+            continue
+        if tap.get("keg_id") == keg_id:
+            return tap
+    return None
+
 @app.route("/api/taps", methods=["GET"])
 def api_list_taps():
     data = load_data()
@@ -3731,6 +3741,14 @@ def api_add_tap():
     parsed_keg_id = _coerce_int(raw_keg_id, None)
     if raw_keg_id not in (None, "") and parsed_keg_id is None:
         return jsonify({"error": "Invalid keg_id."}), 400
+    conflicting_tap = _find_tap_assigned_to_keg(data.get("taps", []), parsed_keg_id)
+    if conflicting_tap is not None:
+        return jsonify({
+            "error": "Keg is already connected to another tap.",
+            "code": "KEG_ALREADY_CONNECTED",
+            "tap_id": conflicting_tap.get("id"),
+            "tap_number": conflicting_tap.get("number"),
+        }), 409
     tap = {
         "id": _next_id(data["taps"]),
         "number": body.get("number", len(data["taps"]) + 1),
@@ -3776,6 +3794,16 @@ def api_add_taps_bulk():
         if keg_id is not None and not any(k.get("id") == keg_id for k in simulated_data.get("kegs", [])):
             return jsonify({"error": "Assigned keg not found.", "index": index}), 404
 
+        conflicting_tap = _find_tap_assigned_to_keg(simulated_data.get("taps", []), keg_id)
+        if conflicting_tap is not None:
+            return jsonify({
+                "error": "Keg is already connected to another tap.",
+                "code": "KEG_ALREADY_CONNECTED",
+                "index": index,
+                "tap_id": conflicting_tap.get("id"),
+                "tap_number": conflicting_tap.get("number"),
+            }), 409
+
         number = _coerce_int(item.get("number"), None)
         if number is None or number <= 0:
             return jsonify({"error": "Tap number must be a positive integer.", "index": index}), 400
@@ -3811,6 +3839,18 @@ def api_update_tap(tap_id: int):
                 parsed_keg_id = _coerce_int(raw_keg_id, None)
                 if raw_keg_id not in (None, "") and parsed_keg_id is None:
                     return jsonify({"error": "Invalid keg_id."}), 400
+                conflicting_tap = _find_tap_assigned_to_keg(
+                    data.get("taps", []),
+                    parsed_keg_id,
+                    exclude_tap_id=tap_id,
+                )
+                if conflicting_tap is not None:
+                    return jsonify({
+                        "error": "Keg is already connected to another tap.",
+                        "code": "KEG_ALREADY_CONNECTED",
+                        "tap_id": conflicting_tap.get("id"),
+                        "tap_number": conflicting_tap.get("number"),
+                    }), 409
                 tap["keg_id"] = parsed_keg_id
                 if parsed_keg_id is not None:
                     tap["ever_assigned_keg"] = True

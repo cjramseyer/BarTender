@@ -159,14 +159,8 @@
         <label>Assigned Keg</label>
         <select id="tapKeg" class="form-control">
           <option value="">— None —</option>
-          {% for keg in kegs %} {% if keg.status in ('full', 'in_use') %}
-          <option value="{{ keg.id }}">
-            {{ keg.name }} ({{ keg.status | replace('_', ' ') }}{% if keg.size
-            %}, {{ keg.size }}{% endif %})
-          </option>
-          {% endif %} {% endfor %}
         </select>
-        <small class="muted">Only full / in-use kegs shown.</small>
+        <small class="muted">Only full / un-used kegs shown.</small>
       </div>
       <div class="form-group">
         <label>Notes</label>
@@ -275,10 +269,71 @@
     document.getElementById("tapModalTitle").textContent = "Add Tap";
     document.getElementById("tapForm").reset();
     document.getElementById("tapId").value = "";
+    buildTapKegOptions();
     document.getElementById("tapNumber").value =
       document.querySelectorAll(".tap-card").length + 1;
     document.getElementById("tapLabel").value = nextIncrementedTapLabel();
     openModal("tapModal");
+  }
+
+  function buildTapKegOptions(activeTapId = null, selectedKegId = null) {
+    const select = document.getElementById("tapKeg");
+    const tapIdNumber =
+      activeTapId === null || activeTapId === ""
+        ? null
+        : parseInt(activeTapId, 10);
+    const selectedKegNumber =
+      selectedKegId === null || selectedKegId === ""
+        ? null
+        : parseInt(selectedKegId, 10);
+
+    const assignedKegToTapId = new Map();
+    for (const tap of TAPS) {
+      if (!tap || tap.keg_id === null || tap.keg_id === undefined || tap.keg_id === "") {
+        continue;
+      }
+      const kegId = parseInt(tap.keg_id, 10);
+      const mappedTapId = parseInt(tap.id, 10);
+      if (Number.isNaN(kegId) || Number.isNaN(mappedTapId)) {
+        continue;
+      }
+      assignedKegToTapId.set(kegId, mappedTapId);
+    }
+
+    select.innerHTML = "";
+    const noneOption = document.createElement("option");
+    noneOption.value = "";
+    noneOption.textContent = "— None —";
+    select.appendChild(noneOption);
+
+    for (const keg of KEGS) {
+      if (!["full", "in_use"].includes(keg.status)) {
+        continue;
+      }
+      const kegId = parseInt(keg.id, 10);
+      if (Number.isNaN(kegId)) {
+        continue;
+      }
+
+      const assignedTapId = assignedKegToTapId.get(kegId);
+      const isConnected = assignedTapId !== undefined;
+      const assignedToOtherTap =
+        isConnected && (tapIdNumber === null || assignedTapId !== tapIdNumber);
+      const statusLabel = isConnected ? "in-use" : "un-used";
+
+      const option = document.createElement("option");
+      option.value = String(kegId);
+      option.textContent = `${keg.name} (${statusLabel}${keg.size ? `, ${keg.size}` : ""})`;
+      option.disabled = assignedToOtherTap;
+      if (selectedKegNumber !== null && selectedKegNumber === kegId) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    }
+
+    if (selectedKegNumber === null) {
+      select.value = "";
+    }
   }
 
   function openBulkTapModal() {
@@ -345,7 +400,7 @@
     document.getElementById("tapId").value = tap.id;
     document.getElementById("tapNumber").value = tap.number;
     document.getElementById("tapLabel").value = tap.label;
-    document.getElementById("tapKeg").value = tap.keg_id || "";
+    buildTapKegOptions(tap.id, tap.keg_id);
     document.getElementById("tapNotes").value = tap.notes;
     openModal("tapModal");
   }
