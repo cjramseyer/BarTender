@@ -1207,6 +1207,8 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
 .settings-header-actions {
@@ -1293,7 +1295,7 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 
 @media (min-width: 980px) {
   .settings-grid {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
     align-items: start;
   }
 
