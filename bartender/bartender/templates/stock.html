@@ -76,14 +76,7 @@ content %}
           class="form-control"
           list="categoryList"
         />
-        <datalist id="categoryList">
-          <option value="Beer" />
-          <option value="Wine" />
-          <option value="Spirits" />
-          <option value="Mixers" />
-          <option value="Garnish" />
-          <option value="Other" />
-        </datalist>
+        <datalist id="categoryList"></datalist>
       </div>
       <div class="form-group">
         <label>Quantity</label>
@@ -133,7 +126,42 @@ content %}
 <script>
   const INGRESS = "{{ ingress }}";
   const MEASUREMENT = "{{ settings.measurement or 'us' }}";
+  const BAR_STOCK = {{ bar_stock | tojson }};
+  const DEFAULT_STOCK_CATEGORIES = [
+    "Whiskey",
+    "Bourbon",
+    "Scotch",
+    "Rye",
+    "Irish Whiskey",
+    "Gin",
+    "Vodka",
+    "Rum",
+    "Tequila",
+    "Mezcal",
+    "Brandy",
+    "Cognac",
+    "Liqueur",
+    "Vermouth",
+    "Bitters",
+    "Amaro",
+    "Beer",
+    "Wine",
+    "Sparkling Wine",
+    "Cider",
+    "Sake",
+    "Non-Alcoholic Spirits",
+    "Ready-to-Drink Cocktails",
+    "Mixers",
+    "Tonic / Soda",
+    "Juice",
+    "Syrups",
+    "Garnish",
+    "Other",
+  ];
   const STANDARD_SIZES_US = [
+    "12 oz bottle",
+    "16 oz bottle",
+    "12 oz can",
     "50 ml",
     "200 ml",
     "375 ml",
@@ -142,6 +170,9 @@ content %}
     "1.75 L",
   ];
   const STANDARD_SIZES_METRIC = [
+    "12 oz bottle",
+    "16 oz bottle",
+    "12 oz can",
     "50 ml",
     "200 ml",
     "375 ml",
@@ -157,6 +188,30 @@ content %}
       return { size_value: null, size_unit: "" };
     }
     return { size_value: parseFloat(m[1]), size_unit: m[2].toLowerCase() };
+  }
+
+  function populateCategoryOptions() {
+    const datalist = document.getElementById("categoryList");
+    if (!datalist) {
+      return;
+    }
+
+    const categories = new Set(DEFAULT_STOCK_CATEGORIES);
+    BAR_STOCK.forEach((item) => {
+      const category = (item.category || "").trim();
+      if (category) {
+        categories.add(category);
+      }
+    });
+
+    datalist.innerHTML = "";
+    Array.from(categories)
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category;
+        datalist.appendChild(option);
+      });
   }
 
   function populateStockSizeOptions() {
@@ -272,6 +327,7 @@ content %}
     openModal("addStockModal");
   }
 
+  populateCategoryOptions();
   populateStockSizeOptions();
 </script>
 {% endblock %}
