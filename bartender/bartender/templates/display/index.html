@@ -22,6 +22,10 @@
         --badge-empty: #9ca3af;
         --badge-cleaning: #f59e0b;
         --badge-retired: #6b7280;
+        --keg-shell-top: #dbe3ee;
+        --keg-shell-bottom: #b9c6d6;
+        --keg-rim-top: #c7d1dd;
+        --keg-rim-bottom: #8d9bae;
         --radius: 8px;
         --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       }
@@ -40,6 +44,10 @@
         --badge-empty: #4b5563;
         --badge-cleaning: #d97706;
         --badge-retired: #4b5563;
+        --keg-shell-top: #566178;
+        --keg-shell-bottom: #394456;
+        --keg-rim-top: #66738d;
+        --keg-rim-bottom: #444f64;
         --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
       }
       *,
@@ -179,15 +187,19 @@
       .keg-level {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        margin-bottom: 0.6rem;
+        gap: 1.35rem;
+        margin-bottom: 0.75rem;
       }
       .keg-level-shell {
-        width: 34px;
-        height: 58px;
-        border-radius: 8px 8px 10px 10px;
-        border: 2px solid var(--border);
-        background: var(--surface2);
+        width: 86px;
+        height: 142px;
+        border-radius: 16px 16px 22px 22px;
+        border: 3px solid var(--border);
+        background: linear-gradient(
+          180deg,
+          var(--keg-shell-top) 0%,
+          var(--keg-shell-bottom) 100%
+        );
         position: relative;
         overflow: hidden;
         flex-shrink: 0;
@@ -195,39 +207,112 @@
       .keg-level-shell::before {
         content: "";
         position: absolute;
-        top: -7px;
-        left: 7px;
-        right: 7px;
-        height: 5px;
-        border-radius: 4px;
-        background: var(--border);
+        top: -14px;
+        left: 15px;
+        right: 15px;
+        height: 18px;
+        border-radius: 10px 10px 4px 4px;
+        background: linear-gradient(
+          180deg,
+          var(--keg-rim-top) 0%,
+          var(--keg-rim-bottom) 100%
+        );
+        border: 3px solid var(--border);
+        border-bottom: none;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
       }
       .keg-level-fill {
         position: absolute;
-        left: 0;
+        left: 4px;
+        right: 4px;
         bottom: 0;
-        width: 100%;
+        width: auto;
+        max-height: calc(100% - 7px);
+        border-radius: 5px 5px 14px 14px;
         background: linear-gradient(
           180deg,
           var(--badge-in_use),
           var(--badge-full)
         );
+        z-index: 1;
+      }
+      .keg-level-fill::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.65);
+        border-radius: 3px;
+      }
+      .keg-level-fill.is-low {
+        background: linear-gradient(180deg, #f59e0b, #f97316);
+        box-shadow: inset 0 0 0 1px rgba(146, 64, 14, 0.32);
+      }
+      .keg-level-bands {
+        position: absolute;
+        inset: 18px 8px 9px;
+        border-radius: 12px;
+        background:
+          linear-gradient(
+            180deg,
+            transparent 0%,
+            transparent 17%,
+            rgba(30, 41, 59, 0.62) 17%,
+            rgba(30, 41, 59, 0.62) 26%,
+            transparent 26%,
+            transparent 45%,
+            rgba(30, 41, 59, 0.62) 45%,
+            rgba(30, 41, 59, 0.62) 55%,
+            transparent 55%,
+            transparent 74%,
+            rgba(30, 41, 59, 0.62) 74%,
+            rgba(30, 41, 59, 0.62) 83%,
+            transparent 83%,
+            transparent 100%
+          );
+        pointer-events: none;
+        z-index: 3;
+      }
+      .keg-level-spout {
+        position: absolute;
+        top: 28px;
+        right: 1px;
+        width: 18px;
+        height: 11px;
+        border-radius: 4px;
+        background: #1f2937;
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+        z-index: 4;
+      }
+      .keg-level-spout::after {
+        content: "";
+        position: absolute;
+        right: -6px;
+        top: 3px;
+        width: 6px;
+        height: 5px;
+        border-radius: 2px;
+        background: #111827;
       }
       .keg-level-meta {
         display: flex;
         flex-direction: column;
-        line-height: 1.1;
+        justify-content: center;
+        line-height: 1;
       }
       .keg-level-label {
-        font-size: 0.72rem;
+        font-size: 0.95rem;
         color: var(--text-muted);
         text-transform: uppercase;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.05em;
       }
       .keg-level-value {
-        font-size: 1rem;
+        font-size: 2.2rem;
         font-weight: 700;
         color: var(--text);
+        letter-spacing: 0.01em;
       }
       .no-keg {
         font-style: italic;
@@ -309,6 +394,13 @@
           width: 120px;
           align-self: flex-end;
         }
+        .keg-level-shell {
+          width: 64px;
+          height: 108px;
+        }
+        .keg-level-value {
+          font-size: 1.7rem;
+        }
       }
     </style>
   </head>
@@ -355,7 +447,9 @@
         {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
         tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
         keg.percent_full is defined else (100 if keg and keg.status == 'full'
-        else 50 if keg and keg.status == 'in_use' else 0) %} {% set beer_brewer
+        else 50 if keg and keg.status == 'in_use' else 0) %} {% set
+        visual_fill_pct = 12 if fill_pct > 0 and fill_pct < 12 else fill_pct %}
+        {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set beer_brewer
         = keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if
         keg else '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set
         beer_brewed_on = keg.beer_brewed_on if keg else '' %}
@@ -376,9 +470,11 @@
             >
               <div class="keg-level-shell">
                 <div
-                  class="keg-level-fill"
-                  style="height: {{ fill_pct }}%;"
+                  class="keg-level-fill{% if low_fill %} is-low{% endif %}"
+                  style="height: {{ visual_fill_pct }}%;"
                 ></div>
+                <div class="keg-level-bands" aria-hidden="true"></div>
+                <div class="keg-level-spout" aria-hidden="true"></div>
               </div>
               <div class="keg-level-meta">
                 <span class="keg-level-value">{{ fill_pct }}%</span>
@@ -390,14 +486,12 @@
                 replace('_', ' ') | title) }}</span
               >
             </p>
+            <p class="muted">Brewery: {{ beer_brewer or keg.brewery or '—' }}</p>
             <p class="muted">
-              {{ beer_brewer or keg.brewery or '—' }}{% if beer_abv or keg.abv
-              %} · {{ beer_abv or keg.abv }}% ABV{% endif %}{% if beer_ibu %} ·
-              {{ beer_ibu }} IBU{% endif %}
+              ABV: {{ (beer_abv or keg.abv) ~ '%' if (beer_abv or keg.abv) else '—' }}
+              · IBU: {{ beer_ibu or '—' }}
             </p>
-            {% if beer_brewed_on %}
-            <p class="muted">{{ beer_brewed_on }}</p>
-            {% endif %} {% else %}
+            {% else %}
             <p class="no-keg">— No keg assigned —</p>
             {% endif %}
           </div>

@@ -30,6 +30,8 @@ content %}
               class="keg-level-fill js-keg-level-fill"
               data-fill-pct="{{ fill_pct }}"
             ></div>
+            <div class="keg-level-bands" aria-hidden="true"></div>
+            <div class="keg-level-spout" aria-hidden="true"></div>
           </div>
           <span class="tap-keg-percent">{{ fill_pct }}%</span>
         </div>
@@ -314,7 +316,10 @@ content %}
       const normalized = Number.isFinite(rawValue)
         ? Math.max(0, Math.min(100, rawValue))
         : 0;
-      fillEl.style.height = `${normalized}%`;
+      const isLow = normalized > 0 && normalized < 12;
+      const visual = isLow ? 12 : normalized;
+      fillEl.style.height = `${visual}%`;
+      fillEl.classList.toggle("is-low", isLow);
     });
 
     document.querySelectorAll(".js-dashboard-pour-btn").forEach((buttonEl) => {
