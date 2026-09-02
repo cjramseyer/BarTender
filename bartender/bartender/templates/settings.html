@@ -974,8 +974,11 @@ content %}
     const displayCount = Math.max(1, Math.min(12, Number.parseInt(displayCountInput.value, 10) || 1));
     displayCountInput.value = String(displayCount);
 
-    const existingAssignments = Array.isArray({{ (settings.display_tap_assignments or []) | tojson }})
-      ? {{ (settings.display_tap_assignments or []) | tojson }}
+    const existingAssignments = JSON.parse(
+      `{{ (settings.display_tap_assignments or []) | tojson }}`,
+    );
+    const normalizedAssignments = Array.isArray(existingAssignments)
+      ? existingAssignments
       : [];
     const tapList = Array.isArray(TAPS) ? TAPS : [];
     const tapNumbers = tapList
@@ -984,7 +987,7 @@ content %}
       .sort((a, b) => a - b);
 
     const assignments = Array.from({ length: displayCount }, (_, index) => {
-      const saved = Array.isArray(existingAssignments[index]) ? existingAssignments[index] : [];
+      const saved = Array.isArray(normalizedAssignments[index]) ? normalizedAssignments[index] : [];
       return saved.map((value) => Number.parseInt(value, 10)).filter((value) => Number.isFinite(value));
     });
 
@@ -1961,130 +1964,6 @@ content %}
       body.display_title_on_tap = displayTitleOnTapInput.value.trim() || "On Draft";
     }
 
-    try {
-      const res = await fetch(`${INGRESS}/api/settings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        throw new Error(`Save failed: ${res.status}`);
-      }
-
-      const savedSettings = await res.json();
-
-      document.getElementById("saveMsg").textContent = "✓ Saved!";
-      setTimeout(() => {
-        document.getElementById("saveMsg").textContent = "";
-      }, 2000);
-      document.documentElement.dataset.theme = body.theme;
-      document.documentElement.dataset.managePos =
-        body.dashboard_manage_button_position;
-      document.body.dataset.managePos = body.dashboard_manage_button_position;
-      if (document.getElementById("externalApiToken")) {
-        document.getElementById("externalApiToken").value =
-          savedSettings.external_api_token || "";
-      }
-      if (document.getElementById("externalApiReadToken")) {
-        document.getElementById("externalApiReadToken").value =
-          savedSettings.external_api_read_token || "";
-      }
-      if (document.getElementById("externalApiWriteToken")) {
-        document.getElementById("externalApiWriteToken").value =
-          savedSettings.external_api_write_token || "";
-      }
-      if (document.getElementById("externalApiAllowlist")) {
-        document.getElementById("externalApiAllowlist").value =
-          savedSettings.external_api_allowlist || "";
-      }
-      if (document.getElementById("externalApiRateLimitPerMinute")) {
-        document.getElementById("externalApiRateLimitPerMinute").value =
-          savedSettings.external_api_rate_limit_per_minute || 120;
-      }
-      if (
-        Array.isArray(savedSettings.keg_type_choices) &&
-        document.getElementById("kegTypeChoicesList")
-      ) {
-        replaceKegTypeChoices(
-          savedSettings.keg_type_choices,
-          savedSettings.default_keg_type || "",
-        );
-      }
-      updateExternalReadonlyLinks(savedSettings.external_base_url || "");
-      localStorage.setItem("bartender_theme", body.theme);
-    } catch (err) {
-      document.getElementById("saveMsg").textContent = "Save failed";
-      console.error(err);
-    }
-  }
-
-  async function importArchive(e) {
-    e.preventDefault();
-    const fileInput = document.getElementById("importArchiveFile");
-    const modeInput = document.getElementById("importMode");
-    const msg = document.getElementById("importMsg");
-    const file =
-      fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-    const mode = modeInput ? modeInput.value : "replace";
-    const isJson = !!(
-      file &&
-      file.name &&
-      file.name.toLowerCase().endsWith(".json")
-    );
-    const previewUrl = isJson
-      ? `${INGRESS}/api/import/json/preview`
-      : `${INGRESS}/api/import/archive/preview`;
-    const importUrl = isJson
-      ? `${INGRESS}/api/import/json`
-      : `${INGRESS}/api/import/archive`;
-    const fileTypeLabel = isJson ? "JSON backup" : "archive";
-
-    if (!file) {
-      msg.textContent = "Please select a backup file.";
-      return;
-    }
-
-    const previewData = new FormData();
-    previewData.append("file", file);
-    previewData.append("mode", mode);
-
-    try {
-      const previewRes = await fetch(previewUrl, {
-        method: "POST",
-        body: previewData,
-      });
-
-      if (!previewRes.ok) {
-        let message = "Preview failed";
-        try {
-          const body = await previewRes.json();
-          if (body.error) message = body.error;
-        } catch (err) {
-          // Ignore parse errors and keep fallback message.
-        ? environmentModeInput.value
-        : DEFAULT_ENVIRONMENT_MODE,
-      audit_retention_days: parseInt(
-        document.getElementById("auditRetentionDays").value,
-        10,
-      ),
-      analytics_low_keg_threshold_percent: parseInt(
-        document.getElementById("analyticsLowThreshold").value,
-        10,
-      ),
-      analytics_days_left_method: document.getElementById("analyticsDaysMethod")
-        .value,
-      analytics_days_left_window_days: parseInt(
-        document.getElementById("analyticsDaysWindow").value,
-        10,
-      ),
-      pour_options: collectPourOptions(),
-      default_pour_preset: document.getElementById("defaultPourPreset").value,
-    };
-
-    const menuQrModeInput = document.getElementById("menuQrMode");
-    if (menuQrModeInput) {
-      body.menu_qr_mode = menuQrModeInput.value;
-    }
     try {
       const res = await fetch(`${INGRESS}/api/settings`, {
         method: "POST",
