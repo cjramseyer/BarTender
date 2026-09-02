@@ -15,6 +15,7 @@ import threading
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from typing import Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 
 try:
@@ -61,6 +62,11 @@ ALLOWED_LOGO_MIME_TYPES = {
     "image/svg+xml": ".svg",
 }
 LOGO_FILENAME_PREFIX = "bar-logo"
+
+
+@runtime_checkable
+class SupportsReadBytes(Protocol):
+    def read(self, size: int | None = -1, /) -> bytes: ...
 
 
 def _read_addon_version() -> str:
@@ -1060,14 +1066,14 @@ def _external_api_listener_base_url() -> str:
     return f"{parsed.scheme}://{netloc}"
 
 
-def _get_request_upload(name: str):
+def _get_request_upload(name: str) -> SupportsReadBytes | None:
     upload = request.files.get(name)
     if upload is not None:
-        return upload
+        return cast(SupportsReadBytes, upload)
 
     candidate = request.form.get(name)
     if candidate is not None and hasattr(candidate, "read"):
-        return candidate
+        return cast(SupportsReadBytes, candidate)
 
     content_type = str(request.content_type or "")
     if not content_type.startswith("multipart/form-data"):
