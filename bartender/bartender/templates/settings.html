@@ -51,6 +51,26 @@ content %}
             />
           </div>
           <div class="form-group">
+            <label>Business Type</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                {% if (settings.brewery_type or 'homebrewer') == 'homebrewer' %}
+                <input type="radio" name="brewery_type" value="homebrewer" checked />
+                {% else %}
+                <input type="radio" name="brewery_type" value="homebrewer" />
+                {% endif %} Homebrewer
+              </label>
+              <label class="radio-label">
+                {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+                <input type="radio" name="brewery_type" value="commercial" checked />
+                {% else %}
+                <input type="radio" name="brewery_type" value="commercial" />
+                {% endif %} Commercial
+              </label>
+            </div>
+            <small class="muted">Homebrewer is the default selection.</small>
+          </div>
+          <div class="form-group">
             <label>Bar Logo URL (optional)</label>
             <input
               type="url"
@@ -226,6 +246,32 @@ content %}
             </div>
           </div>
           <div class="form-group">
+            <label for="displayTitleOnTap">Display Title for “What’s on Tap”</label>
+            <input
+              id="displayTitleOnTap"
+              type="text"
+              class="form-control"
+              value="{{ settings.display_title_on_tap or 'On Draft' }}"
+              maxlength="80"
+            />
+            <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
+          </div>
+          {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+          <div class="form-group" id="commercialDisplaySettings">
+            <label for="displayCount">Number of Displays</label>
+            <input
+              id="displayCount"
+              type="number"
+              min="1"
+              max="12"
+              class="form-control"
+              value="{{ settings.display_count or 1 }}"
+            />
+            <small class="muted">Choose how many display boards this installation should serve.</small>
+            <div id="displayTapAssignments" class="stack-gap-sm" style="margin-top: 0.75rem;"></div>
+          </div>
+          {% endif %}
+          <div class="form-group">
             <label>Dashboard Manage Button Position</label>
             <div class="radio-group">
               <label class="radio-label">
@@ -366,25 +412,39 @@ content %}
               <option value="manual" selected>Manual</option>
               {% else %}
               <option value="manual">Manual</option>
-              {% endif %} {% if (settings.pour_mode or 'manual') == 'pos' %}
-              <option value="pos" selected>POS (API)</option>
-              {% else %}
-              <option value="pos">POS (API)</option>
+              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+                {% if (settings.pour_mode or 'manual') == 'pos' %}
+                <option value="pos" selected>POS (API)</option>
+                {% else %}
+                <option value="pos">POS (API)</option>
+                {% endif %}
               {% endif %} {% if (settings.pour_mode or 'manual') ==
               'inline_device' %}
-              <option value="inline_device" selected disabled>
-                Inline Device (Coming Soon)
-              </option>
+              <option value="inline_device" selected>Inline Device</option>
               {% else %}
-              <option value="inline_device" disabled>
-                Inline Device (Coming Soon)
-              </option>
+              <option value="inline_device">Inline Device</option>
               {% endif %}
             </select>
             <small class="muted"
-              >Non-manual modes hide the pour button in the UI.</small
+              >POS mode is only available for Commercial setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
             >
           </div>
+          {% if (settings.brewery_type or 'homebrewer') == 'commercial' and (settings.pour_mode or 'manual') == 'pos' %}
+          <div class="form-group">
+            <label>Common POS System</label>
+            <select id="posSystem" class="form-control">
+              <option value="">Select an option</option>
+              {% for option in ["Square", "Toast", "Lightspeed", "Shopify POS", "Aloha", "Barmetrix", "Other"] %}
+                {% if (settings.pos_system or '') == option %}
+                <option value="{{ option }}" selected>{{ option }}</option>
+                {% else %}
+                <option value="{{ option }}">{{ option }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <small class="muted">Choose the common POS provider used by this Commercial setup.</small>
+          </div>
+          {% endif %}
           <div class="form-group">
             <label>Pour Amount Presets</label>
             <small class="muted">
@@ -632,6 +692,16 @@ content %}
               forecasting.</small
             >
           </div>
+          <div class="form-group" style="margin-top: 1rem;">
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              onclick="resetAnalyticsData()"
+            >
+              Reset Analytics Data
+            </button>
+            <span id="analyticsResetMsg" class="save-msg"></span>
+          </div>
         </div>
       </details>
 
@@ -796,99 +866,6 @@ content %}
       </details>
     </div>
 
-    <div class="card settings-card settings-team-card">
-      <h2 class="settings-panel-title">Team Access</h2>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Owner Profile</label>
-          <div class="form-row" style="gap: 0.5rem; align-items: end">
-            <div class="form-group" style="flex: 1; min-width: 200px">
-              <input
-                type="text"
-                id="ownerName"
-                class="form-control"
-                placeholder="Owner name"
-              />
-            </div>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              onclick="saveOwnerProfile()"
-            >
-              Save Owner Name
-            </button>
-          </div>
-          <small class="muted"
-            >This is the display name shown for the owner account.</small
-          >
-        </div>
-        <div class="form-group">
-          <label>Additional Team Members</label>
-          <div
-            id="teamUsersList"
-            class="stack-gap-sm"
-            style="margin-top: 8px"
-          ></div>
-        </div>
-        <div class="form-group">
-          <label>Owner PIN</label>
-          <input
-            type="password"
-            id="ownerPin"
-            class="form-control"
-            value="{{ settings.owner_pin or '' }}"
-            placeholder="Required when other team members are present"
-            autocomplete="new-password"
-          />
-          <small class="muted"
-            >Require this PIN for the owner login when there is more than one
-            team member. Leave blank if you want only the single-owner
-            setup.</small
-          >
-        </div>
-        <div class="form-group">
-          <label>Invite User</label>
-          <div class="form-row" style="gap: 0.5rem; align-items: end">
-            <div class="form-group" style="flex: 1; min-width: 180px">
-              <input
-                type="text"
-                id="teamUserName"
-                class="form-control"
-                placeholder="Name"
-              />
-            </div>
-            <div class="form-group" style="min-width: 140px">
-              <input
-                type="password"
-                id="teamUserPin"
-                class="form-control"
-                placeholder="PIN (optional)"
-                autocomplete="new-password"
-              />
-            </div>
-            <div class="form-group" style="min-width: 150px">
-              <select id="teamUserRole" class="form-control">
-                <option value="staff">Staff</option>
-                <option value="manager">Manager</option>
-                <option value="owner">Owner</option>
-              </select>
-            </div>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              onclick="addTeamUser()"
-            >
-              Add User
-            </button>
-          </div>
-          <small class="muted"
-            >Owners and managers can manage users. Staff access is restricted to
-            their own account.</small
-          >
-        </div>
-      </div>
-    </div>
-
     <div class="card settings-card settings-export-card">
       <details class="settings-collapsible">
         <summary>📤 Export Data</summary>
@@ -986,7 +963,52 @@ content %}
   const DEFAULT_ENVIRONMENT_MODE = JSON.parse(
     `{{ (settings.environment_mode or 'production') | tojson }}`,
   );
+  const TAPS = JSON.parse(`{{ (taps or []) | tojson }}`);
   const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
+
+  function renderDisplayTapAssignments() {
+    const container = document.getElementById("displayTapAssignments");
+    const displayCountInput = document.getElementById("displayCount");
+    if (!container || !displayCountInput) return;
+
+    const displayCount = Math.max(1, Math.min(12, Number.parseInt(displayCountInput.value, 10) || 1));
+    displayCountInput.value = String(displayCount);
+
+    const existingAssignments = JSON.parse(
+      `{{ (settings.display_tap_assignments or []) | tojson }}`,
+    );
+    const normalizedAssignments = Array.isArray(existingAssignments)
+      ? existingAssignments
+      : [];
+    const tapList = Array.isArray(TAPS) ? TAPS : [];
+    const tapNumbers = tapList
+      .map((tap) => Number.parseInt(tap.number, 10))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    const assignments = Array.from({ length: displayCount }, (_, index) => {
+      const saved = Array.isArray(normalizedAssignments[index]) ? normalizedAssignments[index] : [];
+      return saved.map((value) => Number.parseInt(value, 10)).filter((value) => Number.isFinite(value));
+    });
+
+    container.innerHTML = assignments
+      .map((selectedNumbers, index) => {
+        const selectId = `displayTapAssignment-${index + 1}`;
+        return `
+          <div class="form-group">
+            <label for="${selectId}">Display ${index + 1} taps</label>
+            <select id="${selectId}" class="form-control display-tap-assignment-select" multiple size="${Math.min(8, Math.max(4, tapNumbers.length || 4))}">
+              ${tapNumbers.length ? tapNumbers.map((tapNumber) => {
+                const selected = selectedNumbers.includes(tapNumber) ? "selected" : "";
+                return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
+              }).join("") : '<option value="">No taps available</option>'}
+            </select>
+            <small class="muted">Choose which taps should appear on this display.</small>
+          </div>
+        `;
+      })
+      .join("");
+  }
 
   function renderTeamUsers(users = []) {
     const list = document.getElementById("teamUsersList");
@@ -1024,11 +1046,12 @@ content %}
           <div class="settings-user-row" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
             <div>
               <strong>${user.name || user.id}</strong>
-              <div class="muted" style="font-size:0.85rem;">${user.role || "staff"} • PIN: ${pinSet ? "set" : "not set"}</div>
+              <div class="muted" style="font-size:0.85rem;">Role: ${user.role || "staff"}</div>
+              <div class="muted" style="font-size:0.85rem;">PIN: ${pinSet ? "set" : "not set"}</div>
               <div class="muted" style="font-size:0.8rem; color:${statusColor};">${statusLabel}</div>
             </div>
             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; justify-content:flex-end;">
-              <select class="form-control team-role-select" data-user-id="${user.id}" style="min-width: 120px;">
+              <select class="form-control team-role-select" data-user-id="${user.id}" style="min-width: 120px; width: 120px; max-width: 120px; text-overflow: ellipsis;">
                 <option value="staff" ${user.role === "staff" ? "selected" : ""}>Staff</option>
                 <option value="manager" ${user.role === "manager" ? "selected" : ""}>Manager</option>
                 <option value="owner" ${user.role === "owner" ? "selected" : ""}>Owner</option>
@@ -1616,6 +1639,35 @@ content %}
     }
   }
 
+  async function resetAnalyticsData() {
+    const msg = document.getElementById("analyticsResetMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset all analytics data? This clears pour history used for dashboard and analytics calculations.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/analytics/reset`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `Reset failed: ${res.status}`);
+      }
+
+      if (msg) {
+        msg.textContent = "✓ Analytics reset.";
+      }
+    } catch (err) {
+      console.error("Unable to reset analytics", err);
+      if (msg) {
+        msg.textContent = err.message || "Reset failed";
+      }
+    }
+  }
+
   async function factoryResetAllData() {
     const msg = document.getElementById("factoryResetMsg");
     if (msg) msg.textContent = "";
@@ -1794,6 +1846,27 @@ content %}
     });
   }
 
+  const displayCountInput = document.getElementById("displayCount");
+  if (displayCountInput) {
+    displayCountInput.addEventListener("input", renderDisplayTapAssignments);
+  }
+
+  const breweryTypeInputs = document.querySelectorAll('input[name="brewery_type"]');
+  breweryTypeInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      const isCommercial = document.querySelector('input[name="brewery_type"]:checked')?.value === "commercial";
+      const displaySettings = document.getElementById("commercialDisplaySettings");
+      if (displaySettings) {
+        displaySettings.hidden = !isCommercial;
+      }
+      if (isCommercial) {
+        renderDisplayTapAssignments();
+      }
+    });
+  });
+
+  renderDisplayTapAssignments();
+
   async function saveSettings(e) {
     e.preventDefault();
     const measurementInput = document.querySelector(
@@ -1809,10 +1882,16 @@ content %}
 
     const body = {
       bar_name: document.getElementById("barName").value,
+      brewery_type: document.querySelector('input[name="brewery_type"]:checked')
+        ? document.querySelector('input[name="brewery_type"]:checked').value
+        : "homebrewer",
       bar_logo_url: document.getElementById("barLogoUrl").value,
       external_base_url: document.getElementById("externalBaseUrl").value,
       default_keg_type: document.getElementById("defaultKegType").value,
       keg_type_choices: collectKegTypeChoices(),
+      pos_system: document.getElementById("posSystem")
+        ? document.getElementById("posSystem").value
+        : "",
       measurement: measurementInput ? measurementInput.value : "us",
       theme: themeInput ? themeInput.value : "light",
       dashboard_manage_button_position: managePosInput
@@ -1851,28 +1930,40 @@ content %}
       environment_mode: environmentModeInput
         ? environmentModeInput.value
         : DEFAULT_ENVIRONMENT_MODE,
-      audit_retention_days: parseInt(
-        document.getElementById("auditRetentionDays").value,
-        10,
-      ),
-      analytics_low_keg_threshold_percent: parseInt(
-        document.getElementById("analyticsLowThreshold").value,
-        10,
-      ),
-      analytics_days_left_method: document.getElementById("analyticsDaysMethod")
-        .value,
-      analytics_days_left_window_days: parseInt(
-        document.getElementById("analyticsDaysWindow").value,
-        10,
-      ),
-      pour_options: collectPourOptions(),
-      default_pour_preset: document.getElementById("defaultPourPreset").value,
     };
+
+    const breweryTypeInput = document.querySelector('input[name="brewery_type"]:checked');
+    const normalizedBreweryType = breweryTypeInput
+      ? breweryTypeInput.value
+      : "homebrewer";
+    if (normalizedBreweryType !== "commercial") {
+      body.pour_mode = "manual";
+      body.pos_system = "";
+      body.display_count = 1;
+      body.display_tap_assignments = [];
+    } else {
+      const displayCountValue = document.getElementById("displayCount")
+        ? Number.parseInt(document.getElementById("displayCount").value, 10)
+        : 1;
+      body.display_count = Math.max(1, Math.min(12, Number.isFinite(displayCountValue) ? displayCountValue : 1));
+      body.display_tap_assignments = Array.from(document.querySelectorAll(".display-tap-assignment-select")).map((select) =>
+        Array.from(select.selectedOptions).map((option) => Number.parseInt(option.value, 10)).filter((value) => Number.isFinite(value)),
+      );
+      if (body.pour_mode !== "pos") {
+        body.pos_system = "";
+      }
+    }
 
     const menuQrModeInput = document.getElementById("menuQrMode");
     if (menuQrModeInput) {
       body.menu_qr_mode = menuQrModeInput.value;
     }
+
+    const displayTitleOnTapInput = document.getElementById("displayTitleOnTap");
+    if (displayTitleOnTapInput) {
+      body.display_title_on_tap = displayTitleOnTapInput.value.trim() || "On Draft";
+    }
+
     try {
       const res = await fetch(`${INGRESS}/api/settings`, {
         method: "POST",

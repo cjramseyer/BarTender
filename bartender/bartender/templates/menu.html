@@ -72,7 +72,7 @@
 
           <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
           <p class="muted">Type: {{ keg.type or '—' }}</p>
-          <p class="muted">Brewer: {{ brewer or '—' }}</p>
+          <p class="muted">Brewery: {{ brewer or '—' }}</p>
           <p class="muted">ABV: {{ abv or '—' }}{% if abv %}%{% endif %}</p>
           <p class="muted">IBU: {{ keg.beer_ibu or '—' }}</p>
           <p class="muted">Fill: {{ fill_pct }}%</p>
@@ -97,8 +97,7 @@
             <span class="badge badge-empty">Packaged</span>
           </div>
           <p class="muted">Type: {{ beer.type or '—' }}</p>
-          <p class="muted">Brewer: {{ beer.brewer or '—' }}</p>
-          <p class="muted">Brewery: {{ beer.brewery or '—' }}</p>
+          <p class="muted">Brewery: {{ beer.brewery or beer.brewer or '—' }}</p>
           <p class="muted">
             ABV: {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}
           </p>

@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}Team Access{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Users</p>
+    <h1>Team Access</h1>
+  </div>
+</div>
+
+<div class="card settings-card settings-team-card">
+  <div class="settings-collapsible-body">
+    <div class="form-group">
+      <label>Owner Profile</label>
+      <div class="form-row" style="gap: 0.5rem; align-items: end">
+        <div class="form-group" style="flex: 1; min-width: 200px">
+          <input
+            type="text"
+            id="ownerName"
+            class="form-control"
+            placeholder="Owner name"
+          />
+        </div>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          onclick="saveOwnerProfile()"
+        >
+          Save Owner Name
+        </button>
+      </div>
+      <small class="muted">This is the display name shown for the owner account.</small>
+    </div>
+    <div class="form-group">
+      <label>Owner PIN</label>
+      <input
+        type="password"
+        id="ownerPin"
+        class="form-control"
+        value="{{ settings.owner_pin or '' }}"
+        placeholder="Required when other team members are present"
+        autocomplete="new-password"
+      />
+      <small class="muted">
+        Require this PIN for the owner login when there is more than one team member.
+        Leave blank if you want only the single-owner setup.
+      </small>
+    </div>
+    <div class="form-group">
+      <label>Additional Team Members</label>
+      <div id="teamUsersList" class="stack-gap-sm" style="margin-top: 8px"></div>
+    </div>
+    <div class="form-group">
+      <label>Invite User</label>
+      <div class="form-row" style="gap: 0.5rem; align-items: end">
+        <div class="form-group" style="flex: 1; min-width: 180px">
+          <input
+            type="text"
+            id="teamUserName"
+            class="form-control"
+            placeholder="Name"
+          />
+        </div>
+        <div class="form-group" style="min-width: 140px">
+          <input
+            type="password"
+            id="teamUserPin"
+            class="form-control"
+            placeholder="PIN (optional)"
+            autocomplete="new-password"
+          />
+        </div>
+        <div class="form-group" style="min-width: 150px">
+          <select id="teamUserRole" class="form-control">
+            <option value="staff">Staff</option>
+            <option value="manager">Manager</option>
+            <option value="owner">Owner</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          onclick="addTeamUser()"
+        >
+          Add User
+        </button>
+      </div>
+      <small class="muted">
+        Owners and managers can manage users. Staff access is restricted to their own account.
+      </small>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const INGRESS = "{{ ingress }}";
+  const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
+
+  function renderTeamUsers(users = []) {
+    const list = document.getElementById("teamUsersList");
+    if (!list) return;
+
+    const allUsers = Array.isArray(users) ? users : [];
+    const ownerUser =
+      allUsers.find((user) => String(user.id || "").trim().toLowerCase() === "owner") ||
+      allUsers.find((user) => String(user.role || "").trim().toLowerCase() === "owner") ||
+      null;
+    const ownerNameInput = document.getElementById("ownerName");
+    if (ownerNameInput) {
+      ownerNameInput.value = ownerUser && ownerUser.name ? ownerUser.name : "Owner";
+    }
+
+    const additionalUsers = allUsers.filter((user) => {
+      if (ownerUser && String(user.id || "").trim() === String(ownerUser.id || "").trim()) {
+        return false;
+      }
+      return true;
+    });
+
+    if (!additionalUsers.length) {
+      list.innerHTML = '<p class="muted">No additional team users yet.</p>';
+      return;
+    }
+
+    list.innerHTML = additionalUsers
+      .map((user) => {
+        const isDisabled = Boolean(user.disabled);
+        const pinSet = Boolean((user.pin || "").trim());
+        const statusLabel = isDisabled ? "Disabled" : "Active";
+        const statusColor = isDisabled ? "#b91c1c" : "#166534";
+        return `
+          <div class="settings-user-row" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
+            <div>
+              <strong>${user.name || user.id}</strong>
+              <div class="muted" style="font-size:0.85rem;">Role: ${user.role || "staff"}</div>
+              <div class="muted" style="font-size:0.85rem;">PIN: ${pinSet ? "set" : "not set"}</div>
+              <div class="muted" style="font-size:0.8rem; color:${statusColor};">${statusLabel}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; justify-content:flex-end;">
+              <select class="form-control team-role-select" data-user-id="${user.id}" style="min-width: 120px; width: 120px; max-width: 120px; text-overflow: ellipsis;">
+                <option value="staff" ${user.role === "staff" ? "selected" : ""}>Staff</option>
+                <option value="manager" ${user.role === "manager" ? "selected" : ""}>Manager</option>
+                <option value="owner" ${user.role === "owner" ? "selected" : ""}>Owner</option>
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="updateTeamMemberRole(this)">Update Role</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="setTeamUserPin(this)">Set PIN</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" ${pinSet ? "" : "disabled"} onclick="resetTeamUserPin(this)">Reset PIN</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" data-disabled="${isDisabled ? "1" : "0"}" onclick="toggleTeamUserDisabled(this)">${isDisabled ? "Enable" : "Disable"}</button>
+              <button type="button" class="btn btn-danger btn-sm" data-user-id="${user.id}" onclick="deleteTeamUser(this)">Delete</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  async function addTeamUser() {
+    const name = document.getElementById("teamUserName").value.trim();
+    const pin = document.getElementById("teamUserPin").value.trim();
+    const role = document.getElementById("teamUserRole").value;
+    if (!name) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, role, pin }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to add user");
+      }
+      document.getElementById("teamUserName").value = "";
+      document.getElementById("teamUserPin").value = "";
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to add user");
+    }
+  }
+
+  async function refreshTeamUsers() {
+    const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
+    renderTeamUsers(users.users || []);
+  }
+
+  async function saveOwnerProfile() {
+    const ownerName = document.getElementById("ownerName").value.trim();
+    if (!ownerName) {
+      alert("Owner name is required.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_profile", user_id: "owner", name: ownerName }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to save owner name");
+      }
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to save owner name");
+    }
+  }
+
+  async function updateTeamMemberRole(button) {
+    const userId = button.dataset.userId;
+    const select = document.querySelector(
+      `.team-role-select[data-user-id="${CSS.escape(userId)}"]`,
+    );
+    if (!userId || !select) return;
+
+    const role = select.value;
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", user_id: userId, role }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to update user role");
+      }
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to update user role");
+    }
+  }
+
+  async function setTeamUserPin(button) {
+    const userId = button.dataset.userId;
+    if (!userId) return;
+    const nextPin = window.prompt("Set PIN for this user:");
+    if (nextPin === null) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_pin", user_id: userId, pin: nextPin }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to set user PIN");
+      }
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to set user PIN");
+    }
+  }
+
+  async function resetTeamUserPin(button) {
+    const userId = button.dataset.userId;
+    if (!userId) return;
+    if (!window.confirm("Reset this user's PIN?")) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset_pin", user_id: userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to reset user PIN");
+      }
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to reset user PIN");
+    }
+  }
+
+  async function toggleTeamUserDisabled(button) {
+    const userId = button.dataset.userId;
+    if (!userId) return;
+    const currentlyDisabled = button.dataset.disabled === "1";
+    const nextDisabled = !currentlyDisabled;
+
+    if (!window.confirm(nextDisabled ? "Disable this user account?" : "Enable this user account?")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_disabled", user_id: userId, disabled: nextDisabled }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to update user status");
+      }
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to update user status");
+    }
+  }
+
+  async function deleteTeamUser(button) {
+    const userId = button.dataset.userId;
+    if (!userId) return;
+
+    const confirmed = window.confirm("Delete this team member?");
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/team/users/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to delete user");
+      }
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to delete user");
+    }
+  }
+
+  renderTeamUsers(TEAM_USERS || []);
+</script>
+{% endblock %}
