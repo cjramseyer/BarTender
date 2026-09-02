@@ -133,14 +133,14 @@ content %}
         ><span class="stat-label">Tapped</span>
       </div>
       <div class="stat">
-        <span class="stat-value">{{ cleaning_count.value }}</span
-        ><span class="stat-label">Needs Cleaning</span>
-      </div>
-      <div class="stat">
         <span class="stat-value"
           >{{ serving_kegs | selectattr('status', 'equalto', 'empty') | list |
           length }}</span
         ><span class="stat-label">Empty</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ cleaning_count.value }}</span
+        ><span class="stat-label">Needs Cleaning</span>
       </div>
     </div>
     <h3 style="margin: 0.4rem 0 0.6rem">Tapped Kegs</h3>
