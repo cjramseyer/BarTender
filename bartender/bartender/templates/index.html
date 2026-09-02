@@ -6,7 +6,11 @@ content %}
   serving_keg_ids = serving_kegs | map(attribute='id') | list %}
 
   <div class="card">
-    <h2>🍺 Taps ({{ taps | length }})</h2>
+    <h2>
+      <a class="dashboard-card-title-link" href="{{ ingress }}/taps"
+        >🍺 Taps ({{ taps | length }})</a
+      >
+    </h2>
     {% if taps %}
     <ul class="tap-list">
       {% for tap in taps %} {% set keg = serving_kegs | selectattr('id',
@@ -55,7 +59,7 @@ content %}
             {% endfor %}
           </select>
           <span class="tap-label tap-volume-remaining dashboard-pour-volume"
-            >Volume Remaining: {% if keg.current_volume is not none %}{% set
+            >Remaining: {% if keg.current_volume is not none %}{% set
             volume_token = '%g' | format(keg.current_volume) %}{{ volume_token
             }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</span
           >
@@ -68,7 +72,7 @@ content %}
           </button>
           {% else %}
           <span class="tap-label tap-volume-remaining dashboard-pour-volume"
-            >Volume Remaining: {% if keg.current_volume is not none %}{% set
+            >Remaining: {% if keg.current_volume is not none %}{% set
             volume_token = '%g' | format(keg.current_volume) %}{{ volume_token
             }} {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</span
           >
@@ -77,7 +81,7 @@ content %}
         </div>
         {% else %}
         <span class="tap-label tap-volume-remaining"
-          >Volume Remaining: {% if keg.current_volume is not none %}{% set
+          >Remaining: {% if keg.current_volume is not none %}{% set
           volume_token = '%g' | format(keg.current_volume) %}{{ volume_token }}
           {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</span
         >
@@ -107,7 +111,11 @@ content %}
     {% set connected_keg_ids = namespace(values=[]) %} {% for tap in taps %} {%
     if tap.keg_id in serving_keg_ids %} {% set connected_keg_ids.values =
     connected_keg_ids.values + [tap.keg_id] %} {% endif %} {% endfor %}
-    <h2>🛢 Kegs ({{ connected_keg_ids.values | length }})</h2>
+    <h2>
+      <a class="dashboard-card-title-link" href="{{ ingress }}/kegs"
+        >🛢 Kegs ({{ connected_keg_ids.values | length }})</a
+      >
+    </h2>
     {% set in_use_count = namespace(value=0) %} {% set cleaning_count =
     namespace(value=0) %} {% for keg in serving_kegs %} {% if keg.id in
     connected_keg_ids.values %} {% set in_use_count.value = in_use_count.value +
@@ -176,7 +184,11 @@ content %}
   {% if settings.analytics_enabled is not defined or settings.analytics_enabled
   %}
   <div class="card">
-    <h2>📈 Pour Analytics</h2>
+    <h2>
+      <a class="dashboard-card-title-link" href="{{ ingress }}/analytics"
+        >📈 Pour Analytics</a
+      >
+    </h2>
     <div class="dashboard-manage-row">
       <a
         class="btn btn-sm dashboard-manage-btn"
@@ -242,7 +254,11 @@ content %}
   </div>
   {% endif %} {% if on_deck_kegs %}
   <div class="card">
-    <h2>🔜 On Deck ({{ on_deck_kegs | length }})</h2>
+    <h2>
+      <a class="dashboard-card-title-link" href="{{ ingress }}/kegs"
+        >🔜 On Deck ({{ on_deck_kegs | length }})</a
+      >
+    </h2>
     <ul class="stock-summary">
       {% for keg in on_deck_kegs %}
       <li>
@@ -260,7 +276,11 @@ content %}
   </div>
   {% endif %} {% if settings.bar_stock_enabled %}
   <div class="card">
-    <h2>📦 Bar Stock ({{ bar_stock | length }} items)</h2>
+    <h2>
+      <a class="dashboard-card-title-link" href="{{ ingress }}/stock"
+        >📦 Bar Stock ({{ bar_stock | length }} items)</a
+      >
+    </h2>
     {% if bar_stock %}
     <ul class="stock-summary">
       {% for item in bar_stock[:5] %}

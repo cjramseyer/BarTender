@@ -665,6 +665,23 @@ textarea.form-control {
   order: -2;
 }
 
+.dashboard-card-title-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius);
+  padding: 0.1rem 0;
+}
+
+.dashboard-card-title-link:hover {
+  color: var(--primary);
+}
+
+.dashboard-card-title-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .dashboard-manage-row {
   display: flex;
   margin-top: 1rem;
