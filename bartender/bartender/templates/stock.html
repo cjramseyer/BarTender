@@ -106,8 +106,10 @@ content %}
           type="text"
           id="stockCustomSize"
           class="form-control"
+          list="customStockSizeList"
           placeholder="e.g. 12 oz can, 3 L box"
         />
+        <datalist id="customStockSizeList"></datalist>
       </div>
       <div class="form-group">
         <label>Notes</label>
@@ -182,6 +184,53 @@ content %}
     "1.5 L",
   ];
 
+  function normalizeSizeKey(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  }
+
+  function collectCustomSizeUsage() {
+    const knownSizeKeys = new Set(
+      [...STANDARD_SIZES_US, ...STANDARD_SIZES_METRIC].map(normalizeSizeKey),
+    );
+    const customSizeCounts = new Map();
+    const customSizeLabels = new Map();
+
+    BAR_STOCK.forEach((item) => {
+      const label = String(item.size_label || item.unit || "").trim();
+      if (!label) {
+        return;
+      }
+      const key = normalizeSizeKey(label);
+      if (!key || knownSizeKeys.has(key)) {
+        return;
+      }
+      customSizeCounts.set(key, (customSizeCounts.get(key) || 0) + 1);
+      if (!customSizeLabels.has(key)) {
+        customSizeLabels.set(key, label);
+      }
+    });
+
+    const promotedCustomSizeKeys = new Set(
+      Array.from(customSizeCounts.entries())
+        .filter(([, count]) => count > 3)
+        .map(([key]) => key),
+    );
+    const promotedCustomSizes = Array.from(promotedCustomSizeKeys)
+      .map((key) => customSizeLabels.get(key))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+
+    const remainingCustomSizes = Array.from(customSizeLabels.entries())
+      .filter(([key]) => !promotedCustomSizeKeys.has(key))
+      .map(([, label]) => label)
+      .sort((a, b) => a.localeCompare(b));
+
+    return { promotedCustomSizes, remainingCustomSizes };
+  }
+
   function parseSizeLabel(label) {
     const m = (label || "").trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(ml|l)$/i);
     if (!m) {
@@ -230,7 +279,32 @@ content %}
       select.appendChild(option);
     });
 
+    // Promote custom sizes that are repeatedly used into quick-pick options.
+    const { promotedCustomSizes } = collectCustomSizeUsage();
+
+    promotedCustomSizes.forEach((size) => {
+      const option = document.createElement("option");
+      option.value = size;
+      option.textContent = `${size} (popular)`;
+      select.appendChild(option);
+    });
+
     select.value = current;
+  }
+
+  function populateCustomStockSizeOptions() {
+    const datalist = document.getElementById("customStockSizeList");
+    if (!datalist) {
+      return;
+    }
+
+    const { remainingCustomSizes } = collectCustomSizeUsage();
+    datalist.innerHTML = "";
+    remainingCustomSizes.forEach((size) => {
+      const option = document.createElement("option");
+      option.value = size;
+      datalist.appendChild(option);
+    });
   }
 
   function toggleCustomStockSize() {
@@ -329,5 +403,6 @@ content %}
 
   populateCategoryOptions();
   populateStockSizeOptions();
+  populateCustomStockSizeOptions();
 </script>
 {% endblock %}
