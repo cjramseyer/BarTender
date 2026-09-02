@@ -25,7 +25,7 @@ Primary runtime components:
 - Bar stock CRUD (create, list, update, delete).
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
-- Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
+- Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, Team Access controls, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Read-only display page.
@@ -130,6 +130,31 @@ menu_qr_mode values:
 - display
 - print
 - both
+
+### Team Access
+
+GET /api/team/users
+
+- Returns team user list.
+- Staff role receives only their own account.
+
+POST /api/team/users
+
+- Creates a user when action is omitted.
+- Supports update actions when action is provided:
+  - update (role)
+  - update_profile (name)
+  - set_pin
+  - reset_pin
+  - set_disabled
+
+POST /api/team/users/delete
+
+- Deletes a non-owner team user.
+
+GET /api/team/audit
+
+- Returns audit trail for team actions.
 
 ### Bar Stock
 
@@ -356,6 +381,17 @@ PUT /api/taps/<id>
 - Updates provided fields only.
 - 200 response: updated tap object.
 - Same tapped_date auto-fill behavior when assigning a keg.
+- 409 response when assigning a keg already connected to another tap:
+
+```json
+{
+  "error": "Keg is already connected to another tap.",
+  "code": "KEG_ALREADY_CONNECTED",
+  "tap_id": 1,
+  "tap_number": 1
+}
+```
+
 - 404 response:
 
 ```json
@@ -400,12 +436,16 @@ POST /api/taps/<id>/pour
 
 GET /api/export/json
 
-- Downloads portable versioned JSON backup as bartender_export.json.
+- Downloads portable versioned JSON backup as bartender_export_YYYY-MM-DD.json.
 
 GET /api/export/archive
 
-- Downloads ZIP archive backup as bartender_export.zip.
+- Downloads ZIP archive backup as bartender_export_YYYY-MM-DD.zip.
 - Includes section JSON files, versioned full JSON payload, and convenience CSV files.
+
+GET /api/beers/export/csv
+
+- Downloads beer catalog CSV as beers_YYYY-MM-DD.csv.
 
 ### Printable Menu and QR
 
@@ -430,7 +470,7 @@ GET /api/menu/qr/health
 
 GET /api/export/csv
 
-- Legacy alias for archive ZIP export (bartender_export.zip).
+- Legacy alias for archive ZIP export (bartender_export_YYYY-MM-DD.zip).
 
 ### Import
 

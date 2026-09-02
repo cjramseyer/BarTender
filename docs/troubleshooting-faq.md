@@ -35,6 +35,14 @@ Typical statuses:
 - 404: record not found for update/delete
 - 5xx: server-side failure or malformed input side effects
 
+### User cannot sign in
+
+Checks:
+
+- Confirm the selected account is not disabled in Settings -> Team Access.
+- If a user PIN is configured for that account, provide the user PIN at login.
+- If owner login is used with multiple users, ensure Owner PIN is configured and entered.
+
 ### Edit button does nothing in web UI
 
 Checks:
@@ -114,6 +122,9 @@ A: Current mobile app is read-only.
 
 Q: Why does the printable menu show "QR unavailable"?
 A: QR dependencies are missing in the running environment. Install requirements and restart, then recheck /api/menu/qr/health.
+
+Q: Why does a team member login fail even with the correct username?
+A: The account may be disabled or require a user PIN. Check Settings -> Team Access.
 
 ## Escalation Path
 

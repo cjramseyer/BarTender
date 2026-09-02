@@ -48,11 +48,11 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **Beer Catalog** — Manage reusable beer records for consistent keg assignment
 - **Beer CSV Import/Export** — Bulk add or back up catalog entries using a canonical CSV schema with preview validation before apply
 - **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog
-- **Tap Management** — Assign kegs to numbered, labelled tap lines
-- **Data Backup & Restore** — Export portable JSON or ZIP archive; import with preview and replace/merge mode
+- **Tap Management** — Assign kegs to numbered, labelled tap lines with single-tap keg assignment protection
+- **Data Backup & Restore** — Export portable JSON or ZIP archive with date-stamped filenames; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
-- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode
+- **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, Team Access (owner profile, per-user PIN, reset PIN, disable/enable), pour mode in Pour Presets, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode in General
 - **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
 - **Analytics** — Dashboard summaries for recent pours, near-empty kegs, and depletion forecasting
@@ -119,6 +119,10 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 - Added keg-to-beer linking so beer details are selected from the catalog, including fill-keg beer selection.
 - Added in-app API Reference page (`/api-reference`) with an API request tester.
 - Added default pour preset setting applied to pour selectors across dashboard and taps pages.
+- Added Team Access enhancements: owner profile name, user PINs, reset PIN, and disable/enable controls.
+- Added tap assignment guardrails that prevent selecting kegs already connected to other taps.
+- Added bar stock category/size defaults and promotion of frequently used custom sizes.
+- Updated export download filenames to include UTC date stamps.
 
 ## Configuration
 
@@ -136,21 +140,25 @@ No configuration required. All settings are managed from within the web UI after
 ### Taps
 
 - Create taps and assign full/on-tap kegs.
+- Kegs already assigned to another tap are shown as in-use and cannot be selected.
 - Use pour presets to record standard pours.
 - Monitor volume remaining and fill level from dashboard or taps views.
 
 ### Bar Stock
 
 - Track inventory items with quantity, category, and notes.
+- Use built-in category suggestions (spirits, mixers, and common bar groupings).
+- Standard size options include 12 oz bottle, 16 oz bottle, and 12 oz can.
+- Frequently used custom sizes are promoted into main size options.
 - Disable the Bar Stock feature from Settings if not needed.
 
 ## Key Settings
 
-- **Pour Mode**: Manual, POS (API), Inline Device (planned)
+- **Pour Mode**: Manual, POS (API), Inline Device (planned) (Settings -> Pour Presets)
 - **Keg Types**: editable keg/container options and defaults
 - **Pour Presets**: named preset volumes and default preset
 - **Analytics**: low-keg threshold and days-left forecasting window
-- **Menu QR**: where QR appears on display/print output
+- **Menu QR**: where QR appears on display/print output (Settings -> General)
 
 ## Troubleshooting
 
@@ -159,6 +167,7 @@ No configuration required. All settings are managed from within the web UI after
 - **Keg needs cleaning**: mark clean from the kegs workflow to reset fill/beer fields.
 - **QR unavailable**: verify dependencies from `requirements.txt` are installed.
 - **Display not reachable externally**: confirm display port mapping and host networking in your add-on environment.
+- **User cannot sign in**: check whether the user is disabled or requires a user PIN.
 
 ## Support
 
