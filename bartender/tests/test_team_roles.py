@@ -51,6 +51,24 @@ def test_staff_cannot_manage_users(tmp_path):
     assert payload["error"] == "Insufficient permissions"
 
 
+def test_staff_cannot_access_settings_page_or_api(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    staff_headers = {"X-BarTender-User-Id": "staff-1", "X-BarTender-Role": "staff"}
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "staff-1"
+        sess["user_role"] = "staff"
+        sess["user_name"] = "Staff One"
+
+    page_response = client.get("/settings")
+    assert page_response.status_code == 403
+
+    api_response = client.get("/api/settings", headers=staff_headers)
+    assert api_response.status_code == 403
+    assert api_response.get_json()["error"] == "Insufficient permissions"
+
+
 def test_settings_changes_are_audited(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -152,6 +170,48 @@ def test_brewery_type_defaults_to_homebrewer_and_normalizes_valid_values(tmp_pat
     data["settings"]["brewery_type"] = "unsupported"
     app_module.save_data(data)
     assert app_module.load_data()["settings"]["brewery_type"] == "homebrewer"
+
+
+def test_on_tap_display_title_defaults_to_on_draft_and_saves(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    data = app_module.load_data()
+    assert data["settings"]["display_title_on_tap"] == "On Draft"
+
+    response = client.post(
+        "/api/settings",
+        json={"display_title_on_tap": "Draft List"},
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["display_title_on_tap"] == "Draft List"
+    assert app_module.load_data()["settings"]["display_title_on_tap"] == "Draft List"
+
+
+def test_commercial_display_count_and_tap_assignments_save(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    response = client.post(
+        "/api/settings",
+        json={
+            "brewery_type": "commercial",
+            "display_count": 2,
+            "display_tap_assignments": [[1, 2], [3, 4]],
+        },
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["display_count"] == 2
+    assert payload["display_tap_assignments"] == [[1, 2], [3, 4]]
+    assert app_module.load_data()["settings"]["display_tap_assignments"] == [[1, 2], [3, 4]]
 
 
 def test_pos_pour_mode_is_forbidden_for_homebrewer_settings(tmp_path):

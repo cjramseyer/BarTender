@@ -246,6 +246,32 @@ content %}
             </div>
           </div>
           <div class="form-group">
+            <label for="displayTitleOnTap">Display Title for “What’s on Tap”</label>
+            <input
+              id="displayTitleOnTap"
+              type="text"
+              class="form-control"
+              value="{{ settings.display_title_on_tap or 'On Draft' }}"
+              maxlength="80"
+            />
+            <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
+          </div>
+          {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+          <div class="form-group" id="commercialDisplaySettings">
+            <label for="displayCount">Number of Displays</label>
+            <input
+              id="displayCount"
+              type="number"
+              min="1"
+              max="12"
+              class="form-control"
+              value="{{ settings.display_count or 1 }}"
+            />
+            <small class="muted">Choose how many display boards this installation should serve.</small>
+            <div id="displayTapAssignments" class="stack-gap-sm" style="margin-top: 0.75rem;"></div>
+          </div>
+          {% endif %}
+          <div class="form-group">
             <label>Dashboard Manage Button Position</label>
             <div class="radio-group">
               <label class="radio-label">
@@ -857,14 +883,6 @@ content %}
           >
         </div>
         <div class="form-group">
-          <label>Additional Team Members</label>
-          <div
-            id="teamUsersList"
-            class="stack-gap-sm"
-            style="margin-top: 8px"
-          ></div>
-        </div>
-        <div class="form-group">
           <label>Owner PIN</label>
           <input
             type="password"
@@ -879,6 +897,14 @@ content %}
             team member. Leave blank if you want only the single-owner
             setup.</small
           >
+        </div>
+        <div class="form-group">
+          <label>Additional Team Members</label>
+          <div
+            id="teamUsersList"
+            class="stack-gap-sm"
+            style="margin-top: 8px"
+          ></div>
         </div>
         <div class="form-group">
           <label>Invite User</label>
@@ -1020,7 +1046,49 @@ content %}
   const DEFAULT_ENVIRONMENT_MODE = JSON.parse(
     `{{ (settings.environment_mode or 'production') | tojson }}`,
   );
+  const TAPS = JSON.parse(`{{ (taps or []) | tojson }}`);
   const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
+
+  function renderDisplayTapAssignments() {
+    const container = document.getElementById("displayTapAssignments");
+    const displayCountInput = document.getElementById("displayCount");
+    if (!container || !displayCountInput) return;
+
+    const displayCount = Math.max(1, Math.min(12, Number.parseInt(displayCountInput.value, 10) || 1));
+    displayCountInput.value = String(displayCount);
+
+    const existingAssignments = Array.isArray({{ (settings.display_tap_assignments or []) | tojson }})
+      ? {{ (settings.display_tap_assignments or []) | tojson }}
+      : [];
+    const tapList = Array.isArray(TAPS) ? TAPS : [];
+    const tapNumbers = tapList
+      .map((tap) => Number.parseInt(tap.number, 10))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    const assignments = Array.from({ length: displayCount }, (_, index) => {
+      const saved = Array.isArray(existingAssignments[index]) ? existingAssignments[index] : [];
+      return saved.map((value) => Number.parseInt(value, 10)).filter((value) => Number.isFinite(value));
+    });
+
+    container.innerHTML = assignments
+      .map((selectedNumbers, index) => {
+        const selectId = `displayTapAssignment-${index + 1}`;
+        return `
+          <div class="form-group">
+            <label for="${selectId}">Display ${index + 1} taps</label>
+            <select id="${selectId}" class="form-control display-tap-assignment-select" multiple size="${Math.min(8, Math.max(4, tapNumbers.length || 4))}">
+              ${tapNumbers.length ? tapNumbers.map((tapNumber) => {
+                const selected = selectedNumbers.includes(tapNumber) ? "selected" : "";
+                return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
+              }).join("") : '<option value="">No taps available</option>'}
+            </select>
+            <small class="muted">Choose which taps should appear on this display.</small>
+          </div>
+        `;
+      })
+      .join("");
+  }
 
   function renderTeamUsers(users = []) {
     const list = document.getElementById("teamUsersList");
@@ -1058,11 +1126,12 @@ content %}
           <div class="settings-user-row" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
             <div>
               <strong>${user.name || user.id}</strong>
-              <div class="muted" style="font-size:0.85rem;">${user.role || "staff"} • PIN: ${pinSet ? "set" : "not set"}</div>
+              <div class="muted" style="font-size:0.85rem;">Role: ${user.role || "staff"}</div>
+              <div class="muted" style="font-size:0.85rem;">PIN: ${pinSet ? "set" : "not set"}</div>
               <div class="muted" style="font-size:0.8rem; color:${statusColor};">${statusLabel}</div>
             </div>
             <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; justify-content:flex-end;">
-              <select class="form-control team-role-select" data-user-id="${user.id}" style="min-width: 120px;">
+              <select class="form-control team-role-select" data-user-id="${user.id}" style="min-width: 120px; width: 120px; max-width: 120px; text-overflow: ellipsis;">
                 <option value="staff" ${user.role === "staff" ? "selected" : ""}>Staff</option>
                 <option value="manager" ${user.role === "manager" ? "selected" : ""}>Manager</option>
                 <option value="owner" ${user.role === "owner" ? "selected" : ""}>Owner</option>
@@ -1828,6 +1897,27 @@ content %}
     });
   }
 
+  const displayCountInput = document.getElementById("displayCount");
+  if (displayCountInput) {
+    displayCountInput.addEventListener("input", renderDisplayTapAssignments);
+  }
+
+  const breweryTypeInputs = document.querySelectorAll('input[name="brewery_type"]');
+  breweryTypeInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      const isCommercial = document.querySelector('input[name="brewery_type"]:checked')?.value === "commercial";
+      const displaySettings = document.getElementById("commercialDisplaySettings");
+      if (displaySettings) {
+        displaySettings.hidden = !isCommercial;
+      }
+      if (isCommercial) {
+        renderDisplayTapAssignments();
+      }
+    });
+  });
+
+  renderDisplayTapAssignments();
+
   async function saveSettings(e) {
     e.preventDefault();
     const measurementInput = document.querySelector(
@@ -1900,13 +1990,29 @@ content %}
     if (normalizedBreweryType !== "commercial") {
       body.pour_mode = "manual";
       body.pos_system = "";
-    } else if (body.pour_mode !== "pos") {
-      body.pos_system = "";
+      body.display_count = 1;
+      body.display_tap_assignments = [];
+    } else {
+      const displayCountValue = document.getElementById("displayCount")
+        ? Number.parseInt(document.getElementById("displayCount").value, 10)
+        : 1;
+      body.display_count = Math.max(1, Math.min(12, Number.isFinite(displayCountValue) ? displayCountValue : 1));
+      body.display_tap_assignments = Array.from(document.querySelectorAll(".display-tap-assignment-select")).map((select) =>
+        Array.from(select.selectedOptions).map((option) => Number.parseInt(option.value, 10)).filter((value) => Number.isFinite(value)),
+      );
+      if (body.pour_mode !== "pos") {
+        body.pos_system = "";
+      }
     }
 
     const menuQrModeInput = document.getElementById("menuQrMode");
     if (menuQrModeInput) {
       body.menu_qr_mode = menuQrModeInput.value;
+    }
+
+    const displayTitleOnTapInput = document.getElementById("displayTitleOnTap");
+    if (displayTitleOnTapInput) {
+      body.display_title_on_tap = displayTitleOnTapInput.value.trim() || "On Draft";
     }
 
     try {

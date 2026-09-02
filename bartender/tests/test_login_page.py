@@ -107,6 +107,27 @@ def test_disabled_user_cannot_login(tmp_path):
     assert "This user account is disabled." in response.get_data(as_text=True)
 
 
+def test_disabled_users_are_hidden_from_login_dropdown(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        {"id": "staff-1", "name": "Staff One", "role": "staff", "pin": "", "disabled": True, "created_at": "2024-01-01T00:00:00Z"},
+        {"id": "manager-1", "name": "Manager One", "role": "manager", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+    ]
+    app_module.save_data(data)
+
+    response = client.get("/login")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert "Staff One" not in page
+    assert "Manager One" in page
+    assert "Owner" in page
+
+
 def test_unauthenticated_request_redirects_to_ingress_login_path(tmp_path):
     app_module = _load_app_module(tmp_path)
     app_module.INGRESS_PATH = "/api/hassio_ingress/test-token"

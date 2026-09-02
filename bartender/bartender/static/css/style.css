@@ -957,22 +957,35 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 .keg-level-shell {
   width: 34px;
   height: 58px;
-  border-radius: 8px 8px 10px 10px;
+  border-radius: 6px 6px 10px 10px;
   border: 2px solid var(--border);
-  background: var(--surface2);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 .keg-level-shell::before {
   content: "";
   position: absolute;
-  top: -7px;
-  left: 7px;
-  right: 7px;
-  height: 5px;
+  top: -8px;
+  left: 6px;
+  right: 6px;
+  height: 9px;
+  border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(180deg, #dfe3e8 0%, #a7b0bb 100%);
+  border: 2px solid var(--border);
+  border-bottom: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.keg-level-shell::after {
+  content: "";
+  position: absolute;
+  inset: 9px 5px 5px;
   border-radius: 4px;
-  background: var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
 }
 .keg-level-fill {
   position: absolute;
@@ -981,6 +994,7 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   width: 100%;
   background: linear-gradient(180deg, var(--badge-in_use), var(--badge-full));
   transition: height 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .keg-level-meta {
   display: flex;

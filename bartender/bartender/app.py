@@ -320,6 +320,9 @@ DEFAULT_DATA = {
         "default_keg_type": "",
         "keg_type_choices": STANDARD_KEG_TYPE_CHOICES,
         "menu_qr_mode": "both",
+        "display_title_on_tap": "On Draft",
+        "display_count": 1,
+        "display_tap_assignments": [],
         "pour_options": [
             {"name": "Pint", "amount": 16, "unit": "oz"},
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
@@ -428,6 +431,17 @@ def load_data() -> dict:
         )
         data["settings"]["menu_qr_mode"] = _normalize_menu_qr_mode(
             data["settings"].get("menu_qr_mode")
+        )
+        data["settings"]["display_title_on_tap"] = _normalize_display_title_on_tap(
+            data["settings"].get("display_title_on_tap")
+        )
+        data["settings"]["display_count"] = _normalize_display_count(
+            data["settings"].get("display_count"),
+            data["settings"].get("brewery_type"),
+        )
+        data["settings"]["display_tap_assignments"] = _normalize_display_tap_assignments(
+            data["settings"].get("display_tap_assignments"),
+            data["settings"].get("display_count", 1),
         )
         data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
             data["settings"].get("audit_retention_days")
@@ -619,6 +633,38 @@ def _normalize_menu_qr_mode(value) -> str:
     if mode in ("off", "display", "print", "both"):
         return mode
     return "both"
+
+
+def _normalize_display_title_on_tap(value) -> str:
+    normalized = str(value or "On Draft").strip()
+    if not normalized:
+        return "On Draft"
+    return normalized[:80]
+
+
+def _normalize_display_count(value, brewery_type: str | None = None) -> int:
+    normalized_type = _normalize_brewery_type(brewery_type)
+    count = _coerce_int(value, 1)
+    if count is None:
+        return 1
+    if normalized_type != "commercial":
+        return 1
+    return max(1, min(12, count))
+
+
+def _normalize_display_tap_assignments(value, display_count: int = 1) -> list[list[int]]:
+    raw = value if isinstance(value, list) else []
+    count = max(1, _coerce_int(display_count, 1) or 1)
+    normalized = []
+    for index in range(count):
+        numbers = []
+        if index < len(raw) and isinstance(raw[index], list):
+            for item in raw[index]:
+                number = _coerce_int(item, None)
+                if number is not None and number > 0:
+                    numbers.append(number)
+        normalized.append(sorted(set(numbers)))
+    return normalized
 
 
 def _normalize_pour_mode(value, brewery_type: str | None = None) -> str:
@@ -832,6 +878,17 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
         settings.get("keg_type_choices", []),
     )
     settings["menu_qr_mode"] = _normalize_menu_qr_mode(settings.get("menu_qr_mode"))
+    settings["display_title_on_tap"] = _normalize_display_title_on_tap(
+        settings.get("display_title_on_tap")
+    )
+    settings["display_count"] = _normalize_display_count(
+        settings.get("display_count"),
+        settings.get("brewery_type"),
+    )
+    settings["display_tap_assignments"] = _normalize_display_tap_assignments(
+        settings.get("display_tap_assignments"),
+        settings.get("display_count", 1),
+    )
     settings["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
         settings.get("analytics_low_keg_threshold_percent")
     )
@@ -2091,12 +2148,18 @@ def inject_runtime_metadata():
 @app.route("/login", methods=["GET", "POST"])
 def login_view():
     data = load_data()
-    team_users = data.get("team_users", [])
+    all_team_users = data.get("team_users", [])
+    if not isinstance(all_team_users, list):
+        all_team_users = []
+    active_team_users = [
+        user for user in all_team_users
+        if not _coerce_bool(user.get("disabled"), False)
+    ]
     error = None
 
     if request.method == "POST":
         user_id = str(request.form.get("user_id", "") or "").strip()
-        matched_user = _find_team_user_by_identifier(team_users, user_id)
+        matched_user = _find_team_user_by_identifier(all_team_users, user_id)
         if matched_user is None:
             error = "User not found. Choose a valid team member."
         else:
@@ -2106,7 +2169,7 @@ def login_view():
                 return render_template(
                     "login.html",
                     settings=data["settings"],
-                    users=team_users,
+                    users=active_team_users,
                     error=error,
                     selected_user_id=user_id,
                     require_owner_pin=False,
@@ -2115,7 +2178,7 @@ def login_view():
 
             owner_pin_recovery_required = False
             owner_pin_required = False
-            if selected_role == "owner" and len(team_users) > 1:
+            if selected_role == "owner" and len(active_team_users) > 1:
                 expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
                 if expected_pin:
                     owner_pin_required = True
@@ -2125,7 +2188,7 @@ def login_view():
                         return render_template(
                             "login.html",
                             settings=data["settings"],
-                            users=team_users,
+                            users=active_team_users,
                             error=error,
                             selected_user_id=user_id,
                             require_owner_pin=True,
@@ -2142,7 +2205,7 @@ def login_view():
                     return render_template(
                         "login.html",
                         settings=data["settings"],
-                        users=team_users,
+                        users=active_team_users,
                         error=error,
                         selected_user_id=user_id,
                         require_owner_pin=owner_pin_required,
@@ -2161,7 +2224,7 @@ def login_view():
     return render_template(
         "login.html",
         settings=data["settings"],
-        users=team_users,
+        users=active_team_users,
         error=error,
         selected_user_id=str(request.form.get("user_id", "") or "").strip() if request.method == "POST" else "",
         require_owner_pin=False,
@@ -2273,6 +2336,10 @@ def taps():
 @app.route("/settings")
 def settings():
     data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
     ingress_path = _effective_ingress_path()
     return render_template(
         "settings.html",
@@ -2311,16 +2378,36 @@ def display_view():
     qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
+
+    display_count = _normalize_display_count(
+        data.get("settings", {}).get("display_count"),
+        data.get("settings", {}).get("brewery_type"),
+    )
+    selected_display_index = max(1, min(display_count, _coerce_int(request.args.get("display"), 1) or 1))
+    assignments = _normalize_display_tap_assignments(
+        data.get("settings", {}).get("display_tap_assignments"),
+        display_count,
+    )
+    selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
+
+    taps = data["taps"]
+    if data.get("settings", {}).get("brewery_type") == "commercial" and display_count > 1:
+        if selected_taps:
+            taps = [tap for tap in data["taps"] if _coerce_int(tap.get("number"), None) in selected_taps]
+        else:
+            taps = []
+
     return render_template(
         "display/index.html",
         settings=data["settings"],
-        taps=data["taps"],
+        taps=taps,
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
         on_deck_kegs=_build_on_deck_kegs(data),
         qr_image_path=qr_image_path,
         menu_qr_mode=menu_qr_mode,
         qr_ready=qr_ready,
+        selected_display_index=selected_display_index,
     )
 
 
@@ -2475,6 +2562,9 @@ def api_menu_qr_health():
 @app.route("/api/settings", methods=["GET"])
 def api_get_settings():
     data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
     return jsonify(data["settings"])
 
 
@@ -2529,6 +2619,9 @@ def api_save_settings():
         "default_keg_type",
         "keg_type_choices",
         "menu_qr_mode",
+        "display_title_on_tap",
+        "display_count",
+        "display_tap_assignments",
         "pour_options",
         "default_pour_preset",
         "analytics_low_keg_threshold_percent",
