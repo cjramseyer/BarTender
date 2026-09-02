@@ -31,7 +31,9 @@
 <div class="keg-grid" id="kegGrid">
   {% for keg in kegs %} {% set fill_pct = keg.percent_full if keg.percent_full
   is defined else (100 if keg.status == 'full' else 50 if keg.status == 'in_use'
-  else 0) %} {% set beer_name = keg.beer_name or '—' %} {% set beer_brewer =
+  else 0) %} {% set visual_fill_pct = 12 if fill_pct > 0 and fill_pct < 12 else
+  fill_pct %} {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set
+  beer_name = keg.beer_name or '—' %} {% set beer_brewer =
   keg.beer_brewer or keg.brewery %} {% set beer_abv = keg.beer_abv or keg.abv %}
   {% set filled_display = keg.filled_date or '—' %} {% set notes_display =
   keg.notes or '—' %}
@@ -61,7 +63,9 @@
         aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
       >
         <div class="keg-level-shell">
-          <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
+          <div class="keg-level-fill{% if low_fill %} is-low{% endif %}" style="height: {{ visual_fill_pct }}%;"></div>
+          <div class="keg-level-bands" aria-hidden="true"></div>
+          <div class="keg-level-spout" aria-hidden="true"></div>
         </div>
         <div class="keg-level-meta">
           <span class="keg-level-label">Estimated Fill</span>
