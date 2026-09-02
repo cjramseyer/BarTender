@@ -25,9 +25,11 @@ Primary runtime components:
 - Bar stock CRUD (create, list, update, delete).
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
-- Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, Team Access controls, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
+- Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
+- Team Access management from a dedicated owner/manager-only page with profile PIN controls, user management, and staff restriction.
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
+- Analytics reset support for clearing historical pour data used in dashboard and forecasting calculations.
 - Read-only display page.
 - In-app API reference and API tester page.
 - Runtime QR generation endpoint for printable menu.
@@ -133,6 +135,8 @@ menu_qr_mode values:
 
 ### Team Access
 
+Team management is available from the dedicated /team-access page and is restricted to owner/manager roles. Staff users cannot access the page or the management APIs.
+
 GET /api/team/users
 
 - Returns team user list.
@@ -155,6 +159,11 @@ POST /api/team/users/delete
 GET /api/team/audit
 
 - Returns audit trail for team actions.
+
+POST /api/analytics/reset
+
+- Clears historical pour events used for analytics and depletion forecasting.
+- Requires owner permissions.
 
 ### Bar Stock
 

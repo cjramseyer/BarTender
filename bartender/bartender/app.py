@@ -2359,6 +2359,22 @@ def settings():
     )
 
 
+@app.route("/team-access")
+def team_access():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    ingress_path = _effective_ingress_path()
+    return render_template(
+        "team_access.html",
+        settings=data["settings"],
+        team_users=data.get("team_users", []),
+        ingress=ingress_path,
+    )
+
+
 @app.route("/api-reference")
 def api_reference():
     data = load_data()
@@ -2665,7 +2681,7 @@ def api_reset_settings_to_defaults():
     if data["settings"].get("owner_pin"):
         session.pop("owner_pin_recovery_required", None)
     else:
-        session["owner_pin_recovery_required"] = _owner_pin_recovery_needed(data)
+        session["owner_pin_recovery_needed"] = _owner_pin_recovery_needed(data)
 
     _record_team_audit(
         data,
@@ -2679,6 +2695,26 @@ def api_reset_settings_to_defaults():
     )
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/analytics/reset", methods=["POST"])
+def api_reset_analytics_data():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    previous_count = len(data.get("pour_events", []))
+    data["pour_events"] = []
+    _record_team_audit(
+        data,
+        current_user,
+        "analytics_reset",
+        "analytics",
+        {"events_removed": previous_count},
+    )
+    save_data(data)
+    return jsonify({"ok": True, "events_removed": previous_count})
 
 
 @app.route("/api/reset", methods=["POST"])

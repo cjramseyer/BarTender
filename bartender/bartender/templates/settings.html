@@ -692,6 +692,16 @@ content %}
               forecasting.</small
             >
           </div>
+          <div class="form-group" style="margin-top: 1rem;">
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              onclick="resetAnalyticsData()"
+            >
+              Reset Analytics Data
+            </button>
+            <span id="analyticsResetMsg" class="save-msg"></span>
+          </div>
         </div>
       </details>
 
@@ -854,99 +864,6 @@ content %}
           </p>
         </div>
       </details>
-    </div>
-
-    <div class="card settings-card settings-team-card">
-      <h2 class="settings-panel-title">Team Access</h2>
-      <div class="settings-collapsible-body">
-        <div class="form-group">
-          <label>Owner Profile</label>
-          <div class="form-row" style="gap: 0.5rem; align-items: end">
-            <div class="form-group" style="flex: 1; min-width: 200px">
-              <input
-                type="text"
-                id="ownerName"
-                class="form-control"
-                placeholder="Owner name"
-              />
-            </div>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              onclick="saveOwnerProfile()"
-            >
-              Save Owner Name
-            </button>
-          </div>
-          <small class="muted"
-            >This is the display name shown for the owner account.</small
-          >
-        </div>
-        <div class="form-group">
-          <label>Owner PIN</label>
-          <input
-            type="password"
-            id="ownerPin"
-            class="form-control"
-            value="{{ settings.owner_pin or '' }}"
-            placeholder="Required when other team members are present"
-            autocomplete="new-password"
-          />
-          <small class="muted"
-            >Require this PIN for the owner login when there is more than one
-            team member. Leave blank if you want only the single-owner
-            setup.</small
-          >
-        </div>
-        <div class="form-group">
-          <label>Additional Team Members</label>
-          <div
-            id="teamUsersList"
-            class="stack-gap-sm"
-            style="margin-top: 8px"
-          ></div>
-        </div>
-        <div class="form-group">
-          <label>Invite User</label>
-          <div class="form-row" style="gap: 0.5rem; align-items: end">
-            <div class="form-group" style="flex: 1; min-width: 180px">
-              <input
-                type="text"
-                id="teamUserName"
-                class="form-control"
-                placeholder="Name"
-              />
-            </div>
-            <div class="form-group" style="min-width: 140px">
-              <input
-                type="password"
-                id="teamUserPin"
-                class="form-control"
-                placeholder="PIN (optional)"
-                autocomplete="new-password"
-              />
-            </div>
-            <div class="form-group" style="min-width: 150px">
-              <select id="teamUserRole" class="form-control">
-                <option value="staff">Staff</option>
-                <option value="manager">Manager</option>
-                <option value="owner">Owner</option>
-              </select>
-            </div>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              onclick="addTeamUser()"
-            >
-              Add User
-            </button>
-          </div>
-          <small class="muted"
-            >Owners and managers can manage users. Staff access is restricted to
-            their own account.</small
-          >
-        </div>
-      </div>
     </div>
 
     <div class="card settings-card settings-export-card">
@@ -1715,6 +1632,35 @@ content %}
       console.error("Unable to reset settings", err);
       if (msg) {
         msg.textContent = "Reset failed";
+      }
+    }
+  }
+
+  async function resetAnalyticsData() {
+    const msg = document.getElementById("analyticsResetMsg");
+    if (msg) msg.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset all analytics data? This clears pour history used for dashboard and analytics calculations.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${INGRESS}/api/analytics/reset`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `Reset failed: ${res.status}`);
+      }
+
+      if (msg) {
+        msg.textContent = "✓ Analytics reset.";
+      }
+    } catch (err) {
+      console.error("Unable to reset analytics", err);
+      if (msg) {
+        msg.textContent = err.message || "Reset failed";
       }
     }
   }
