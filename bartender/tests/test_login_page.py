@@ -227,3 +227,41 @@ def test_logout_clears_session_and_redirects_to_login(tmp_path):
     assert response.headers["Location"] == "/login"
     with client.session_transaction() as session:
         assert "user_id" not in session
+
+
+def test_login_redirect_stays_within_ingress_path(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = ""
+    app_module.app.config["APPLICATION_ROOT"] = "/"
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/login",
+        data={"user_id": "owner"},
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/hassio_ingress/test-token/"
+
+
+def test_logout_redirect_stays_within_ingress_path(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = ""
+    app_module.app.config["APPLICATION_ROOT"] = "/"
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get(
+        "/logout",
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/hassio_ingress/test-token/login"

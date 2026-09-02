@@ -136,6 +136,14 @@ def _normalized_request_path() -> str:
     return raw_path
 
 
+def _redirect_to_endpoint(endpoint: str):
+    target = url_for(endpoint)
+    ingress = _effective_ingress_path()
+    if ingress and target.startswith("/") and not target.startswith(f"{ingress}/") and target != ingress:
+        target = f"{ingress}{target}"
+    return redirect(target)
+
+
 def _owner_pin_recovery_needed(data: dict) -> bool:
     users = data.get("team_users", [])
     if not isinstance(users, list) or len(users) <= 1:
@@ -2011,8 +2019,8 @@ def login_view():
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
-                return redirect(url_for("settings"))
-            return redirect(url_for("index"))
+                return _redirect_to_endpoint("settings")
+            return _redirect_to_endpoint("index")
 
     return render_template(
         "login.html",
@@ -2028,7 +2036,7 @@ def login_view():
 @app.route("/logout")
 def logout_view():
     session.clear()
-    return redirect(url_for("login_view"))
+    return _redirect_to_endpoint("login_view")
 
 
 # ---------------------------------------------------------------------------
@@ -2055,7 +2063,7 @@ def index():
 def analytics_view():
     data = load_data()
     if not _analytics_enabled(data):
-        return redirect(url_for("index"))
+        return _redirect_to_endpoint("index")
     ingress_path = _effective_ingress_path()
     return render_template(
         "analytics.html",
@@ -2069,7 +2077,7 @@ def analytics_view():
 def stock():
     data = load_data()
     if not _bar_stock_enabled(data):
-        return redirect(url_for("index"))
+        return _redirect_to_endpoint("index")
     ingress_path = _effective_ingress_path()
     return render_template(
         "stock.html",
