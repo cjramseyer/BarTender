@@ -329,6 +329,125 @@ def test_manager_can_update_member_role_but_not_owner(tmp_path):
     assert owner_denied.status_code == 403
 
 
+def test_owner_can_set_reset_pin_and_disable_member(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": app_module.DEFAULT_DATA["settings"],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "staff-1", "name": "Staff One", "role": "staff", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [],
+    })
+
+    set_pin = client.post(
+        "/api/team/users",
+        json={"action": "set_pin", "user_id": "staff-1", "pin": "2468"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+    assert set_pin.status_code == 200
+    assert set_pin.get_json()["user"]["pin"] == "2468"
+
+    disable_user = client.post(
+        "/api/team/users",
+        json={"action": "set_disabled", "user_id": "staff-1", "disabled": True},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+    assert disable_user.status_code == 200
+    assert disable_user.get_json()["user"]["disabled"] is True
+
+    enable_user = client.post(
+        "/api/team/users",
+        json={"action": "set_disabled", "user_id": "staff-1", "disabled": False},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+    assert enable_user.status_code == 200
+    assert enable_user.get_json()["user"]["disabled"] is False
+
+    reset_pin = client.post(
+        "/api/team/users",
+        json={"action": "reset_pin", "user_id": "staff-1"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+    assert reset_pin.status_code == 200
+    assert reset_pin.get_json()["user"]["pin"] == ""
+
+
+def test_owner_account_cannot_be_disabled(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": app_module.DEFAULT_DATA["settings"],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [],
+    })
+
+    response = client.post(
+        "/api/team/users",
+        json={"action": "set_disabled", "user_id": "owner", "disabled": True},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_owner_can_update_owner_profile_name(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": app_module.DEFAULT_DATA["settings"],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [],
+    })
+
+    response = client.post(
+        "/api/team/users",
+        json={"action": "update_profile", "user_id": "owner", "name": "Chris"},
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["user"]["name"] == "Chris"
+
+
+def test_manager_cannot_update_owner_profile_or_delete_owner(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        "settings": app_module.DEFAULT_DATA["settings"],
+        "team_users": [
+            {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+            {"id": "manager-1", "name": "Manager One", "role": "manager", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        ],
+        "team_audit": [],
+    })
+
+    rename_response = client.post(
+        "/api/team/users",
+        json={"action": "update_profile", "user_id": "owner", "name": "New Owner"},
+        headers={"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"},
+    )
+    assert rename_response.status_code == 403
+
+    delete_response = client.post(
+        "/api/team/users/delete",
+        json={"user_id": "owner"},
+        headers={"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"},
+    )
+    assert delete_response.status_code == 400
+
+
 def test_dashboard_analytics_handles_invalid_unit_data(tmp_path):
     app_module = _load_app_module(tmp_path)
 

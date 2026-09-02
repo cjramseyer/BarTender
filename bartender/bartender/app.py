@@ -347,6 +347,17 @@ def load_data() -> dict:
                 data["settings"].setdefault(key, value)
 
         _ensure_owner_team_user(data)
+        normalized_team_users = []
+        for user in data.get("team_users", []):
+            if not isinstance(user, dict):
+                continue
+            user.setdefault("id", "")
+            user.setdefault("name", "")
+            user["role"] = _normalize_team_role(user.get("role", "staff"))
+            user["pin"] = _normalize_team_user_pin(user.get("pin", ""))
+            user["disabled"] = _coerce_bool(user.get("disabled"), False)
+            normalized_team_users.append(user)
+        data["team_users"] = normalized_team_users
 
         setup_default = str(data["settings"].get("bar_name", "")).strip() not in ("", "My Bar")
         data["settings"]["setup_completed"] = _coerce_bool(
@@ -639,6 +650,11 @@ def _ensure_owner_team_user(data: dict) -> None:
     users = data.get("team_users", [])
     if not isinstance(users, list):
         users = []
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        user.setdefault("pin", "")
+        user.setdefault("disabled", False)
     has_owner = any(
         isinstance(user, dict) and str(user.get("role", "")).strip().lower() == "owner"
         for user in users
@@ -651,6 +667,8 @@ def _ensure_owner_team_user(data: dict) -> None:
         "id": "owner",
         "name": "Owner",
         "role": "owner",
+        "pin": "",
+        "disabled": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
     data["team_users"] = users
@@ -913,6 +931,13 @@ def _normalize_external_api_token(value) -> str:
 
 
 def _normalize_owner_pin(value) -> str:
+    pin = str(value or "").strip()
+    if len(pin) > 32:
+        pin = pin[:32]
+    return pin
+
+
+def _normalize_team_user_pin(value) -> str:
     pin = str(value or "").strip()
     if len(pin) > 32:
         pin = pin[:32]
@@ -1994,10 +2019,24 @@ def login_view():
             error = "User not found. Choose a valid team member."
         else:
             selected_role = _normalize_team_role(matched_user.get("role", "staff"))
+            if _coerce_bool(matched_user.get("disabled"), False):
+                error = "This user account is disabled."
+                return render_template(
+                    "login.html",
+                    settings=data["settings"],
+                    users=team_users,
+                    error=error,
+                    selected_user_id=user_id,
+                    require_owner_pin=False,
+                    ingress=_effective_ingress_path(),
+                )
+
             owner_pin_recovery_required = False
+            owner_pin_required = False
             if selected_role == "owner" and len(team_users) > 1:
                 expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
                 if expected_pin:
+                    owner_pin_required = True
                     supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
                     if not secrets.compare_digest(expected_pin, supplied_pin):
                         error = "Owner PIN required when additional team members are configured."
@@ -2012,6 +2051,21 @@ def login_view():
                         )
                 else:
                     owner_pin_recovery_required = True
+
+            expected_user_pin = _normalize_team_user_pin(matched_user.get("pin", ""))
+            if expected_user_pin:
+                supplied_user_pin = str(request.form.get("user_pin", "") or "").strip()
+                if not secrets.compare_digest(expected_user_pin, supplied_user_pin):
+                    error = "PIN required for this team member."
+                    return render_template(
+                        "login.html",
+                        settings=data["settings"],
+                        users=team_users,
+                        error=error,
+                        selected_user_id=user_id,
+                        require_owner_pin=owner_pin_required,
+                        ingress=_effective_ingress_path(),
+                    )
 
             session.clear()
             session["user_id"] = str(matched_user.get("id", "")).strip() or user_id
@@ -2500,9 +2554,18 @@ def api_create_team_user():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     payload = request.get_json(silent=True) or {}
-    if payload.get("action") == "delete":
+    action = str(payload.get("action", "")).strip().lower()
+    if action == "delete":
         return api_delete_team_user()
-    if payload.get("action") == "update":
+    if action in (
+        "update",
+        "update_profile",
+        "set_pin",
+        "update_pin",
+        "reset_pin",
+        "disable",
+        "set_disabled",
+    ):
         return api_update_team_user()
 
     name = str(payload.get("name", "")).strip()
@@ -2515,6 +2578,7 @@ def api_create_team_user():
         for existing in users
     )
     role = "owner" if not has_owner else _normalize_team_role(payload.get("role"))
+    user_pin = _normalize_team_user_pin(payload.get("pin", ""))
     if not name:
         return jsonify({"error": "User name is required."}), 400
 
@@ -2526,6 +2590,8 @@ def api_create_team_user():
         if owner_placeholder is not None:
             owner_placeholder["name"] = name
             owner_placeholder["role"] = "owner"
+            owner_placeholder["pin"] = user_pin
+            owner_placeholder["disabled"] = False
             owner_placeholder["created_at"] = datetime.now(timezone.utc).isoformat()
             user = owner_placeholder
             user_id = "owner"
@@ -2535,6 +2601,8 @@ def api_create_team_user():
                 "id": user_id,
                 "name": name,
                 "role": "owner",
+                "pin": user_pin,
+                "disabled": False,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             users.insert(0, user)
@@ -2550,6 +2618,8 @@ def api_create_team_user():
         "id": user_id,
         "name": name,
         "role": role,
+        "pin": user_pin,
+        "disabled": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     users.append(user)
@@ -2566,6 +2636,7 @@ def api_update_team_user():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action") or "update").strip().lower()
     user_id = str(payload.get("user_id") or payload.get("id") or "").strip()
     if not user_id:
         return jsonify({"error": "User ID is required."}), 400
@@ -2593,6 +2664,71 @@ def api_update_team_user():
 
     if current_user.get("role") == "manager" and str(matching_user.get("role", "")).strip().lower() == "owner":
         return jsonify({"error": "Only the owner can change the owner account."}), 403
+
+    if action == "update_profile":
+        new_name = str(payload.get("name", "")).strip()
+        if not new_name:
+            return jsonify({"error": "User name is required."}), 400
+        if str(matching_user.get("role", "")).strip().lower() == "owner" and current_user.get("role") != "owner":
+            return jsonify({"error": "Only the owner can update the owner profile."}), 403
+        previous_name = str(matching_user.get("name", "")).strip()
+        matching_user["name"] = new_name
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower():
+            session["user_name"] = new_name
+        _record_team_audit(
+            data,
+            current_user,
+            "user_profile_updated",
+            user_id,
+            {"from_name": previous_name, "to_name": new_name},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
+
+    if action in ("set_pin", "update_pin"):
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
+            return jsonify({"error": "Managers cannot change their own PIN. Another manager or the owner must do this."}), 403
+        matching_user["pin"] = _normalize_team_user_pin(payload.get("pin", ""))
+        _record_team_audit(
+            data,
+            current_user,
+            "user_pin_updated",
+            user_id,
+            {"pin_set": bool(matching_user.get("pin"))},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
+
+    if action == "reset_pin":
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
+            return jsonify({"error": "Managers cannot reset their own PIN. Another manager or the owner must do this."}), 403
+        matching_user["pin"] = ""
+        _record_team_audit(
+            data,
+            current_user,
+            "user_pin_reset",
+            user_id,
+            {},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
+
+    if action in ("disable", "set_disabled"):
+        disable_value = _coerce_bool(payload.get("disabled"), True)
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower() and disable_value:
+            return jsonify({"error": "You cannot disable the currently signed-in user."}), 400
+        if str(matching_user.get("role", "")).strip().lower() == "owner" and disable_value:
+            return jsonify({"error": "Owner account cannot be disabled."}), 400
+        matching_user["disabled"] = disable_value
+        _record_team_audit(
+            data,
+            current_user,
+            "user_disabled_updated",
+            user_id,
+            {"disabled": disable_value},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
 
     if requested_role == "owner" and current_user.get("role") != "owner":
         return jsonify({"error": "Only the owner can promote someone to owner."}), 403
@@ -2637,6 +2773,13 @@ def api_delete_team_user():
 
     if str(current_user.get("id", "")).lower() == user_id.lower():
         return jsonify({"error": "You cannot delete the currently signed-in user."}), 400
+
+    matching_user = next(
+        (user for user in users if str(user.get("id", "")).strip().lower() == user_id.lower()),
+        None,
+    )
+    if matching_user and str(matching_user.get("role", "")).strip().lower() == "owner":
+        return jsonify({"error": "Owner account cannot be deleted."}), 400
 
     data["team_users"] = remaining
     _record_team_audit(data, current_user, "user_deleted", user_id, {"deleted_user_id": user_id})
