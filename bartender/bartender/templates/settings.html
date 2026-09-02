@@ -127,6 +127,60 @@ content %}
               updates.</small
             >
           </div>
+          {% if qr_ready %}
+          <div class="form-group">
+            <label>Printable Menu QR Code</label>
+            <select id="menuQrMode" class="form-control">
+              {% if (settings.menu_qr_mode or 'both') == 'off' %}
+              <option value="off" selected>Off</option>
+              {% else %}
+              <option value="off">Off</option>
+              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'display'
+              %}
+              <option value="display" selected>Display only</option>
+              {% else %}
+              <option value="display">Display only</option>
+              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print' %}
+              <option value="print" selected>Print only</option>
+              {% else %}
+              <option value="print">Print only</option>
+              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'both' %}
+              <option value="both" selected>Display and print</option>
+              {% else %}
+              <option value="both">Display and print</option>
+              {% endif %}
+            </select>
+            <small class="muted">
+              Controls where the QR code appears on the printable menu page.
+            </small>
+            <div style="margin-top: 0.65rem">
+              <a
+                class="btn btn-secondary btn-sm"
+                href="{{ ingress }}/menu/qr-print"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Print QR Code Page
+              </a>
+            </div>
+          </div>
+          {% else %}
+          <div class="form-group settings-warning-block">
+            <label>Printable Menu QR Code</label>
+            <p class="muted" style="margin-top: 0.35rem">
+              QR options are unavailable on this system.
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Install requirements to enable QR generation:
+              <code>pip install -r requirements.txt</code>
+            </p>
+            {% if qr_error %}
+            <p class="muted" style="margin-top: 0.25rem">
+              Details: {{ qr_error }}
+            </p>
+            {% endif %}
+          </div>
+          {% endif %}
         </div>
       </details>
 
@@ -305,6 +359,32 @@ content %}
       <details class="settings-collapsible">
         <summary>Pour Presets</summary>
         <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label>Pour Mode</label>
+            <select id="pourMode" class="form-control">
+              {% if (settings.pour_mode or 'manual') == 'manual' %}
+              <option value="manual" selected>Manual</option>
+              {% else %}
+              <option value="manual">Manual</option>
+              {% endif %} {% if (settings.pour_mode or 'manual') == 'pos' %}
+              <option value="pos" selected>POS (API)</option>
+              {% else %}
+              <option value="pos">POS (API)</option>
+              {% endif %} {% if (settings.pour_mode or 'manual') ==
+              'inline_device' %}
+              <option value="inline_device" selected disabled>
+                Inline Device (Coming Soon)
+              </option>
+              {% else %}
+              <option value="inline_device" disabled>
+                Inline Device (Coming Soon)
+              </option>
+              {% endif %}
+            </select>
+            <small class="muted"
+              >Non-manual modes hide the pour button in the UI.</small
+            >
+          </div>
           <div class="form-group">
             <label>Pour Amount Presets</label>
             <small class="muted">
@@ -488,86 +568,6 @@ content %}
               value="{{ settings.external_api_rate_limit_per_minute or 120 }}"
             />
           </div>
-          <div class="form-group">
-            <label>Pour Mode</label>
-            <select id="pourMode" class="form-control">
-              {% if (settings.pour_mode or 'manual') == 'manual' %}
-              <option value="manual" selected>Manual</option>
-              {% else %}
-              <option value="manual">Manual</option>
-              {% endif %} {% if (settings.pour_mode or 'manual') == 'pos' %}
-              <option value="pos" selected>POS (API)</option>
-              {% else %}
-              <option value="pos">POS (API)</option>
-              {% endif %} {% if (settings.pour_mode or 'manual') ==
-              'inline_device' %}
-              <option value="inline_device" selected disabled>
-                Inline Device (Coming Soon)
-              </option>
-              {% else %}
-              <option value="inline_device" disabled>
-                Inline Device (Coming Soon)
-              </option>
-              {% endif %}
-            </select>
-            <small class="muted"
-              >Non-manual modes hide the pour button in the UI.</small
-            >
-          </div>
-          {% if qr_ready %}
-          <div class="form-group">
-            <label>Printable Menu QR Code</label>
-            <select id="menuQrMode" class="form-control">
-              {% if (settings.menu_qr_mode or 'both') == 'off' %}
-              <option value="off" selected>Off</option>
-              {% else %}
-              <option value="off">Off</option>
-              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'display'
-              %}
-              <option value="display" selected>Display only</option>
-              {% else %}
-              <option value="display">Display only</option>
-              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print' %}
-              <option value="print" selected>Print only</option>
-              {% else %}
-              <option value="print">Print only</option>
-              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'both' %}
-              <option value="both" selected>Display and print</option>
-              {% else %}
-              <option value="both">Display and print</option>
-              {% endif %}
-            </select>
-            <small class="muted">
-              Controls where the QR code appears on the printable menu page.
-            </small>
-            <div style="margin-top: 0.65rem">
-              <a
-                class="btn btn-secondary btn-sm"
-                href="{{ ingress }}/menu/qr-print"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Print QR Code Page
-              </a>
-            </div>
-          </div>
-          {% else %}
-          <div class="form-group settings-warning-block">
-            <label>Printable Menu QR Code</label>
-            <p class="muted" style="margin-top: 0.35rem">
-              QR options are unavailable on this system.
-            </p>
-            <p class="muted" style="margin-top: 0.25rem">
-              Install requirements to enable QR generation:
-              <code>pip install -r requirements.txt</code>
-            </p>
-            {% if qr_error %}
-            <p class="muted" style="margin-top: 0.25rem">
-              Details: {{ qr_error }}
-            </p>
-            {% endif %}
-          </div>
-          {% endif %}
         </div>
       </details>
 
