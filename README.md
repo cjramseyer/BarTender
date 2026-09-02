@@ -126,7 +126,7 @@ The add-on exposes a JSON REST API at the ingress URL.
 | POST   | `/api/beers`                       | Add a beer                                                |
 | PUT    | `/api/beers/<id>`                  | Update a beer                                             |
 | DELETE | `/api/beers/<id>`                  | Delete a beer                                             |
-| GET    | `/api/beers/export/csv`            | Export beers CSV (date-stamped filename)                 |
+| GET    | `/api/beers/export/csv`            | Export beers CSV (date-stamped filename)                  |
 | GET    | `/api/kegs`                        | List all kegs                                             |
 | POST   | `/api/kegs`                        | Add a keg                                                 |
 | PUT    | `/api/kegs/<id>`                   | Update a keg                                              |
