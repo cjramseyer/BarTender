@@ -175,8 +175,10 @@ content %}
         >Opens in a new tab</span
       >
     </div>
-    <details class="analytics-panel">
-      <summary class="btn btn-sm btn-secondary">View Analytics</summary>
+    <details class="analytics-panel" open>
+      <summary class="btn btn-sm btn-secondary js-analytics-toggle-label">
+        Hide Analytics
+      </summary>
       <div class="analytics-panel-body">
         <p class="muted" style="margin-bottom: 0.5rem">
           Low keg threshold: {{ dashboard_analytics.low_keg_threshold_percent
@@ -288,6 +290,20 @@ content %}
         pourDashboardTap(tapId);
       });
     });
+
+    const analyticsPanel = document.querySelector(".analytics-panel");
+    const analyticsToggleLabel = analyticsPanel
+      ? analyticsPanel.querySelector(".js-analytics-toggle-label")
+      : null;
+    if (analyticsPanel && analyticsToggleLabel) {
+      const syncAnalyticsLabel = () => {
+        analyticsToggleLabel.textContent = analyticsPanel.open
+          ? "Hide Analytics"
+          : "Show Analytics";
+      };
+      syncAnalyticsLabel();
+      analyticsPanel.addEventListener("toggle", syncAnalyticsLabel);
+    }
   }
 
   async function pourDashboardTap(tapId) {
