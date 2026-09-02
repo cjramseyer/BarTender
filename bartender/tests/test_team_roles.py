@@ -137,6 +137,112 @@ def test_default_keg_type_prefers_corny_and_normalizes_full_size_label(tmp_path)
     assert reloaded["settings"]["default_keg_type"] == "Full Size (1/2 bbl, 15.5 gal)"
 
 
+def test_brewery_type_defaults_to_homebrewer_and_normalizes_valid_values(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+
+    assert data["settings"]["brewery_type"] == "homebrewer"
+
+    data["settings"]["brewery_type"] = "commercial"
+    app_module.save_data(data)
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["brewery_type"] == "commercial"
+
+    data["settings"]["brewery_type"] = "unsupported"
+    app_module.save_data(data)
+    assert app_module.load_data()["settings"]["brewery_type"] == "homebrewer"
+
+
+def test_pos_pour_mode_is_forbidden_for_homebrewer_settings(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "homebrewer"
+    data["settings"]["pour_mode"] = "pos"
+    app_module.save_data(data)
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["brewery_type"] == "homebrewer"
+    assert reloaded["settings"]["pour_mode"] == "manual"
+
+    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["pour_mode"] = "pos"
+    app_module.save_data(data)
+    assert app_module.load_data()["settings"]["pour_mode"] == "pos"
+
+
+def test_pos_system_is_available_only_for_commercial_pos_mode(tmp_path):
+    app_module = _load_app_module(tmp_path)
+
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["pour_mode"] = "pos"
+    data["settings"]["pos_system"] = "toast"
+    app_module.save_data(data)
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["brewery_type"] == "commercial"
+    assert reloaded["settings"]["pour_mode"] == "pos"
+    assert reloaded["settings"]["pos_system"] == "Toast"
+
+    data["settings"]["brewery_type"] = "homebrewer"
+    data["settings"]["pour_mode"] = "pos"
+    data["settings"]["pos_system"] = "Toast"
+    app_module.save_data(data)
+    assert app_module.load_data()["settings"]["pour_mode"] == "manual"
+    assert app_module.load_data()["settings"]["pos_system"] == ""
+
+
+def test_homebrewer_limits_taps_and_kegs(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    app_module.save_data({
+        "settings": {
+            **app_module.DEFAULT_DATA["settings"],
+            "brewery_type": "homebrewer",
+        },
+        "beers": [],
+        "kegs": [],
+        "taps": [],
+        "pour_events": [],
+        "team_users": [{"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"}],
+        "team_audit": [],
+    })
+
+    for i in range(12):
+        response = client.post(
+            "/api/taps",
+            json={"number": i + 1},
+            headers=owner_headers,
+        )
+        assert response.status_code == 201
+
+    response = client.post(
+        "/api/taps",
+        json={"number": 13},
+        headers=owner_headers,
+    )
+    assert response.status_code == 409
+    assert "12" in response.get_json()["error"]
+
+    for i in range(20):
+        response = client.post(
+            "/api/kegs",
+            json={"name": f"Keg {i + 1}", "status": "empty"},
+            headers=owner_headers,
+        )
+        assert response.status_code == 201
+
+    response = client.post(
+        "/api/kegs",
+        json={"name": "Keg 21", "status": "empty"},
+        headers=owner_headers,
+    )
+    assert response.status_code == 409
+    assert "20" in response.get_json()["error"]
+
+
 def test_default_pour_preset_prefers_pint_and_includes_taste(tmp_path):
     app_module = _load_app_module(tmp_path)
 

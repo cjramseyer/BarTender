@@ -106,6 +106,15 @@ STANDARD_KEG_TYPE_CHOICES = [
 LEGACY_KEG_TYPE_ALIASES = {
     "1/2 bbl (15.5 gal)": "Full Size (1/2 bbl, 15.5 gal)",
 }
+COMMON_POS_SYSTEMS = [
+    "Square",
+    "Toast",
+    "Lightspeed",
+    "Shopify POS",
+    "Aloha",
+    "Barmetrix",
+    "Other",
+]
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
@@ -288,6 +297,8 @@ DEFAULT_DATA = {
         "measurement": "us",
         "theme": "light",
         "bar_name": "My Bar",
+        "brewery_type": "homebrewer",
+        "pos_system": "",
         "bar_logo_url": "",
         "external_base_url": "",
         "external_api_token_auth_enabled": True,
@@ -370,8 +381,17 @@ def load_data() -> dict:
             data["settings"].get("setup_completed"),
             setup_default,
         )
+        data["settings"]["brewery_type"] = _normalize_brewery_type(
+            data["settings"].get("brewery_type")
+        )
+        data["settings"]["pos_system"] = _normalize_pos_system(
+            data["settings"].get("pos_system"),
+            data["settings"].get("brewery_type"),
+            data["settings"].get("pour_mode"),
+        )
         data["settings"]["pour_mode"] = _normalize_pour_mode(
-            data["settings"].get("pour_mode")
+            data["settings"].get("pour_mode"),
+            data["settings"].get("brewery_type"),
         )
         data["settings"]["environment_mode"] = _normalize_environment_mode(
             data["settings"].get("environment_mode")
@@ -601,8 +621,11 @@ def _normalize_menu_qr_mode(value) -> str:
     return "both"
 
 
-def _normalize_pour_mode(value) -> str:
+def _normalize_pour_mode(value, brewery_type: str | None = None) -> str:
     mode = str(value or "manual").strip().lower()
+    normalized_type = _normalize_brewery_type(brewery_type)
+    if mode == "pos" and normalized_type != "commercial":
+        return "manual"
     if mode in ("manual", "pos", "inline_device"):
         return mode
     return "manual"
@@ -785,7 +808,16 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
     settings["bar_stock_enabled"] = _coerce_bool(settings.get("bar_stock_enabled"), True)
     settings["analytics_enabled"] = _coerce_bool(settings.get("analytics_enabled"), True)
     settings["api_reference_enabled"] = _coerce_bool(settings.get("api_reference_enabled"), True)
-    settings["pour_mode"] = _normalize_pour_mode(settings.get("pour_mode"))
+    settings["brewery_type"] = _normalize_brewery_type(settings.get("brewery_type"))
+    settings["pos_system"] = _normalize_pos_system(
+        settings.get("pos_system"),
+        settings.get("brewery_type"),
+        settings.get("pour_mode"),
+    )
+    settings["pour_mode"] = _normalize_pour_mode(
+        settings.get("pour_mode"),
+        settings.get("brewery_type"),
+    )
     settings["environment_mode"] = _normalize_environment_mode(settings.get("environment_mode"))
     if setup_completed_explicit:
         settings["setup_completed"] = _coerce_bool(settings.get("setup_completed"), False)
@@ -1551,6 +1583,50 @@ def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str
                 return _pour_option_value(option)
 
     return _preferred_default_pour_preset(pour_options)
+
+
+def _normalize_brewery_type(value) -> str:
+    normalized = str(value or "homebrewer").strip().lower()
+    if normalized in ("homebrewer", "commercial"):
+        return normalized
+    return "homebrewer"
+
+
+def _homebrewer_limit_for(collection: str) -> int:
+    if collection == "taps":
+        return 12
+    if collection == "kegs":
+        return 20
+    return 0
+
+
+def _enforce_homebrewer_limits(data: dict, collection: str) -> tuple[bool, str | None]:
+    if data.get("settings", {}).get("brewery_type") != "homebrewer":
+        return True, None
+
+    limit = _homebrewer_limit_for(collection)
+    if limit <= 0:
+        return True, None
+
+    current_count = len(data.get(collection, []) if isinstance(data.get(collection, []), list) else [])
+    if current_count >= limit:
+        return False, f"Homebrewer mode is limited to {limit} {collection}."
+    return True, None
+
+
+def _normalize_pos_system(value, brewery_type: str | None = None, pour_mode: str | None = None) -> str:
+    normalized_type = _normalize_brewery_type(brewery_type)
+    normalized_mode = str(pour_mode or "manual").strip().lower()
+    valid_choices = {str(choice).strip().lower() for choice in COMMON_POS_SYSTEMS}
+    candidate = str(value or "").strip()
+    if normalized_type != "commercial" or normalized_mode != "pos":
+        return ""
+    if not candidate:
+        return ""
+    lookup = candidate.strip().lower()
+    if lookup in valid_choices:
+        return next(choice for choice in COMMON_POS_SYSTEMS if choice.lower() == lookup)
+    return ""
 
 
 def _normalize_keg_type_choices(raw_choices, default_type: str) -> list[str]:
@@ -2429,6 +2505,8 @@ def api_save_settings():
         "measurement",
         "theme",
         "bar_name",
+        "brewery_type",
+        "pos_system",
         "bar_logo_url",
         "external_base_url",
         "external_api_token_auth_enabled",
@@ -3352,6 +3430,10 @@ def api_add_keg():
     if selected_beer and not _is_beer_kegged(selected_beer):
         return jsonify({"error": "Only kegged beers can be assigned to kegs."}), 409
 
+    allowed, error = _enforce_homebrewer_limits(data, "kegs")
+    if not allowed:
+        return jsonify({"error": error}), 409
+
     keg_type = _normalize_builtin_keg_type_label(body.get("type", "")) or _normalize_builtin_keg_type_label(
         data.get("settings", {}).get("default_keg_type", "")
     )
@@ -3449,6 +3531,10 @@ def api_add_kegs_bulk():
             return jsonify({"error": "Selected beer was not found.", "index": index}), 404
         if selected_beer and not _is_beer_kegged(selected_beer):
             return jsonify({"error": "Only kegged beers can be assigned to kegs.", "index": index}), 409
+
+        allowed, error = _enforce_homebrewer_limits(simulated_data, "kegs")
+        if not allowed:
+            return jsonify({"error": error, "index": index}), 409
 
         keg_type = _normalize_builtin_keg_type_label(item.get("type", "")) or _normalize_builtin_keg_type_label(
             simulated_data.get("settings", {}).get("default_keg_type", "")
@@ -3899,6 +3985,9 @@ def api_add_tap():
             "tap_id": conflicting_tap.get("id"),
             "tap_number": conflicting_tap.get("number"),
         }), 409
+    allowed, error = _enforce_homebrewer_limits(data, "taps")
+    if not allowed:
+        return jsonify({"error": error}), 409
     tap = {
         "id": _next_id(data["taps"]),
         "number": body.get("number", len(data["taps"]) + 1),
@@ -3953,6 +4042,10 @@ def api_add_taps_bulk():
                 "tap_id": conflicting_tap.get("id"),
                 "tap_number": conflicting_tap.get("number"),
             }), 409
+
+        allowed, error = _enforce_homebrewer_limits(simulated_data, "taps")
+        if not allowed:
+            return jsonify({"error": error, "index": index}), 409
 
         number = _coerce_int(item.get("number"), None)
         if number is None or number <= 0:

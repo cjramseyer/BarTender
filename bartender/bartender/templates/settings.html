@@ -51,6 +51,26 @@ content %}
             />
           </div>
           <div class="form-group">
+            <label>Business Type</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                {% if (settings.brewery_type or 'homebrewer') == 'homebrewer' %}
+                <input type="radio" name="brewery_type" value="homebrewer" checked />
+                {% else %}
+                <input type="radio" name="brewery_type" value="homebrewer" />
+                {% endif %} Homebrewer
+              </label>
+              <label class="radio-label">
+                {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+                <input type="radio" name="brewery_type" value="commercial" checked />
+                {% else %}
+                <input type="radio" name="brewery_type" value="commercial" />
+                {% endif %} Commercial
+              </label>
+            </div>
+            <small class="muted">Homebrewer is the default selection.</small>
+          </div>
+          <div class="form-group">
             <label>Bar Logo URL (optional)</label>
             <input
               type="url"
@@ -366,25 +386,39 @@ content %}
               <option value="manual" selected>Manual</option>
               {% else %}
               <option value="manual">Manual</option>
-              {% endif %} {% if (settings.pour_mode or 'manual') == 'pos' %}
-              <option value="pos" selected>POS (API)</option>
-              {% else %}
-              <option value="pos">POS (API)</option>
+              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+                {% if (settings.pour_mode or 'manual') == 'pos' %}
+                <option value="pos" selected>POS (API)</option>
+                {% else %}
+                <option value="pos">POS (API)</option>
+                {% endif %}
               {% endif %} {% if (settings.pour_mode or 'manual') ==
               'inline_device' %}
-              <option value="inline_device" selected disabled>
-                Inline Device (Coming Soon)
-              </option>
+              <option value="inline_device" selected>Inline Device</option>
               {% else %}
-              <option value="inline_device" disabled>
-                Inline Device (Coming Soon)
-              </option>
+              <option value="inline_device">Inline Device</option>
               {% endif %}
             </select>
             <small class="muted"
-              >Non-manual modes hide the pour button in the UI.</small
+              >POS mode is only available for Commercial setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
             >
           </div>
+          {% if (settings.brewery_type or 'homebrewer') == 'commercial' and (settings.pour_mode or 'manual') == 'pos' %}
+          <div class="form-group">
+            <label>Common POS System</label>
+            <select id="posSystem" class="form-control">
+              <option value="">Select an option</option>
+              {% for option in ["Square", "Toast", "Lightspeed", "Shopify POS", "Aloha", "Barmetrix", "Other"] %}
+                {% if (settings.pos_system or '') == option %}
+                <option value="{{ option }}" selected>{{ option }}</option>
+                {% else %}
+                <option value="{{ option }}">{{ option }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <small class="muted">Choose the common POS provider used by this Commercial setup.</small>
+          </div>
+          {% endif %}
           <div class="form-group">
             <label>Pour Amount Presets</label>
             <small class="muted">
@@ -1809,10 +1843,16 @@ content %}
 
     const body = {
       bar_name: document.getElementById("barName").value,
+      brewery_type: document.querySelector('input[name="brewery_type"]:checked')
+        ? document.querySelector('input[name="brewery_type"]:checked').value
+        : "homebrewer",
       bar_logo_url: document.getElementById("barLogoUrl").value,
       external_base_url: document.getElementById("externalBaseUrl").value,
       default_keg_type: document.getElementById("defaultKegType").value,
       keg_type_choices: collectKegTypeChoices(),
+      pos_system: document.getElementById("posSystem")
+        ? document.getElementById("posSystem").value
+        : "",
       measurement: measurementInput ? measurementInput.value : "us",
       theme: themeInput ? themeInput.value : "light",
       dashboard_manage_button_position: managePosInput
@@ -1849,6 +1889,126 @@ content %}
         ? document.getElementById("pourMode").value
         : DEFAULT_POUR_MODE,
       environment_mode: environmentModeInput
+        ? environmentModeInput.value
+        : DEFAULT_ENVIRONMENT_MODE,
+    };
+
+    const breweryTypeInput = document.querySelector('input[name="brewery_type"]:checked');
+    const normalizedBreweryType = breweryTypeInput
+      ? breweryTypeInput.value
+      : "homebrewer";
+    if (normalizedBreweryType !== "commercial") {
+      body.pour_mode = "manual";
+      body.pos_system = "";
+    } else if (body.pour_mode !== "pos") {
+      body.pos_system = "";
+    }
+
+    const menuQrModeInput = document.getElementById("menuQrMode");
+    if (menuQrModeInput) {
+      body.menu_qr_mode = menuQrModeInput.value;
+    }
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        throw new Error(`Save failed: ${res.status}`);
+      }
+
+      const savedSettings = await res.json();
+
+      document.getElementById("saveMsg").textContent = "✓ Saved!";
+      setTimeout(() => {
+        document.getElementById("saveMsg").textContent = "";
+      }, 2000);
+      document.documentElement.dataset.theme = body.theme;
+      document.documentElement.dataset.managePos =
+        body.dashboard_manage_button_position;
+      document.body.dataset.managePos = body.dashboard_manage_button_position;
+      if (document.getElementById("externalApiToken")) {
+        document.getElementById("externalApiToken").value =
+          savedSettings.external_api_token || "";
+      }
+      if (document.getElementById("externalApiReadToken")) {
+        document.getElementById("externalApiReadToken").value =
+          savedSettings.external_api_read_token || "";
+      }
+      if (document.getElementById("externalApiWriteToken")) {
+        document.getElementById("externalApiWriteToken").value =
+          savedSettings.external_api_write_token || "";
+      }
+      if (document.getElementById("externalApiAllowlist")) {
+        document.getElementById("externalApiAllowlist").value =
+          savedSettings.external_api_allowlist || "";
+      }
+      if (document.getElementById("externalApiRateLimitPerMinute")) {
+        document.getElementById("externalApiRateLimitPerMinute").value =
+          savedSettings.external_api_rate_limit_per_minute || 120;
+      }
+      if (
+        Array.isArray(savedSettings.keg_type_choices) &&
+        document.getElementById("kegTypeChoicesList")
+      ) {
+        replaceKegTypeChoices(
+          savedSettings.keg_type_choices,
+          savedSettings.default_keg_type || "",
+        );
+      }
+      updateExternalReadonlyLinks(savedSettings.external_base_url || "");
+      localStorage.setItem("bartender_theme", body.theme);
+    } catch (err) {
+      document.getElementById("saveMsg").textContent = "Save failed";
+      console.error(err);
+    }
+  }
+
+  async function importArchive(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById("importArchiveFile");
+    const modeInput = document.getElementById("importMode");
+    const msg = document.getElementById("importMsg");
+    const file =
+      fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    const mode = modeInput ? modeInput.value : "replace";
+    const isJson = !!(
+      file &&
+      file.name &&
+      file.name.toLowerCase().endsWith(".json")
+    );
+    const previewUrl = isJson
+      ? `${INGRESS}/api/import/json/preview`
+      : `${INGRESS}/api/import/archive/preview`;
+    const importUrl = isJson
+      ? `${INGRESS}/api/import/json`
+      : `${INGRESS}/api/import/archive`;
+    const fileTypeLabel = isJson ? "JSON backup" : "archive";
+
+    if (!file) {
+      msg.textContent = "Please select a backup file.";
+      return;
+    }
+
+    const previewData = new FormData();
+    previewData.append("file", file);
+    previewData.append("mode", mode);
+
+    try {
+      const previewRes = await fetch(previewUrl, {
+        method: "POST",
+        body: previewData,
+      });
+
+      if (!previewRes.ok) {
+        let message = "Preview failed";
+        try {
+          const body = await previewRes.json();
+          if (body.error) message = body.error;
+        } catch (err) {
+          // Ignore parse errors and keep fallback message.
         ? environmentModeInput.value
         : DEFAULT_ENVIRONMENT_MODE,
       audit_retention_days: parseInt(
