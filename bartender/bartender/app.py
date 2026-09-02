@@ -2038,6 +2038,7 @@ def logout_view():
 @app.route("/")
 def index():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "index.html",
         settings=data["settings"],
@@ -2046,7 +2047,7 @@ def index():
         bar_stock=data["bar_stock"],
         on_deck_kegs=_build_on_deck_kegs(data),
         dashboard_analytics=_build_dashboard_analytics(data),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
@@ -2055,11 +2056,12 @@ def analytics_view():
     data = load_data()
     if not _analytics_enabled(data):
         return redirect(url_for("index"))
+    ingress_path = _effective_ingress_path()
     return render_template(
         "analytics.html",
         settings=data["settings"],
         dashboard_analytics=_build_dashboard_analytics(data),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
@@ -2068,29 +2070,32 @@ def stock():
     data = load_data()
     if not _bar_stock_enabled(data):
         return redirect(url_for("index"))
+    ingress_path = _effective_ingress_path()
     return render_template(
         "stock.html",
         settings=data["settings"],
         bar_stock=data["bar_stock"],
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/kegs")
 def kegs():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "kegs.html",
         settings=data["settings"],
         kegs=data["kegs"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/beers")
 def beers():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     beer_type_choices = sorted(
         {
             str(beer.get("type", "")).strip()
@@ -2104,25 +2109,27 @@ def beers():
         settings=data["settings"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
         beer_type_choices=beer_type_choices,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/taps")
 def taps():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "taps.html",
         settings=data["settings"],
         taps=data["taps"],
         kegs=data["kegs"],
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/settings")
 def settings():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "settings.html",
         settings=data["settings"],
@@ -2137,25 +2144,27 @@ def settings():
         external_menu_url=_external_menu_url(data),
         auto_external_display_url=_external_display_url(),
         auto_external_menu_url=_external_menu_url(),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/api-reference")
 def api_reference():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "api_reference.html",
         settings=data["settings"],
         endpoints=API_REFERENCE_ENDPOINTS,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/display")
 def display_view():
     data = load_data()
-    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    ingress_path = _effective_ingress_path()
+    qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
     return render_template(
@@ -2174,6 +2183,7 @@ def display_view():
 @app.route("/menu")
 def menu_view():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     kegs_by_id = {
         keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
     }
@@ -2208,7 +2218,7 @@ def menu_view():
         })
 
     menu_path = _external_menu_url(data)
-    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
     return render_template(
@@ -2221,15 +2231,16 @@ def menu_view():
         menu_qr_mode=menu_qr_mode,
         qr_ready=qr_ready,
         qr_error=QR_IMPORT_ERROR,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/menu/qr-print")
 def menu_qr_print_view():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     menu_path = _external_menu_url(data)
-    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     return render_template(
         "menu_qr_print.html",
         settings=data["settings"],
@@ -2237,7 +2248,7 @@ def menu_qr_print_view():
         qr_image_path=qr_image_path,
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 

@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import sys
 from pathlib import Path
@@ -75,7 +76,7 @@ def test_beer_csv_preview_validates_rows_before_apply(tmp_path):
 
     response = client.post(
         "/api/beers/import/csv/preview",
-        data={"file": (csv_payload, "beers.csv")},
+        data={"file": (io.BytesIO(csv_payload), "beers.csv")},
         content_type="multipart/form-data",
     )
 

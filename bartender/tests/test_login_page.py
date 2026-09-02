@@ -190,6 +190,28 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert "Log out" in body
 
 
+def test_authenticated_layout_uses_request_ingress_for_logout_link(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = ""
+    app_module.app.config["APPLICATION_ROOT"] = "/"
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get(
+        "/",
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'href="/api/hassio_ingress/test-token/logout"' in body
+
+
 def test_logout_clears_session_and_redirects_to_login(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
