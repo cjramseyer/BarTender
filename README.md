@@ -29,12 +29,12 @@ Sample dashboard with seeded data:
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
 - **Beer Catalog** — Manage reusable beer records (name, type, brewer, ABV/IBU, brewed date, notes)
 - **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
-- **Tap Management** — Assign kegs to numbered taps and label each line
-- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode, keg type choices/default, and pour defaults
+- **Tap Management** — Assign kegs to numbered taps and label each line, with single-tap keg assignment protection
+- **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, team access controls (owner profile, user PINs, reset PIN, disable/enable), pour mode in Pour Presets, keg type choices/default, pour defaults, and printable menu QR mode in General
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, and low-volume alerts
-- **Data Backup & Restore** — Export portable versioned JSON or ZIP archive, with import preview and replace/merge modes
+- **Data Backup & Restore** — Export portable versioned JSON or ZIP archive with date-stamped filenames, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
 - **API Reference + Tester** — In-app endpoint documentation with a request tester for GET/POST/PUT/DELETE calls
@@ -73,6 +73,10 @@ Sample dashboard with seeded data:
 - Added fill-keg flow that requires selecting a beer from the catalog when marking a keg full.
 - Added in-app API Reference page (`/api-reference`) and interactive API tester, with nav visibility controlled from Settings.
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
+- Added Team Access enhancements: owner profile name management, per-user PIN, PIN reset, and disable/enable controls.
+- Added duplicate keg assignment protection for taps (already-connected kegs are shown as in-use and blocked for other taps).
+- Added bar stock category/size quality-of-life updates (expanded defaults and promoted popular custom sizes).
+- Updated export downloads to include date-stamped filenames.
 
 ## Installation
 
@@ -122,6 +126,7 @@ The add-on exposes a JSON REST API at the ingress URL.
 | POST   | `/api/beers`                       | Add a beer                                                |
 | PUT    | `/api/beers/<id>`                  | Update a beer                                             |
 | DELETE | `/api/beers/<id>`                  | Delete a beer                                             |
+| GET    | `/api/beers/export/csv`            | Export beers CSV (date-stamped filename)                 |
 | GET    | `/api/kegs`                        | List all kegs                                             |
 | POST   | `/api/kegs`                        | Add a keg                                                 |
 | PUT    | `/api/kegs/<id>`                   | Update a keg                                              |
@@ -133,6 +138,10 @@ The add-on exposes a JSON REST API at the ingress URL.
 | PUT    | `/api/taps/<id>`                   | Update a tap                                              |
 | POST   | `/api/taps/<id>/pour`              | Record a preset/manual pour against assigned keg          |
 | DELETE | `/api/taps/<id>`                   | Delete a tap                                              |
+| GET    | `/api/team/users`                  | List team users (staff sees only self)                    |
+| POST   | `/api/team/users`                  | Create/update users and team access actions               |
+| POST   | `/api/team/users/delete`           | Delete a non-owner user                                   |
+| GET    | `/api/team/audit`                  | List team audit events                                    |
 | GET    | `/api/export/json`                 | Export portable versioned JSON backup                     |
 | GET    | `/api/export/archive`              | Export ZIP archive backup                                 |
 | GET    | `/api/export/csv`                  | Legacy alias for archive ZIP export                       |
@@ -144,6 +153,8 @@ The add-on exposes a JSON REST API at the ingress URL.
 | GET    | `/api/menu/qr/health`              | Check runtime QR dependency readiness                     |
 
 Import endpoints accept a multipart file upload plus optional `mode=replace|merge` (default: `replace`).
+
+Export filenames include a UTC date stamp in `YYYY-MM-DD` format (for example `bartender_export_2026-09-01.zip`).
 
 UI reference route:
 

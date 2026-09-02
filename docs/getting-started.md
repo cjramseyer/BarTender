@@ -1,6 +1,6 @@
 # BarTender Getting Started Guide
 
-Last updated: 2026-08-22
+Last updated: 2026-09-01
 Audience: first-time users
 
 ## Quick Setup
@@ -16,13 +16,16 @@ Audience: first-time users
 Open Settings in BarTender UI and set:
 
 - Bar Name
+- Owner Profile Name (Team Access)
 - Bar Logo URL (optional)
 - Keg Type Choices (keg/container sizes shown in Add Keg)
 - Default Keg Type (optional)
 - Measurement (us or metric)
 - Theme (light or dark)
-- Printable Menu QR Mode (off, display, print, or both)
+- Printable Menu QR Mode (off, display, print, or both) in General
+- Pour Mode in Pour Presets
 - Default Pour Preset (used by dashboard and taps pour selectors)
+- Team member PIN/disable settings in Team Access
 
 Recommended defaults:
 
@@ -42,16 +45,6 @@ Use this order for a clean initial setup:
 
 ```mermaid
 flowchart LR
-  A[Add Stock] --> B[Add Kegs]
-  B --> C[Add Taps]
-  C --> D[Assign Kegs to Taps]
-  D --> E[View Dashboard and Display]
-```
-
-Updated order with beer catalog:
-
-```mermaid
-flowchart LR
   A[Add Stock] --> B[Add Beers]
   B --> C[Add Kegs]
   C --> D[Add Taps]
@@ -65,6 +58,12 @@ flowchart LR
 - Click Add Item.
 - Enter name, category, quantity, unit, notes.
 - Save.
+
+Bar stock dialog note:
+
+- Category and size fields include built-in suggestions.
+- Standard sizes include 12 oz bottle, 16 oz bottle, and 12 oz can.
+- Frequently used custom sizes are promoted into the main Size list.
 
 ### Step 2: Add Beers
 
@@ -85,7 +84,7 @@ Default behavior note:
 
 - New kegs default status to empty unless you choose another status.
 - New keg name is prefilled as Keg N based on existing keg names.
-- Name/beer selection is required only when status is full.
+- Name and beer selection are required only when status is full.
 
 ### Step 4: Add Taps
 
@@ -102,6 +101,10 @@ Default behavior note:
 
 - Edit a tap and select Assigned Keg.
 - Save.
+
+Assignment behavior note:
+
+- Kegs already connected to another tap are shown as in-use and cannot be selected.
 
 Auto-fill behavior note:
 
@@ -136,6 +139,10 @@ Before upgrading:
 2. Optionally export ZIP archive from /api/export/archive.
 3. Store backup outside the HA host.
 
+Export file naming note:
+
+- Download filenames include UTC date stamps, for example bartender_export_2026-09-01.json.
+
 After upgrading:
 
 1. Start add-on.
@@ -156,7 +163,7 @@ Restore workflow:
 
 ## Quick API Smoke Test
 
-Use API Reference page (`/api-reference`) from Settings or top navigation, or use an HTTP client:
+Use API Reference page (/api-reference) from Settings or top navigation, or use an HTTP client:
 
 - GET /api/settings
 - GET /api/stock
