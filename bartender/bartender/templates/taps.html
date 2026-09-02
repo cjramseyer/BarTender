@@ -16,7 +16,9 @@
   {% for tap in taps %} {% set keg = kegs | selectattr('id', 'equalto',
   tap.keg_id) | first %} {% set fill_pct = keg.percent_full if keg and
   keg.percent_full is defined else (100 if keg and keg.status == 'full' else 50
-  if keg and keg.status == 'in_use' else 0) %} {% set beer_brewer =
+  if keg and keg.status == 'in_use' else 0) %} {% set visual_fill_pct = 12 if
+  fill_pct > 0 and fill_pct < 12 else fill_pct %} {% set low_fill = fill_pct >
+  0 and fill_pct < 12 %} {% set beer_brewer =
   keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if keg else
   '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set beer_brewed_on =
   keg.beer_brewed_on if keg else '' %}
@@ -35,7 +37,9 @@
         aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
       >
         <div class="keg-level-shell">
-          <div class="keg-level-fill" style="height: {{ fill_pct }}%;"></div>
+          <div class="keg-level-fill{% if low_fill %} is-low{% endif %}" style="height: {{ visual_fill_pct }}%;"></div>
+          <div class="keg-level-bands" aria-hidden="true"></div>
+          <div class="keg-level-spout" aria-hidden="true"></div>
         </div>
         <div class="keg-level-meta">
           <span class="keg-level-label">Current Fill</span>
