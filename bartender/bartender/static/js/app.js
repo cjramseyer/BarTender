@@ -143,6 +143,7 @@ async function submitSetupWizard(event) {
   const payload = {
     bar_name: barName ? barName.value.trim() : "",
     measurement: measurement ? measurement.value : "us",
+    brewery_type: "homebrewer",
     theme: theme ? theme.value : "light",
     setup_completed: true,
   };

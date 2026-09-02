@@ -337,7 +337,7 @@
     <div class="container">
       <!-- Taps -->
       <div class="display-top-row">
-        <div class="section-title">🍺 Taps on Tap</div>
+        <div class="section-title">🍺 {{ settings.display_title_on_tap or 'On Draft' }}</div>
         {% if qr_image_path and qr_ready and menu_qr_mode in ('display', 'both')
         %}
         <div class="qr-panel" role="complementary" aria-label="Menu QR code">
@@ -442,8 +442,7 @@
     </div>
 
     <footer>
-      BarTender · display view only · management available via Home Assistant
-      ingress
+      BarTender · display view only
     </footer>
   </body>
 </html>

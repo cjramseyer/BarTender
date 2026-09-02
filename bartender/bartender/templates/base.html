@@ -129,12 +129,20 @@
               role="menuitem"
               >Printable Menu</a
             >
+            {% if current_user_role in ['owner', 'manager'] %}
             <a
               class="nav-menu-item"
               href="{{ ingress }}/settings"
               role="menuitem"
               >Settings</a
             >
+            <a
+              class="nav-menu-item"
+              href="{{ ingress }}/team-access"
+              role="menuitem"
+              >Team Access</a
+            >
+            {% endif %}
           </div>
         </div>
         {% if current_user_name %} {% set user_initial = ((current_user_name or

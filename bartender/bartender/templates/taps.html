@@ -48,7 +48,7 @@
         >
       </p>
       <p class="muted">Type: {{ keg.type or '—' }}</p>
-      <p class="muted">Brewer: {{ beer_brewer or keg.brewery or '—' }}</p>
+      <p class="muted">Brewery: {{ beer_brewer or keg.brewery or '—' }}</p>
       <p class="muted">
         ABV: {{ (beer_abv or keg.abv) ~ '%' if (beer_abv or keg.abv) else '—' }}
       </p>

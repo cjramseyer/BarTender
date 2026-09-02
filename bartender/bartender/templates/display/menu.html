@@ -213,8 +213,7 @@
             <span class="badge badge-empty">Packaged</span>
           </div>
           <p class="muted">{{ beer.type or '—' }}</p>
-          <p class="muted">Brewer: {{ beer.brewer or '—' }}</p>
-          <p class="muted">Brewery: {{ beer.brewery or '—' }}</p>
+          <p class="muted">Brewery: {{ beer.brewery or beer.brewer or '—' }}</p>
           <p class="muted">
             ABV: {{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}
           </p>

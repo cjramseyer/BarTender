@@ -207,11 +207,13 @@ content %}
         Hide Analytics
       </summary>
       <div class="analytics-panel-body">
-        <p class="muted" style="margin-bottom: 0.5rem">
-          Low keg threshold: {{ dashboard_analytics.low_keg_threshold_percent
-          }}%. Days left method: trailing window over {{
+        <div class="muted" style="margin-bottom: 0.25rem">
+          Low keg threshold: {{ dashboard_analytics.low_keg_threshold_percent }}%
+        </div>
+        <div class="muted" style="margin-bottom: 0.5rem">
+          Days left method: trailing window over {{
           dashboard_analytics.days_left_window_days }} days.
-        </p>
+        </div>
         <div class="stat-row">
           <div class="stat">
             <span class="stat-value"
