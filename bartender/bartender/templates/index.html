@@ -141,11 +141,26 @@ content %}
       %} {% if keg.id in connected_keg_ids.values %} {% set
       tapped_keg_count.value = tapped_keg_count.value + 1 %}
       <li>
-        <strong>{{ keg.name or 'Unnamed Keg' }}</strong>
-        {% if keg.beer_name %} - {{ keg.beer_name }}{% endif %} - {{
-        keg.percent_full if keg.percent_full is defined else (100 if keg.status
-        == 'full' else 50) }}% {% if keg.filled_date %} - Filled {{
-        keg.filled_date }}{% endif %}
+        {% set volume_token = '%g' | format(keg.current_volume)
+        if keg.current_volume is not none else '—' %}
+        <div class="keg-summary-line keg-summary-line-primary">
+          <strong>{{ keg.beer_name or 'Unknown Beer' }}</strong>
+          <span class="muted"
+            >Volume Remaining: {{ volume_token }} {{ keg.volume_unit or '' }}</span
+          >
+        </div>
+        <div class="keg-summary-line keg-summary-line-secondary muted">
+          Filled: {{ keg.filled_date or '—' }}
+          <span aria-hidden="true">|</span>
+          Tapped: {{ keg.tapped_date or '—' }}
+          <span aria-hidden="true">|</span>
+          Age:
+          <span
+            class="js-keg-age-days"
+            data-tapped-date="{{ keg.tapped_date or '' }}"
+            >—</span
+          >
+        </div>
       </li>
       {% endif %} {% endfor %} {% if tapped_keg_count.value == 0 %}
       <li class="muted">No tapped kegs available.</li>
@@ -304,6 +319,34 @@ content %}
       syncAnalyticsLabel();
       analyticsPanel.addEventListener("toggle", syncAnalyticsLabel);
     }
+
+    document.querySelectorAll(".js-keg-age-days").forEach((ageEl) => {
+      const tappedDate = String(ageEl.dataset.tappedDate || "").trim();
+      if (!tappedDate) {
+        ageEl.textContent = "—";
+        return;
+      }
+
+      const parsedDate = new Date(`${tappedDate}T00:00:00`);
+      if (Number.isNaN(parsedDate.getTime())) {
+        ageEl.textContent = "—";
+        return;
+      }
+
+      const now = new Date();
+      const startOfToday = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      );
+      const diffMs = startOfToday.getTime() - parsedDate.getTime();
+      if (diffMs < 0) {
+        ageEl.textContent = "0d";
+        return;
+      }
+      const ageDays = Math.floor(diffMs / 86400000);
+      ageEl.textContent = `${ageDays}d`;
+    });
   }
 
   async function pourDashboardTap(tapId) {

@@ -872,6 +872,22 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   border-bottom: none;
 }
 
+.keg-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+}
+
+.keg-summary-line-primary {
+  font-size: 0.92rem;
+}
+
+.keg-summary-line-secondary {
+  font-size: 0.83rem;
+  margin-top: 0.12rem;
+}
+
 /* Keg grid */
 .keg-grid {
   display: grid;
