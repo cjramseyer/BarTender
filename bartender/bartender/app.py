@@ -3037,11 +3037,12 @@ def export_beers_csv():
             beer.get("notes", ""),
         ])
     csv_bytes = _rows_to_csv_bytes(rows)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(csv_bytes),
         mimetype="text/csv",
         as_attachment=True,
-        download_name="beers.csv",
+        download_name=f"beers_{date_stamp}.csv",
     )
 
 
@@ -4089,6 +4090,10 @@ def _rows_to_csv_bytes(rows: list[list]) -> bytes:
     return buf.getvalue().encode("utf-8")
 
 
+def _export_date_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
 def _build_export_json_payload(data: dict) -> dict:
     return {
         "format": "bartender-export",
@@ -4276,11 +4281,12 @@ def _import_summary(payload: dict) -> dict:
 def export_json():
     data = load_data()
     payload = _build_export_json_payload(data)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(json.dumps(payload, indent=2).encode("utf-8")),
         mimetype="application/json",
         as_attachment=True,
-        download_name="bartender_export.json",
+        download_name=f"bartender_export_{date_stamp}.json",
     )
 
 
@@ -4288,11 +4294,12 @@ def export_json():
 def export_archive():
     data = load_data()
     archive = _build_export_archive(data)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(archive),
         mimetype="application/zip",
         as_attachment=True,
-        download_name="bartender_export.zip",
+        download_name=f"bartender_export_{date_stamp}.zip",
     )
 
 
@@ -4300,11 +4307,12 @@ def export_archive():
 def export_csv():
     data = load_data()
     archive = _build_export_archive(data)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(archive),
         mimetype="application/zip",
         as_attachment=True,
-        download_name="bartender_export.zip",
+        download_name=f"bartender_export_{date_stamp}.zip",
     )
 
 
