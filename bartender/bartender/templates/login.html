@@ -19,10 +19,21 @@
           <option value="">Select a user...</option>
           {% for user in users %}
           <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>
-            {{ user.name }} ({{ user.role }})
+            {{ user.name }} ({{ user.role }}{% if user.disabled %}, disabled{% endif %})
           </option>
           {% endfor %}
         </select>
+      </div>
+      <div class="form-group">
+        <label for="user_pin">User PIN (if required)</label>
+        <input
+          id="user_pin"
+          name="user_pin"
+          type="password"
+          class="form-control"
+          placeholder="Enter user PIN"
+          autocomplete="current-password"
+        />
       </div>
       {% if require_owner_pin or (selected_user_id and selected_user_id ==
       'owner' and users|length > 1) %}

@@ -1,8 +1,8 @@
 ---
 name: Problem / Error
 description: Report an error, crash, or unexpected behavior that isn't a clear code bug.
-title: "[Problem]: "
-labels: ["problem", "triage"]
+title: "[Problem] "
+labels: ["priority-medium"]
 assignees:
   - cjramseyer
 body:

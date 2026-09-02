@@ -665,6 +665,23 @@ textarea.form-control {
   order: -2;
 }
 
+.dashboard-card-title-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius);
+  padding: 0.1rem 0;
+}
+
+.dashboard-card-title-link:hover {
+  color: var(--primary);
+}
+
+.dashboard-card-title-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .dashboard-manage-row {
   display: flex;
   margin-top: 1rem;
@@ -870,6 +887,22 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 .stock-summary li:last-child {
   border-bottom: none;
+}
+
+.keg-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+}
+
+.keg-summary-line-primary {
+  font-size: 0.92rem;
+}
+
+.keg-summary-line-secondary {
+  font-size: 0.83rem;
+  margin-top: 0.12rem;
 }
 
 /* Keg grid */

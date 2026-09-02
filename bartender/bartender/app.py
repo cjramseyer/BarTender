@@ -15,6 +15,7 @@ import threading
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from typing import Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 
 try:
@@ -61,6 +62,11 @@ ALLOWED_LOGO_MIME_TYPES = {
     "image/svg+xml": ".svg",
 }
 LOGO_FILENAME_PREFIX = "bar-logo"
+
+
+@runtime_checkable
+class SupportsReadBytes(Protocol):
+    def read(self, size: int | None = -1, /) -> bytes: ...
 
 
 def _read_addon_version() -> str:
@@ -134,6 +140,14 @@ def _normalized_request_path() -> str:
     if script_root and raw_path.startswith(script_root):
         return raw_path[len(script_root):] or "/"
     return raw_path
+
+
+def _redirect_to_endpoint(endpoint: str):
+    target = url_for(endpoint)
+    ingress = _effective_ingress_path()
+    if ingress and target.startswith("/") and not target.startswith(f"{ingress}/") and target != ingress:
+        target = f"{ingress}{target}"
+    return redirect(target)
 
 
 def _owner_pin_recovery_needed(data: dict) -> bool:
@@ -339,6 +353,17 @@ def load_data() -> dict:
                 data["settings"].setdefault(key, value)
 
         _ensure_owner_team_user(data)
+        normalized_team_users = []
+        for user in data.get("team_users", []):
+            if not isinstance(user, dict):
+                continue
+            user.setdefault("id", "")
+            user.setdefault("name", "")
+            user["role"] = _normalize_team_role(user.get("role", "staff"))
+            user["pin"] = _normalize_team_user_pin(user.get("pin", ""))
+            user["disabled"] = _coerce_bool(user.get("disabled"), False)
+            normalized_team_users.append(user)
+        data["team_users"] = normalized_team_users
 
         setup_default = str(data["settings"].get("bar_name", "")).strip() not in ("", "My Bar")
         data["settings"]["setup_completed"] = _coerce_bool(
@@ -631,6 +656,11 @@ def _ensure_owner_team_user(data: dict) -> None:
     users = data.get("team_users", [])
     if not isinstance(users, list):
         users = []
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        user.setdefault("pin", "")
+        user.setdefault("disabled", False)
     has_owner = any(
         isinstance(user, dict) and str(user.get("role", "")).strip().lower() == "owner"
         for user in users
@@ -643,6 +673,8 @@ def _ensure_owner_team_user(data: dict) -> None:
         "id": "owner",
         "name": "Owner",
         "role": "owner",
+        "pin": "",
+        "disabled": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
     data["team_users"] = users
@@ -911,6 +943,13 @@ def _normalize_owner_pin(value) -> str:
     return pin
 
 
+def _normalize_team_user_pin(value) -> str:
+    pin = str(value or "").strip()
+    if len(pin) > 32:
+        pin = pin[:32]
+    return pin
+
+
 def _normalize_external_api_rate_limit_per_minute(value) -> int:
     parsed = _coerce_int(value, DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE)
     if parsed is None:
@@ -1027,14 +1066,14 @@ def _external_api_listener_base_url() -> str:
     return f"{parsed.scheme}://{netloc}"
 
 
-def _get_request_upload(name: str):
+def _get_request_upload(name: str) -> SupportsReadBytes | None:
     upload = request.files.get(name)
     if upload is not None:
-        return upload
+        return cast(SupportsReadBytes, upload)
 
     candidate = request.form.get(name)
     if candidate is not None and hasattr(candidate, "read"):
-        return candidate
+        return cast(SupportsReadBytes, candidate)
 
     content_type = str(request.content_type or "")
     if not content_type.startswith("multipart/form-data"):
@@ -1986,10 +2025,24 @@ def login_view():
             error = "User not found. Choose a valid team member."
         else:
             selected_role = _normalize_team_role(matched_user.get("role", "staff"))
+            if _coerce_bool(matched_user.get("disabled"), False):
+                error = "This user account is disabled."
+                return render_template(
+                    "login.html",
+                    settings=data["settings"],
+                    users=team_users,
+                    error=error,
+                    selected_user_id=user_id,
+                    require_owner_pin=False,
+                    ingress=_effective_ingress_path(),
+                )
+
             owner_pin_recovery_required = False
+            owner_pin_required = False
             if selected_role == "owner" and len(team_users) > 1:
                 expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
                 if expected_pin:
+                    owner_pin_required = True
                     supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
                     if not secrets.compare_digest(expected_pin, supplied_pin):
                         error = "Owner PIN required when additional team members are configured."
@@ -2005,14 +2058,29 @@ def login_view():
                 else:
                     owner_pin_recovery_required = True
 
+            expected_user_pin = _normalize_team_user_pin(matched_user.get("pin", ""))
+            if expected_user_pin:
+                supplied_user_pin = str(request.form.get("user_pin", "") or "").strip()
+                if not secrets.compare_digest(expected_user_pin, supplied_user_pin):
+                    error = "PIN required for this team member."
+                    return render_template(
+                        "login.html",
+                        settings=data["settings"],
+                        users=team_users,
+                        error=error,
+                        selected_user_id=user_id,
+                        require_owner_pin=owner_pin_required,
+                        ingress=_effective_ingress_path(),
+                    )
+
             session.clear()
             session["user_id"] = str(matched_user.get("id", "")).strip() or user_id
             session["user_role"] = selected_role
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
-                return redirect(url_for("settings"))
-            return redirect(url_for("index"))
+                return _redirect_to_endpoint("settings")
+            return _redirect_to_endpoint("index")
 
     return render_template(
         "login.html",
@@ -2028,7 +2096,7 @@ def login_view():
 @app.route("/logout")
 def logout_view():
     session.clear()
-    return redirect(url_for("login_view"))
+    return _redirect_to_endpoint("login_view")
 
 
 # ---------------------------------------------------------------------------
@@ -2038,6 +2106,7 @@ def logout_view():
 @app.route("/")
 def index():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "index.html",
         settings=data["settings"],
@@ -2046,7 +2115,7 @@ def index():
         bar_stock=data["bar_stock"],
         on_deck_kegs=_build_on_deck_kegs(data),
         dashboard_analytics=_build_dashboard_analytics(data),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
@@ -2054,12 +2123,13 @@ def index():
 def analytics_view():
     data = load_data()
     if not _analytics_enabled(data):
-        return redirect(url_for("index"))
+        return _redirect_to_endpoint("index")
+    ingress_path = _effective_ingress_path()
     return render_template(
         "analytics.html",
         settings=data["settings"],
         dashboard_analytics=_build_dashboard_analytics(data),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
@@ -2067,30 +2137,33 @@ def analytics_view():
 def stock():
     data = load_data()
     if not _bar_stock_enabled(data):
-        return redirect(url_for("index"))
+        return _redirect_to_endpoint("index")
+    ingress_path = _effective_ingress_path()
     return render_template(
         "stock.html",
         settings=data["settings"],
         bar_stock=data["bar_stock"],
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/kegs")
 def kegs():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "kegs.html",
         settings=data["settings"],
         kegs=data["kegs"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/beers")
 def beers():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     beer_type_choices = sorted(
         {
             str(beer.get("type", "")).strip()
@@ -2104,25 +2177,27 @@ def beers():
         settings=data["settings"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
         beer_type_choices=beer_type_choices,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/taps")
 def taps():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "taps.html",
         settings=data["settings"],
         taps=data["taps"],
         kegs=data["kegs"],
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/settings")
 def settings():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "settings.html",
         settings=data["settings"],
@@ -2137,25 +2212,27 @@ def settings():
         external_menu_url=_external_menu_url(data),
         auto_external_display_url=_external_display_url(),
         auto_external_menu_url=_external_menu_url(),
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/api-reference")
 def api_reference():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     return render_template(
         "api_reference.html",
         settings=data["settings"],
         endpoints=API_REFERENCE_ENDPOINTS,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/display")
 def display_view():
     data = load_data()
-    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    ingress_path = _effective_ingress_path()
+    qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
     return render_template(
@@ -2174,6 +2251,7 @@ def display_view():
 @app.route("/menu")
 def menu_view():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     kegs_by_id = {
         keg.get("id"): keg for keg in data.get("kegs", []) if isinstance(keg, dict)
     }
@@ -2208,7 +2286,7 @@ def menu_view():
         })
 
     menu_path = _external_menu_url(data)
-    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
     return render_template(
@@ -2221,15 +2299,16 @@ def menu_view():
         menu_qr_mode=menu_qr_mode,
         qr_ready=qr_ready,
         qr_error=QR_IMPORT_ERROR,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
 @app.route("/menu/qr-print")
 def menu_qr_print_view():
     data = load_data()
+    ingress_path = _effective_ingress_path()
     menu_path = _external_menu_url(data)
-    qr_image_path = f"{INGRESS_PATH}/api/menu/qr" if INGRESS_PATH else "/api/menu/qr"
+    qr_image_path = f"{ingress_path}/api/menu/qr" if ingress_path else "/api/menu/qr"
     return render_template(
         "menu_qr_print.html",
         settings=data["settings"],
@@ -2237,7 +2316,7 @@ def menu_qr_print_view():
         qr_image_path=qr_image_path,
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
-        ingress=INGRESS_PATH,
+        ingress=ingress_path,
     )
 
 
@@ -2481,9 +2560,18 @@ def api_create_team_user():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     payload = request.get_json(silent=True) or {}
-    if payload.get("action") == "delete":
+    action = str(payload.get("action", "")).strip().lower()
+    if action == "delete":
         return api_delete_team_user()
-    if payload.get("action") == "update":
+    if action in (
+        "update",
+        "update_profile",
+        "set_pin",
+        "update_pin",
+        "reset_pin",
+        "disable",
+        "set_disabled",
+    ):
         return api_update_team_user()
 
     name = str(payload.get("name", "")).strip()
@@ -2496,6 +2584,7 @@ def api_create_team_user():
         for existing in users
     )
     role = "owner" if not has_owner else _normalize_team_role(payload.get("role"))
+    user_pin = _normalize_team_user_pin(payload.get("pin", ""))
     if not name:
         return jsonify({"error": "User name is required."}), 400
 
@@ -2507,6 +2596,8 @@ def api_create_team_user():
         if owner_placeholder is not None:
             owner_placeholder["name"] = name
             owner_placeholder["role"] = "owner"
+            owner_placeholder["pin"] = user_pin
+            owner_placeholder["disabled"] = False
             owner_placeholder["created_at"] = datetime.now(timezone.utc).isoformat()
             user = owner_placeholder
             user_id = "owner"
@@ -2516,6 +2607,8 @@ def api_create_team_user():
                 "id": user_id,
                 "name": name,
                 "role": "owner",
+                "pin": user_pin,
+                "disabled": False,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             users.insert(0, user)
@@ -2531,6 +2624,8 @@ def api_create_team_user():
         "id": user_id,
         "name": name,
         "role": role,
+        "pin": user_pin,
+        "disabled": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     users.append(user)
@@ -2547,6 +2642,7 @@ def api_update_team_user():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action") or "update").strip().lower()
     user_id = str(payload.get("user_id") or payload.get("id") or "").strip()
     if not user_id:
         return jsonify({"error": "User ID is required."}), 400
@@ -2574,6 +2670,71 @@ def api_update_team_user():
 
     if current_user.get("role") == "manager" and str(matching_user.get("role", "")).strip().lower() == "owner":
         return jsonify({"error": "Only the owner can change the owner account."}), 403
+
+    if action == "update_profile":
+        new_name = str(payload.get("name", "")).strip()
+        if not new_name:
+            return jsonify({"error": "User name is required."}), 400
+        if str(matching_user.get("role", "")).strip().lower() == "owner" and current_user.get("role") != "owner":
+            return jsonify({"error": "Only the owner can update the owner profile."}), 403
+        previous_name = str(matching_user.get("name", "")).strip()
+        matching_user["name"] = new_name
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower():
+            session["user_name"] = new_name
+        _record_team_audit(
+            data,
+            current_user,
+            "user_profile_updated",
+            user_id,
+            {"from_name": previous_name, "to_name": new_name},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
+
+    if action in ("set_pin", "update_pin"):
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
+            return jsonify({"error": "Managers cannot change their own PIN. Another manager or the owner must do this."}), 403
+        matching_user["pin"] = _normalize_team_user_pin(payload.get("pin", ""))
+        _record_team_audit(
+            data,
+            current_user,
+            "user_pin_updated",
+            user_id,
+            {"pin_set": bool(matching_user.get("pin"))},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
+
+    if action == "reset_pin":
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
+            return jsonify({"error": "Managers cannot reset their own PIN. Another manager or the owner must do this."}), 403
+        matching_user["pin"] = ""
+        _record_team_audit(
+            data,
+            current_user,
+            "user_pin_reset",
+            user_id,
+            {},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
+
+    if action in ("disable", "set_disabled"):
+        disable_value = _coerce_bool(payload.get("disabled"), True)
+        if str(current_user.get("id", "")).strip().lower() == user_id.lower() and disable_value:
+            return jsonify({"error": "You cannot disable the currently signed-in user."}), 400
+        if str(matching_user.get("role", "")).strip().lower() == "owner" and disable_value:
+            return jsonify({"error": "Owner account cannot be disabled."}), 400
+        matching_user["disabled"] = disable_value
+        _record_team_audit(
+            data,
+            current_user,
+            "user_disabled_updated",
+            user_id,
+            {"disabled": disable_value},
+        )
+        save_data(data)
+        return jsonify({"user": matching_user})
 
     if requested_role == "owner" and current_user.get("role") != "owner":
         return jsonify({"error": "Only the owner can promote someone to owner."}), 403
@@ -2618,6 +2779,13 @@ def api_delete_team_user():
 
     if str(current_user.get("id", "")).lower() == user_id.lower():
         return jsonify({"error": "You cannot delete the currently signed-in user."}), 400
+
+    matching_user = next(
+        (user for user in users if str(user.get("id", "")).strip().lower() == user_id.lower()),
+        None,
+    )
+    if matching_user and str(matching_user.get("role", "")).strip().lower() == "owner":
+        return jsonify({"error": "Owner account cannot be deleted."}), 400
 
     data["team_users"] = remaining
     _record_team_audit(data, current_user, "user_deleted", user_id, {"deleted_user_id": user_id})
@@ -2875,11 +3043,12 @@ def export_beers_csv():
             beer.get("notes", ""),
         ])
     csv_bytes = _rows_to_csv_bytes(rows)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(csv_bytes),
         mimetype="text/csv",
         as_attachment=True,
-        download_name="beers.csv",
+        download_name=f"beers_{date_stamp}.csv",
     )
 
 
@@ -3698,6 +3867,16 @@ def api_delete_keg(keg_id: int):
 # API – Taps
 # ---------------------------------------------------------------------------
 
+def _find_tap_assigned_to_keg(taps: list[dict], keg_id: int | None, exclude_tap_id: int | None = None) -> dict | None:
+    if keg_id is None:
+        return None
+    for tap in taps:
+        if exclude_tap_id is not None and tap.get("id") == exclude_tap_id:
+            continue
+        if tap.get("keg_id") == keg_id:
+            return tap
+    return None
+
 @app.route("/api/taps", methods=["GET"])
 def api_list_taps():
     data = load_data()
@@ -3712,6 +3891,14 @@ def api_add_tap():
     parsed_keg_id = _coerce_int(raw_keg_id, None)
     if raw_keg_id not in (None, "") and parsed_keg_id is None:
         return jsonify({"error": "Invalid keg_id."}), 400
+    conflicting_tap = _find_tap_assigned_to_keg(data.get("taps", []), parsed_keg_id)
+    if conflicting_tap is not None:
+        return jsonify({
+            "error": "Keg is already connected to another tap.",
+            "code": "KEG_ALREADY_CONNECTED",
+            "tap_id": conflicting_tap.get("id"),
+            "tap_number": conflicting_tap.get("number"),
+        }), 409
     tap = {
         "id": _next_id(data["taps"]),
         "number": body.get("number", len(data["taps"]) + 1),
@@ -3757,6 +3944,16 @@ def api_add_taps_bulk():
         if keg_id is not None and not any(k.get("id") == keg_id for k in simulated_data.get("kegs", [])):
             return jsonify({"error": "Assigned keg not found.", "index": index}), 404
 
+        conflicting_tap = _find_tap_assigned_to_keg(simulated_data.get("taps", []), keg_id)
+        if conflicting_tap is not None:
+            return jsonify({
+                "error": "Keg is already connected to another tap.",
+                "code": "KEG_ALREADY_CONNECTED",
+                "index": index,
+                "tap_id": conflicting_tap.get("id"),
+                "tap_number": conflicting_tap.get("number"),
+            }), 409
+
         number = _coerce_int(item.get("number"), None)
         if number is None or number <= 0:
             return jsonify({"error": "Tap number must be a positive integer.", "index": index}), 400
@@ -3792,6 +3989,18 @@ def api_update_tap(tap_id: int):
                 parsed_keg_id = _coerce_int(raw_keg_id, None)
                 if raw_keg_id not in (None, "") and parsed_keg_id is None:
                     return jsonify({"error": "Invalid keg_id."}), 400
+                conflicting_tap = _find_tap_assigned_to_keg(
+                    data.get("taps", []),
+                    parsed_keg_id,
+                    exclude_tap_id=tap_id,
+                )
+                if conflicting_tap is not None:
+                    return jsonify({
+                        "error": "Keg is already connected to another tap.",
+                        "code": "KEG_ALREADY_CONNECTED",
+                        "tap_id": conflicting_tap.get("id"),
+                        "tap_number": conflicting_tap.get("number"),
+                    }), 409
                 tap["keg_id"] = parsed_keg_id
                 if parsed_keg_id is not None:
                     tap["ever_assigned_keg"] = True
@@ -3885,6 +4094,10 @@ def _rows_to_csv_bytes(rows: list[list]) -> bytes:
     writer = csv.writer(buf)
     writer.writerows(rows)
     return buf.getvalue().encode("utf-8")
+
+
+def _export_date_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def _build_export_json_payload(data: dict) -> dict:
@@ -4074,11 +4287,12 @@ def _import_summary(payload: dict) -> dict:
 def export_json():
     data = load_data()
     payload = _build_export_json_payload(data)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(json.dumps(payload, indent=2).encode("utf-8")),
         mimetype="application/json",
         as_attachment=True,
-        download_name="bartender_export.json",
+        download_name=f"bartender_export_{date_stamp}.json",
     )
 
 
@@ -4086,11 +4300,12 @@ def export_json():
 def export_archive():
     data = load_data()
     archive = _build_export_archive(data)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(archive),
         mimetype="application/zip",
         as_attachment=True,
-        download_name="bartender_export.zip",
+        download_name=f"bartender_export_{date_stamp}.zip",
     )
 
 
@@ -4098,11 +4313,12 @@ def export_archive():
 def export_csv():
     data = load_data()
     archive = _build_export_archive(data)
+    date_stamp = _export_date_stamp()
     return send_file(
         io.BytesIO(archive),
         mimetype="application/zip",
         as_attachment=True,
-        download_name="bartender_export.zip",
+        download_name=f"bartender_export_{date_stamp}.zip",
     )
 
 

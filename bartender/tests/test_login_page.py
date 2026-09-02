@@ -56,6 +56,57 @@ def test_valid_user_can_login_from_team_users(tmp_path):
         assert session["user_role"] == "manager"
 
 
+def test_user_pin_required_when_configured(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        {"id": "manager-1", "name": "Manager One", "role": "manager", "pin": "2468", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+    ]
+    app_module.save_data(data)
+
+    denied = client.post(
+        "/login",
+        data={"user_id": "manager-1"},
+        follow_redirects=False,
+    )
+
+    assert denied.status_code == 200
+    assert "PIN required for this team member." in denied.get_data(as_text=True)
+
+    allowed = client.post(
+        "/login",
+        data={"user_id": "manager-1", "user_pin": "2468"},
+        follow_redirects=False,
+    )
+
+    assert allowed.status_code == 302
+    assert allowed.headers["Location"] == "/"
+
+
+def test_disabled_user_cannot_login(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False, "created_at": "2024-01-01T00:00:00Z"},
+        {"id": "staff-1", "name": "Staff One", "role": "staff", "pin": "", "disabled": True, "created_at": "2024-01-01T00:00:00Z"},
+    ]
+    app_module.save_data(data)
+
+    response = client.post(
+        "/login",
+        data={"user_id": "staff-1"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert "This user account is disabled." in response.get_data(as_text=True)
+
+
 def test_unauthenticated_request_redirects_to_ingress_login_path(tmp_path):
     app_module = _load_app_module(tmp_path)
     app_module.INGRESS_PATH = "/api/hassio_ingress/test-token"
@@ -190,6 +241,28 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert "Log out" in body
 
 
+def test_authenticated_layout_uses_request_ingress_for_logout_link(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = ""
+    app_module.app.config["APPLICATION_ROOT"] = "/"
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get(
+        "/",
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'href="/api/hassio_ingress/test-token/logout"' in body
+
+
 def test_logout_clears_session_and_redirects_to_login(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -205,3 +278,41 @@ def test_logout_clears_session_and_redirects_to_login(tmp_path):
     assert response.headers["Location"] == "/login"
     with client.session_transaction() as session:
         assert "user_id" not in session
+
+
+def test_login_redirect_stays_within_ingress_path(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = ""
+    app_module.app.config["APPLICATION_ROOT"] = "/"
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/login",
+        data={"user_id": "owner"},
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/hassio_ingress/test-token/"
+
+
+def test_logout_redirect_stays_within_ingress_path(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = ""
+    app_module.app.config["APPLICATION_ROOT"] = "/"
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get(
+        "/logout",
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/hassio_ingress/test-token/login"
