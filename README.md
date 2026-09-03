@@ -38,6 +38,7 @@ Sample dashboard with seeded data:
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive with date-stamped filenames, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
+- **Standalone Window Launch** — Open the main app in a new browser tab/window from the in-app Menu while still using Home Assistant ingress
 - **API Reference + Tester** — In-app endpoint documentation with a request tester for GET/POST/PUT/DELETE calls
 - **Ingress** — Admin UI runs behind the Home Assistant ingress proxy
 - **External Integrations API** — Dedicated external API listener for POS/hardware integrations (port `8110`)
@@ -67,6 +68,7 @@ Sample dashboard with seeded data:
 - Added printable menu route (`GET /menu`) showing currently assigned taps and keg details.
 - Added runtime QR generation for printable menu (`GET /api/menu/qr`) with health endpoint (`GET /api/menu/qr/health`).
 - Added `menu_qr_mode` setting (`off|display|print|both`) to control QR visibility on screen and print output.
+- Added an in-app **Open in New Window** action in the Menu dropdown to launch the main ingress route in a standalone browser tab/window.
 - Added dashboard tap pour controls with preset selection.
 - Updated pour behavior so each pour also updates `percent_full`, and first pour transitions keg status from `full` to `in_use`.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
