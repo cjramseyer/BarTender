@@ -256,6 +256,7 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert "API Reference" in body
     assert "toggleNavSetting" in body
     assert "View Display" in body
+    assert "Open in New Window" in body
     assert "Printable Menu" in body
     assert "nav-avatar-button" in body
     assert "Owner" in body

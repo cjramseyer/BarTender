@@ -52,6 +52,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **Data Backup & Restore** — Export portable JSON or ZIP archive with date-stamped filenames; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
+- **Standalone Window Launch** — Open the main app in a new browser tab/window from the in-app Menu while still using Home Assistant ingress
 - **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, Team Access (owner profile, per-user PIN, reset PIN, disable/enable), pour mode in Pour Presets, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode in General
 - **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
@@ -112,6 +113,7 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
   - previously filled kegs that reach empty transition to cleaning
 - Added printable menu route (`GET /menu`) and runtime QR generation endpoint (`GET /api/menu/qr`).
 - Added QR health endpoint (`GET /api/menu/qr/health`) and settings control for display/print behavior.
+- Added an in-app **Open in New Window** action in the Menu dropdown to launch the main ingress route in a standalone browser tab/window.
 - Added dashboard tap pour controls with preset selection.
 - Updated pour behavior so pouring adjusts both `current_volume` and `percent_full`, with automatic `full` to `in_use` transition on first pour.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
