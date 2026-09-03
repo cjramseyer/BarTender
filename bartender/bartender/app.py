@@ -28,6 +28,7 @@ from bartender.pos_sync.service import (
     mark_pos_sync_failed,
     normalize_pos_sync_settings,
     perform_pos_sync,
+    validate_pos_sync_runtime_configuration,
 )
 
 try:
@@ -320,6 +321,7 @@ DEFAULT_DATA = {
             "location_id": "",
             "merchant_id": "",
         },
+        "pos_sync_provider_config_json": "",
         "pos_sync_last_run_at": "",
         "pos_sync_last_status": "never",
         "pos_sync_last_error": "",
@@ -2633,6 +2635,7 @@ def api_save_settings():
         "external_api_write_token",
         "owner_pin",
         "pos_sync_credentials",
+        "pos_sync_provider_config_json",
     }
     if current_user.get("role") != "owner":
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -2651,6 +2654,7 @@ def api_save_settings():
         "pos_sync_enabled",
         "pos_sync_provider",
         "pos_sync_credentials",
+        "pos_sync_provider_config_json",
         "bar_logo_url",
         "external_base_url",
         "external_api_token_auth_enabled",
@@ -2691,6 +2695,14 @@ def api_save_settings():
         data["settings"]["dashboard_manage_button_position"] = body.get("manage_button_position")
 
     _normalize_settings_in_place(data, setup_completed_explicit="setup_completed" in body)
+    try:
+        validate_pos_sync_runtime_configuration(
+            data.get("settings", {}),
+            for_sync_now=False,
+        )
+    except PosSyncError as exc:
+        return jsonify({"error": str(exc), "hint": exc.hint}), exc.status_code
+
     if data["settings"]["owner_pin"]:
         session.pop("owner_pin_recovery_required", None)
 

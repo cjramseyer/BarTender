@@ -1,6 +1,7 @@
 """POS sync normalization, status helpers, and sync runner."""
 
 from datetime import datetime, timezone
+import json
 import re
 
 from .adapters.base import PosSyncAdapter, PosSyncPayload, PosTapRecord
@@ -155,6 +156,13 @@ def normalize_pos_sync_credentials(value) -> dict[str, str]:
     return normalized
 
 
+def normalize_pos_sync_provider_config_json(value) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return raw[:20000]
+
+
 def normalize_pos_sync_status(value) -> str:
     status = str(value or "never").strip().lower()
     if status in ("never", "success", "failed"):
@@ -195,6 +203,9 @@ def normalize_pos_sync_settings(settings: dict) -> None:
     )
     settings["pos_sync_credentials"] = normalize_pos_sync_credentials(
         settings.get("pos_sync_credentials", {})
+    )
+    settings["pos_sync_provider_config_json"] = normalize_pos_sync_provider_config_json(
+        settings.get("pos_sync_provider_config_json", "")
     )
     settings["pos_sync_last_run_at"] = str(settings.get("pos_sync_last_run_at", "") or "").strip()
     settings["pos_sync_last_status"] = normalize_pos_sync_status(settings.get("pos_sync_last_status"))
@@ -240,6 +251,104 @@ def get_pos_provider_catalog(settings: dict) -> list[dict]:
             }
         )
     return catalog
+
+
+def _find_custom_provider(settings: dict, provider_key: str) -> dict | None:
+    custom_providers = settings.get("pos_sync_custom_providers", [])
+    lookup = str(provider_key or "").strip().lower()
+    for item in custom_providers:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key", "")).strip().lower()
+        if key == lookup:
+            return item
+    return None
+
+
+def _parse_provider_config_json(raw_json: str) -> dict:
+    payload = str(raw_json or "").strip()
+    if not payload:
+        return {}
+
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise PosSyncError(
+            "Provider configuration JSON is invalid.",
+            hint=f"Fix JSON syntax near line {exc.lineno}, column {exc.colno}.",
+            status_code=400,
+        )
+
+    if not isinstance(parsed, dict):
+        raise PosSyncError(
+            "Provider configuration JSON must be an object.",
+            hint="Wrap values in an object, for example: {\"static_taps\": [...]}.",
+            status_code=400,
+        )
+
+    return parsed
+
+
+def _resolve_static_provider_rows(settings: dict, provider_key: str) -> list[dict]:
+    custom_provider = _find_custom_provider(settings, provider_key)
+    if not custom_provider:
+        return []
+
+    inline_rows = _normalize_static_taps(custom_provider.get("static_taps", []))
+    if inline_rows:
+        return inline_rows
+
+    config = _parse_provider_config_json(settings.get("pos_sync_provider_config_json", ""))
+    return _normalize_static_taps(config.get("static_taps", []))
+
+
+def validate_pos_sync_runtime_configuration(settings: dict, for_sync_now: bool = False) -> None:
+    normalize_pos_sync_settings(settings)
+
+    if for_sync_now and not settings.get("pos_sync_enabled"):
+        raise PosSyncError(
+            "POS sync is disabled.",
+            hint="Enable POS sync in Settings before running a sync.",
+            status_code=409,
+        )
+
+    if not settings.get("pos_sync_enabled") and not for_sync_now:
+        return
+
+    provider = settings.get("pos_sync_provider", "")
+    if not provider:
+        raise PosSyncError(
+            "POS sync provider is not configured.",
+            hint="Choose a provider in Settings before running a sync.",
+            status_code=400,
+        )
+
+    if provider in POS_SYNC_PROVIDERS:
+        return
+
+    custom_provider = _find_custom_provider(settings, provider)
+    if custom_provider is None:
+        raise PosSyncError(
+            f"POS sync provider '{provider}' is not supported.",
+            hint="Select a supported provider in Settings.",
+            status_code=400,
+        )
+
+    mode = str(custom_provider.get("mode", "static")).strip().lower()
+    if mode != "static":
+        raise PosSyncError(
+            f"Provider '{provider}' mode '{mode}' is not supported yet.",
+            hint="Use mode 'static' for imported providers.",
+            status_code=400,
+        )
+
+    static_rows = _resolve_static_provider_rows(settings, provider)
+    if not static_rows:
+        raise PosSyncError(
+            "Provider configuration JSON is required for this provider.",
+            hint="Set static_taps in provider import JSON or in Provider Configuration JSON.",
+            status_code=400,
+        )
 
 
 def add_or_update_custom_provider(settings: dict, provider: dict) -> dict:
@@ -331,50 +440,15 @@ def _next_tap_id(taps: list[dict]) -> int:
 def perform_pos_sync(data: dict) -> dict:
     settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
     normalize_pos_sync_settings(settings)
-
-    if not settings.get("pos_sync_enabled"):
-        raise PosSyncError(
-            "POS sync is disabled.",
-            hint="Enable POS sync in Settings before running a sync.",
-            status_code=409,
-        )
-
+    validate_pos_sync_runtime_configuration(settings, for_sync_now=True)
     provider = settings.get("pos_sync_provider", "")
-    if not provider:
-        raise PosSyncError(
-            "POS sync provider is not configured.",
-            hint="Choose a provider in Settings before running a sync.",
-            status_code=400,
-        )
 
     adapter_cls = POS_SYNC_PROVIDERS.get(provider)
     if adapter_cls is not None:
         adapter = adapter_cls()
         payload = adapter.pull_snapshot(settings.get("pos_sync_credentials", {}))
     else:
-        custom_providers = settings.get("pos_sync_custom_providers", [])
-        custom_map = {
-            str(item.get("key", "")).strip().lower(): item
-            for item in custom_providers
-            if isinstance(item, dict)
-        }
-        custom_provider = custom_map.get(provider)
-        if custom_provider is None:
-            raise PosSyncError(
-                f"POS sync provider '{provider}' is not supported.",
-                hint="Select a supported provider in Settings.",
-                status_code=400,
-            )
-
-        mode = str(custom_provider.get("mode", "static")).strip().lower()
-        if mode != "static":
-            raise PosSyncError(
-                f"Provider '{provider}' mode '{mode}' is not supported yet.",
-                hint="Use mode 'static' for imported providers.",
-                status_code=400,
-            )
-
-        static_rows = _normalize_static_taps(custom_provider.get("static_taps", []))
+        static_rows = _resolve_static_provider_rows(settings, provider)
         payload = PosSyncPayload(
             taps=[
                 PosTapRecord(

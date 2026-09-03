@@ -293,3 +293,95 @@ def test_requested_built_in_providers_can_sync(tmp_path):
         assert sync_payload["ok"] is True
         assert sync_payload["status"]["provider"] == provider
         assert sync_payload["status"]["last_counts"]["items_received"] == 2
+
+
+def test_adding_custom_provider_does_not_require_runtime_config_json(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    response = client.post(
+        "/api/pos/providers",
+        json={
+            "key": "empty-static",
+            "name": "Empty Static",
+            "mode": "static",
+            "static_taps": [],
+        },
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["provider"]["key"] == "empty-static"
+
+
+def test_enabled_static_provider_requires_runtime_config_json(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    add_response = client.post(
+        "/api/pos/providers",
+        json={
+            "key": "cfg-required",
+            "name": "Config Required",
+            "mode": "static",
+            "static_taps": [],
+        },
+        headers=owner_headers,
+    )
+    assert add_response.status_code == 200
+
+    settings_response = client.post(
+        "/api/settings",
+        json={
+            "pos_sync_enabled": True,
+            "pos_sync_provider": "cfg-required",
+        },
+        headers=owner_headers,
+    )
+
+    assert settings_response.status_code == 400
+    payload = settings_response.get_json()
+    assert "Provider configuration JSON is required" in payload["error"]
+
+
+def test_enabled_static_provider_accepts_valid_runtime_config_json(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    add_response = client.post(
+        "/api/pos/providers",
+        json={
+            "key": "cfg-json",
+            "name": "Config JSON Provider",
+            "mode": "static",
+            "static_taps": [],
+        },
+        headers=owner_headers,
+    )
+    assert add_response.status_code == 200
+
+    settings_response = client.post(
+        "/api/settings",
+        json={
+            "pos_sync_enabled": True,
+            "pos_sync_provider": "cfg-json",
+            "pos_sync_provider_config_json": '{"static_taps":[{"number":12,"label":"Cfg Tap","item_name":"Config Stout","serving_size":"16 oz","price_label":"$6.75","available":true}]}'
+        },
+        headers=owner_headers,
+    )
+    assert settings_response.status_code == 200
+
+    sync_response = client.post("/api/pos/sync/now", headers=owner_headers)
+    assert sync_response.status_code == 200
+    payload = sync_response.get_json()
+    assert payload["ok"] is True
+    assert payload["status"]["provider"] == "cfg-json"
+
+    reloaded = app_module.load_data()
+    tap = next(item for item in reloaded["taps"] if item["number"] == 12)
+    assert tap["label"] == "Cfg Tap"

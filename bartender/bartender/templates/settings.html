@@ -558,6 +558,18 @@ content %}
             </div>
           </div>
           <div class="form-group">
+            <label>Provider Configuration JSON</label>
+            <textarea
+              id="posSyncProviderConfigJson"
+              class="form-control"
+              rows="5"
+              placeholder='{"static_taps":[{"number":1,"label":"Tap 1","item_name":"IPA","serving_size":"16 oz","price_label":"$6.00","available":true}]}'
+            >{{ settings.pos_sync_provider_config_json or '' }}</textarea>
+            <small class="muted"
+              >Optional when adding providers. Required only when the selected provider needs runtime config and sync is enabled or Sync Now is used.</small
+            >
+          </div>
+          <div class="form-group">
             <label>Provider API Key (placeholder)</label>
             <input
               type="password"
@@ -2252,6 +2264,9 @@ content %}
           ? document.getElementById("posSyncMerchantId").value
           : "",
       },
+      pos_sync_provider_config_json: document.getElementById("posSyncProviderConfigJson")
+        ? document.getElementById("posSyncProviderConfigJson").value
+        : "",
       measurement: measurementInput ? measurementInput.value : "us",
       theme: themeInput ? themeInput.value : "light",
       dashboard_manage_button_position: managePosInput
@@ -2330,11 +2345,12 @@ content %}
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      const saveBody = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(`Save failed: ${res.status}`);
+        throw new Error(saveBody.error || `Save failed: ${res.status}`);
       }
 
-      const savedSettings = await res.json();
+      const savedSettings = saveBody;
 
       document.getElementById("saveMsg").textContent = "✓ Saved!";
       setTimeout(() => {
@@ -2382,7 +2398,8 @@ content %}
       updateExternalReadonlyLinks(savedSettings.external_base_url || "");
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
-      document.getElementById("saveMsg").textContent = "Save failed";
+      document.getElementById("saveMsg").textContent =
+        err?.message || "Save failed";
       console.error(err);
     }
   }
