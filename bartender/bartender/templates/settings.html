@@ -475,6 +475,98 @@ content %}
       </details>
 
       <details class="settings-collapsible">
+        <summary>POS Sync</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.pos_sync_enabled %}
+              <input type="checkbox" id="posSyncEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="posSyncEnabled" />
+              {% endif %} Enable POS Sync
+            </label>
+            <small class="muted"
+              >Keeps tap/menu mapping data in sync with an external provider.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>POS Sync Provider</label>
+            <select id="posSyncProvider" class="form-control">
+              <option value="">Select provider</option>
+              {% for provider in pos_sync_providers %}
+                {% if (settings.pos_sync_provider or '') == provider %}
+                <option value="{{ provider }}" selected>{{ provider | upper }}</option>
+                {% else %}
+                <option value="{{ provider }}">{{ provider | upper }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <small class="muted"
+              >Mock provider is available as a sandbox proof-of-concept.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>Provider API Key (placeholder)</label>
+            <input
+              type="password"
+              id="posSyncApiKey"
+              class="form-control"
+              value="{{ (settings.pos_sync_credentials.api_key if settings.pos_sync_credentials is defined else '') or '' }}"
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-group">
+            <label>Provider Location ID (placeholder)</label>
+            <input
+              type="text"
+              id="posSyncLocationId"
+              class="form-control"
+              value="{{ (settings.pos_sync_credentials.location_id if settings.pos_sync_credentials is defined else '') or '' }}"
+            />
+          </div>
+          <div class="form-group">
+            <label>Provider Merchant ID (placeholder)</label>
+            <input
+              type="text"
+              id="posSyncMerchantId"
+              class="form-control"
+              value="{{ (settings.pos_sync_credentials.merchant_id if settings.pos_sync_credentials is defined else '') or '' }}"
+            />
+          </div>
+          <div class="form-group" style="margin-top: 0.5rem">
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="runPosSyncNow()"
+            >
+              Sync Now
+            </button>
+            <span id="posSyncMsg" class="save-msg"></span>
+          </div>
+          <div class="form-group">
+            <label>Sync Status</label>
+            <p class="muted" style="margin-top: 0.35rem">
+              Last Result: <strong id="posSyncLastStatus">{{ settings.pos_sync_last_status or 'never' }}</strong>
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Last Run: <span id="posSyncLastRunAt">{{ settings.pos_sync_last_run_at or 'Never' }}</span>
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Last Counts:
+              <span id="posSyncLastCounts">
+                items={{ (settings.pos_sync_last_counts.items_received if settings.pos_sync_last_counts is defined else 0) or 0 }},
+                updated={{ (settings.pos_sync_last_counts.taps_updated if settings.pos_sync_last_counts is defined else 0) or 0 }},
+                created={{ (settings.pos_sync_last_counts.taps_created if settings.pos_sync_last_counts is defined else 0) or 0 }}
+              </span>
+            </p>
+            <p class="muted" style="margin-top: 0.25rem">
+              Last Error: <span id="posSyncLastError">{{ settings.pos_sync_last_error or 'None' }}</span>
+            </p>
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
         <summary>Audit Trail</summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
@@ -1453,6 +1545,58 @@ content %}
     }
   }
 
+  function renderPosSyncStatus(status) {
+    const lastStatus = document.getElementById("posSyncLastStatus");
+    const lastRunAt = document.getElementById("posSyncLastRunAt");
+    const lastCounts = document.getElementById("posSyncLastCounts");
+    const lastError = document.getElementById("posSyncLastError");
+    if (!status) return;
+
+    const counts = status.last_counts || {};
+    if (lastStatus) {
+      lastStatus.textContent = status.last_status || "never";
+    }
+    if (lastRunAt) {
+      lastRunAt.textContent = status.last_run_at || "Never";
+    }
+    if (lastCounts) {
+      lastCounts.textContent = `items=${counts.items_received || 0}, updated=${counts.taps_updated || 0}, created=${counts.taps_created || 0}`;
+    }
+    if (lastError) {
+      lastError.textContent = status.last_error || "None";
+    }
+  }
+
+  async function runPosSyncNow() {
+    const msg = document.getElementById("posSyncMsg");
+    if (msg) msg.textContent = "Syncing...";
+
+    try {
+      const response = await fetch(`${INGRESS}/api/pos/sync/now`, {
+        method: "POST",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) {
+        const errMsg = body.error || `Sync failed: ${response.status}`;
+        if (msg) msg.textContent = errMsg;
+        if (body.status) {
+          renderPosSyncStatus(body.status);
+        }
+        return;
+      }
+
+      renderPosSyncStatus(body.status || {});
+      if (msg) {
+        msg.textContent = "✓ POS sync complete.";
+      }
+    } catch (err) {
+      console.error("POS sync failed", err);
+      if (msg) {
+        msg.textContent = "Unable to run POS sync.";
+      }
+    }
+  }
+
   function createPourOptionRow(option = {}) {
     const row = document.createElement("div");
     row.className = "form-row pour-option-row";
@@ -1892,6 +2036,23 @@ content %}
       pos_system: document.getElementById("posSystem")
         ? document.getElementById("posSystem").value
         : "",
+      pos_sync_enabled: document.getElementById("posSyncEnabled")
+        ? document.getElementById("posSyncEnabled").checked
+        : false,
+      pos_sync_provider: document.getElementById("posSyncProvider")
+        ? document.getElementById("posSyncProvider").value
+        : "",
+      pos_sync_credentials: {
+        api_key: document.getElementById("posSyncApiKey")
+          ? document.getElementById("posSyncApiKey").value
+          : "",
+        location_id: document.getElementById("posSyncLocationId")
+          ? document.getElementById("posSyncLocationId").value
+          : "",
+        merchant_id: document.getElementById("posSyncMerchantId")
+          ? document.getElementById("posSyncMerchantId").value
+          : "",
+      },
       measurement: measurementInput ? measurementInput.value : "us",
       theme: themeInput ? themeInput.value : "light",
       dashboard_manage_button_position: managePosInput
@@ -2013,6 +2174,12 @@ content %}
           savedSettings.default_keg_type || "",
         );
       }
+      renderPosSyncStatus({
+        last_status: savedSettings.pos_sync_last_status || "never",
+        last_run_at: savedSettings.pos_sync_last_run_at || "",
+        last_error: savedSettings.pos_sync_last_error || "",
+        last_counts: savedSettings.pos_sync_last_counts || {},
+      });
       updateExternalReadonlyLinks(savedSettings.external_base_url || "");
       localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {

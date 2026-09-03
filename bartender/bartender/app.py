@@ -18,6 +18,15 @@ from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 
+from bartender.pos_sync.service import (
+    POS_SYNC_PROVIDERS,
+    PosSyncError,
+    get_pos_sync_status,
+    mark_pos_sync_failed,
+    normalize_pos_sync_settings,
+    perform_pos_sync,
+)
+
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
 
@@ -299,6 +308,21 @@ DEFAULT_DATA = {
         "bar_name": "My Bar",
         "brewery_type": "homebrewer",
         "pos_system": "",
+        "pos_sync_enabled": False,
+        "pos_sync_provider": "",
+        "pos_sync_credentials": {
+            "api_key": "",
+            "location_id": "",
+            "merchant_id": "",
+        },
+        "pos_sync_last_run_at": "",
+        "pos_sync_last_status": "never",
+        "pos_sync_last_error": "",
+        "pos_sync_last_counts": {
+            "items_received": 0,
+            "taps_updated": 0,
+            "taps_created": 0,
+        },
         "bar_logo_url": "",
         "external_base_url": "",
         "external_api_token_auth_enabled": True,
@@ -392,6 +416,7 @@ def load_data() -> dict:
             data["settings"].get("brewery_type"),
             data["settings"].get("pour_mode"),
         )
+        normalize_pos_sync_settings(data["settings"])
         data["settings"]["pour_mode"] = _normalize_pour_mode(
             data["settings"].get("pour_mode"),
             data["settings"].get("brewery_type"),
@@ -860,6 +885,7 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
         settings.get("brewery_type"),
         settings.get("pour_mode"),
     )
+    normalize_pos_sync_settings(settings)
     settings["pour_mode"] = _normalize_pour_mode(
         settings.get("pour_mode"),
         settings.get("brewery_type"),
@@ -2344,6 +2370,7 @@ def settings():
     return render_template(
         "settings.html",
         settings=data["settings"],
+        pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
         team_users=data.get("team_users", []),
         owner_pin_recovery_required=bool(session.get("owner_pin_recovery_required")),
         qr_ready=_qr_is_available(),
@@ -2598,6 +2625,7 @@ def api_save_settings():
         "external_api_read_token",
         "external_api_write_token",
         "owner_pin",
+        "pos_sync_credentials",
     }
     if current_user.get("role") != "owner":
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -2613,6 +2641,9 @@ def api_save_settings():
         "bar_name",
         "brewery_type",
         "pos_system",
+        "pos_sync_enabled",
+        "pos_sync_provider",
+        "pos_sync_credentials",
         "bar_logo_url",
         "external_base_url",
         "external_api_token_auth_enabled",
@@ -2665,6 +2696,58 @@ def api_save_settings():
     )
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/pos/sync/status", methods=["GET"])
+def api_pos_sync_status():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    return jsonify(get_pos_sync_status(data.get("settings", {})))
+
+
+@app.route("/api/pos/sync/now", methods=["POST"])
+def api_pos_sync_now():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    try:
+        status = perform_pos_sync(data)
+        _record_team_audit(
+            data,
+            current_user,
+            "pos_sync_run",
+            "pos_sync",
+            {
+                "provider": status.get("provider", ""),
+                "last_status": status.get("last_status", ""),
+                "last_counts": status.get("last_counts", {}),
+            },
+        )
+        save_data(data)
+        return jsonify({"ok": True, "status": status})
+    except PosSyncError as exc:
+        status = mark_pos_sync_failed(
+            data.get("settings", {}),
+            str(exc),
+            hint=exc.hint,
+        )
+        _record_team_audit(
+            data,
+            current_user,
+            "pos_sync_failed",
+            "pos_sync",
+            {
+                "error": str(exc),
+                "hint": exc.hint,
+            },
+        )
+        save_data(data)
+        return jsonify({"ok": False, "error": str(exc), "hint": exc.hint, "status": status}), exc.status_code
 
 
 @app.route("/api/settings/reset", methods=["POST"])
