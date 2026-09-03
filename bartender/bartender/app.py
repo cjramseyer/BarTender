@@ -21,7 +21,10 @@ from urllib.parse import urlsplit, urlunsplit
 from bartender.pos_sync.service import (
     POS_SYNC_PROVIDERS,
     PosSyncError,
+    add_or_update_custom_provider,
+    get_pos_provider_catalog,
     get_pos_sync_status,
+    import_custom_providers,
     mark_pos_sync_failed,
     normalize_pos_sync_settings,
     perform_pos_sync,
@@ -118,7 +121,9 @@ LEGACY_KEG_TYPE_ALIASES = {
 COMMON_POS_SYSTEMS = [
     "Square",
     "Toast",
+    "Clover",
     "Lightspeed",
+    "Arryved",
     "Shopify POS",
     "Aloha",
     "Barmetrix",
@@ -323,6 +328,7 @@ DEFAULT_DATA = {
             "taps_updated": 0,
             "taps_created": 0,
         },
+        "pos_sync_custom_providers": [],
         "bar_logo_url": "",
         "external_base_url": "",
         "external_api_token_auth_enabled": True,
@@ -2371,6 +2377,7 @@ def settings():
         "settings.html",
         settings=data["settings"],
         pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
+        pos_sync_provider_catalog=get_pos_provider_catalog(data["settings"]),
         team_users=data.get("team_users", []),
         owner_pin_recovery_required=bool(session.get("owner_pin_recovery_required")),
         qr_ready=_qr_is_available(),
@@ -2706,6 +2713,77 @@ def api_pos_sync_status():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     return jsonify(get_pos_sync_status(data.get("settings", {})))
+
+
+@app.route("/api/pos/providers", methods=["GET"])
+def api_pos_sync_provider_catalog():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    return jsonify({"providers": get_pos_provider_catalog(data.get("settings", {}))})
+
+
+@app.route("/api/pos/providers", methods=["POST"])
+def api_pos_sync_add_provider():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    body = request.get_json(force=True)
+    settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+    try:
+        provider = add_or_update_custom_provider(settings, body)
+    except PosSyncError as exc:
+        return jsonify({"error": str(exc), "hint": exc.hint}), exc.status_code
+
+    _record_team_audit(
+        data,
+        current_user,
+        "pos_provider_saved",
+        "pos_sync",
+        {
+            "provider": provider.get("key", ""),
+            "mode": provider.get("mode", "static"),
+        },
+    )
+    save_data(data)
+    return jsonify(
+        {
+            "ok": True,
+            "provider": provider,
+            "providers": get_pos_provider_catalog(settings),
+        }
+    )
+
+
+@app.route("/api/pos/providers/import", methods=["POST"])
+def api_pos_sync_import_providers():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    body = request.get_json(force=True)
+    settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
+    try:
+        summary = import_custom_providers(settings, body)
+    except PosSyncError as exc:
+        return jsonify({"error": str(exc), "hint": exc.hint}), exc.status_code
+
+    _record_team_audit(
+        data,
+        current_user,
+        "pos_provider_imported",
+        "pos_sync",
+        {
+            "added_or_updated": summary.get("added_or_updated", 0),
+        },
+    )
+    save_data(data)
+    return jsonify({"ok": True, **summary})
 
 
 @app.route("/api/pos/sync/now", methods=["POST"])

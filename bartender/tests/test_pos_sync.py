@@ -124,3 +124,172 @@ def test_pos_sync_now_returns_actionable_error_when_disabled(tmp_path):
 
     reloaded = app_module.load_data()
     assert reloaded["taps"][0]["label"] == "Manual Tap"
+
+
+def test_owner_can_add_custom_provider_via_api(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    response = client.post(
+        "/api/pos/providers",
+        json={
+            "key": "square-sandbox",
+            "name": "Square Sandbox",
+            "mode": "static",
+            "static_taps": [
+                {
+                    "number": 1,
+                    "label": "Tap 1",
+                    "item_name": "Pale Ale",
+                    "serving_size": "16 oz",
+                    "price_label": "$6.50",
+                    "available": True,
+                }
+            ],
+        },
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["provider"]["key"] == "square-sandbox"
+    assert any(item["key"] == "square-sandbox" for item in payload["providers"])
+
+
+def test_owner_can_import_custom_providers(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    response = client.post(
+        "/api/pos/providers/import",
+        json={
+            "providers": [
+                {
+                    "key": "toast-sandbox",
+                    "name": "Toast Sandbox",
+                    "mode": "static",
+                    "static_taps": [
+                        {
+                            "number": 4,
+                            "label": "Tap 4",
+                            "item_name": "Porter",
+                            "serving_size": "16 oz",
+                            "price_label": "$7.00",
+                            "available": True,
+                        }
+                    ],
+                },
+                {
+                    "key": "lightspeed-demo",
+                    "name": "Lightspeed Demo",
+                    "mode": "static",
+                    "static_taps": [],
+                },
+            ]
+        },
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["added_or_updated"] == 2
+    keys = {item["key"] for item in payload["catalog"]}
+    assert "toast-sandbox" in keys
+    assert "lightspeed-demo" in keys
+
+
+def test_imported_static_provider_can_be_selected_and_synced(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    import_response = client.post(
+        "/api/pos/providers/import",
+        json={
+            "providers": [
+                {
+                    "key": "sample-static",
+                    "name": "Sample Static",
+                    "mode": "static",
+                    "static_taps": [
+                        {
+                            "number": 9,
+                            "label": "Static Tap 9",
+                            "item_name": "Static IPA",
+                            "serving_size": "16 oz",
+                            "price_label": "$6.25",
+                            "available": True,
+                        }
+                    ],
+                }
+            ]
+        },
+        headers=owner_headers,
+    )
+    assert import_response.status_code == 200
+
+    settings_response = client.post(
+        "/api/settings",
+        json={
+            "pos_sync_enabled": True,
+            "pos_sync_provider": "sample-static",
+        },
+        headers=owner_headers,
+    )
+    assert settings_response.status_code == 200
+
+    sync_response = client.post("/api/pos/sync/now", headers=owner_headers)
+    assert sync_response.status_code == 200
+    sync_payload = sync_response.get_json()
+    assert sync_payload["ok"] is True
+    assert sync_payload["status"]["provider"] == "sample-static"
+
+    reloaded = app_module.load_data()
+    tap = next(item for item in reloaded["taps"] if item["number"] == 9)
+    assert tap["label"] == "Static Tap 9"
+    assert tap["pos_sync"]["item_name"] == "Static IPA"
+
+
+def test_provider_catalog_includes_requested_common_built_ins(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    response = client.get("/api/pos/providers", headers=owner_headers)
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    keys = {item["key"] for item in payload["providers"]}
+    assert "toast" in keys
+    assert "square" in keys
+    assert "clover" in keys
+    assert "lightspeed" in keys
+    assert "arryved" in keys
+
+
+def test_requested_built_in_providers_can_sync(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    for provider in ("toast", "square", "clover", "lightspeed", "arryved"):
+        settings_response = client.post(
+            "/api/settings",
+            json={
+                "pos_sync_enabled": True,
+                "pos_sync_provider": provider,
+            },
+            headers=owner_headers,
+        )
+        assert settings_response.status_code == 200
+
+        sync_response = client.post("/api/pos/sync/now", headers=owner_headers)
+        assert sync_response.status_code == 200
+        sync_payload = sync_response.get_json()
+        assert sync_payload["ok"] is True
+        assert sync_payload["status"]["provider"] == provider
+        assert sync_payload["status"]["last_counts"]["items_received"] == 2

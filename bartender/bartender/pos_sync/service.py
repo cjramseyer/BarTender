@@ -1,12 +1,34 @@
 """POS sync normalization, status helpers, and sync runner."""
 
 from datetime import datetime, timezone
+import re
 
-from .adapters.base import PosSyncAdapter
+from .adapters.base import PosSyncAdapter, PosSyncPayload, PosTapRecord
+from .adapters.built_in_providers import (
+    ArryvedPosAdapter,
+    CloverPosAdapter,
+    LightspeedPosAdapter,
+    SquarePosAdapter,
+    ToastPosAdapter,
+)
 from .adapters.mock_provider import MockPosAdapter
 
 POS_SYNC_PROVIDERS: dict[str, type[PosSyncAdapter]] = {
+    "arryved": ArryvedPosAdapter,
+    "clover": CloverPosAdapter,
+    "lightspeed": LightspeedPosAdapter,
     "mock": MockPosAdapter,
+    "square": SquarePosAdapter,
+    "toast": ToastPosAdapter,
+}
+
+BUILT_IN_PROVIDER_NAMES: dict[str, str] = {
+    "arryved": "Arryved",
+    "clover": "Clover",
+    "lightspeed": "Lightspeed",
+    "mock": "MOCK",
+    "square": "Square",
+    "toast": "Toast",
 }
 
 
@@ -34,8 +56,95 @@ def _coerce_bool(value, default: bool = False) -> bool:
 
 
 def normalize_pos_sync_provider(value) -> str:
+    return normalize_pos_sync_provider_with_custom(value, set())
+
+
+def normalize_pos_sync_provider_with_custom(value, custom_provider_keys: set[str]) -> str:
     provider = str(value or "").strip().lower()
-    return provider if provider in POS_SYNC_PROVIDERS else ""
+    supported = set(POS_SYNC_PROVIDERS.keys()) | set(custom_provider_keys)
+    return provider if provider in supported else ""
+
+
+def _normalize_provider_key(value) -> str:
+    normalized = str(value or "").strip().lower()
+    normalized = re.sub(r"[^a-z0-9_-]+", "-", normalized)
+    normalized = re.sub(r"-+", "-", normalized).strip("-")
+    return normalized[:48]
+
+
+def _normalize_provider_mode(value) -> str:
+    mode = str(value or "static").strip().lower()
+    if mode in ("static",):
+        return mode
+    return "static"
+
+
+def _normalize_static_taps(value) -> list[dict]:
+    rows = value if isinstance(value, list) else []
+    normalized: list[dict] = []
+    seen_numbers: set[int] = set()
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            number = int(row.get("number", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if number <= 0 or number in seen_numbers:
+            continue
+        seen_numbers.add(number)
+
+        normalized.append(
+            {
+                "number": number,
+                "label": str(row.get("label", "") or "").strip()[:80],
+                "item_name": str(row.get("item_name", "") or "").strip()[:120],
+                "serving_size": str(row.get("serving_size", "") or "").strip()[:40],
+                "price_label": str(row.get("price_label", "") or "").strip()[:32],
+                "available": _coerce_bool(row.get("available"), True),
+            }
+        )
+
+    return normalized
+
+
+def _normalize_custom_provider_entry(value) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+
+    key = _normalize_provider_key(value.get("key"))
+    if not key or key in POS_SYNC_PROVIDERS:
+        return None
+
+    name = str(value.get("name", "") or "").strip()[:80]
+    if not name:
+        name = key.upper()
+
+    mode = _normalize_provider_mode(value.get("mode"))
+    static_taps = _normalize_static_taps(value.get("static_taps", []))
+    return {
+        "key": key,
+        "name": name,
+        "mode": mode,
+        "static_taps": static_taps,
+    }
+
+
+def normalize_pos_sync_custom_providers(value) -> list[dict]:
+    raw = value if isinstance(value, list) else []
+    normalized: list[dict] = []
+    seen_keys: set[str] = set()
+    for entry in raw:
+        parsed = _normalize_custom_provider_entry(entry)
+        if not parsed:
+            continue
+        key = parsed["key"]
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        normalized.append(parsed)
+    return normalized
 
 
 def normalize_pos_sync_credentials(value) -> dict[str, str]:
@@ -72,7 +181,18 @@ def normalize_pos_sync_counts(value) -> dict[str, int]:
 
 def normalize_pos_sync_settings(settings: dict) -> None:
     settings["pos_sync_enabled"] = _coerce_bool(settings.get("pos_sync_enabled"), False)
-    settings["pos_sync_provider"] = normalize_pos_sync_provider(settings.get("pos_sync_provider"))
+    settings["pos_sync_custom_providers"] = normalize_pos_sync_custom_providers(
+        settings.get("pos_sync_custom_providers", [])
+    )
+    custom_keys = {
+        str(provider.get("key", "")).strip().lower()
+        for provider in settings.get("pos_sync_custom_providers", [])
+        if isinstance(provider, dict)
+    }
+    settings["pos_sync_provider"] = normalize_pos_sync_provider_with_custom(
+        settings.get("pos_sync_provider"),
+        custom_keys,
+    )
     settings["pos_sync_credentials"] = normalize_pos_sync_credentials(
         settings.get("pos_sync_credentials", {})
     )
@@ -91,6 +211,96 @@ def get_pos_sync_status(settings: dict) -> dict:
         "last_status": settings["pos_sync_last_status"],
         "last_error": settings["pos_sync_last_error"],
         "last_counts": settings["pos_sync_last_counts"],
+    }
+
+
+def get_pos_provider_catalog(settings: dict) -> list[dict]:
+    normalize_pos_sync_settings(settings)
+    catalog = []
+    for key in sorted(POS_SYNC_PROVIDERS.keys()):
+        catalog.append(
+            {
+                "key": key,
+                "name": BUILT_IN_PROVIDER_NAMES.get(key, key.upper()),
+                "mode": "adapter",
+                "source": "built_in",
+            }
+        )
+    for provider in settings.get("pos_sync_custom_providers", []):
+        if not isinstance(provider, dict):
+            continue
+        catalog.append(
+            {
+                "key": str(provider.get("key", "")).strip().lower(),
+                "name": str(provider.get("name", "") or "").strip()[:80] or str(
+                    provider.get("key", "")
+                ).upper(),
+                "mode": str(provider.get("mode", "static")).strip().lower() or "static",
+                "source": "custom",
+            }
+        )
+    return catalog
+
+
+def add_or_update_custom_provider(settings: dict, provider: dict) -> dict:
+    normalize_pos_sync_settings(settings)
+    parsed = _normalize_custom_provider_entry(provider)
+    if not parsed:
+        raise PosSyncError(
+            "Invalid provider payload.",
+            hint="Set a unique provider key (not built-in) and valid fields.",
+            status_code=400,
+        )
+
+    providers = settings.get("pos_sync_custom_providers", [])
+    providers = providers if isinstance(providers, list) else []
+
+    replaced = False
+    for index, existing in enumerate(providers):
+        if not isinstance(existing, dict):
+            continue
+        existing_key = str(existing.get("key", "")).strip().lower()
+        if existing_key == parsed["key"]:
+            providers[index] = parsed
+            replaced = True
+            break
+
+    if not replaced:
+        providers.append(parsed)
+
+    settings["pos_sync_custom_providers"] = normalize_pos_sync_custom_providers(providers)
+    normalize_pos_sync_settings(settings)
+    return parsed
+
+
+def import_custom_providers(settings: dict, payload) -> dict:
+    normalize_pos_sync_settings(settings)
+
+    if isinstance(payload, dict) and isinstance(payload.get("providers"), list):
+        candidates = payload.get("providers", [])
+    elif isinstance(payload, list):
+        candidates = payload
+    elif isinstance(payload, dict):
+        candidates = [payload]
+    else:
+        raise PosSyncError(
+            "Invalid provider import payload.",
+            hint="Submit a provider object or list under 'providers'.",
+            status_code=400,
+        )
+
+    added_or_updated = 0
+    for candidate in candidates:
+        parsed = _normalize_custom_provider_entry(candidate)
+        if not parsed:
+            continue
+        add_or_update_custom_provider(settings, parsed)
+        added_or_updated += 1
+
+    normalize_pos_sync_settings(settings)
+    return {
+        "added_or_updated": added_or_updated,
+        "catalog": get_pos_provider_catalog(settings),
     }
 
 
@@ -138,15 +348,47 @@ def perform_pos_sync(data: dict) -> dict:
         )
 
     adapter_cls = POS_SYNC_PROVIDERS.get(provider)
-    if adapter_cls is None:
-        raise PosSyncError(
-            f"POS sync provider '{provider}' is not supported.",
-            hint="Select a supported provider in Settings.",
-            status_code=400,
-        )
+    if adapter_cls is not None:
+        adapter = adapter_cls()
+        payload = adapter.pull_snapshot(settings.get("pos_sync_credentials", {}))
+    else:
+        custom_providers = settings.get("pos_sync_custom_providers", [])
+        custom_map = {
+            str(item.get("key", "")).strip().lower(): item
+            for item in custom_providers
+            if isinstance(item, dict)
+        }
+        custom_provider = custom_map.get(provider)
+        if custom_provider is None:
+            raise PosSyncError(
+                f"POS sync provider '{provider}' is not supported.",
+                hint="Select a supported provider in Settings.",
+                status_code=400,
+            )
 
-    adapter = adapter_cls()
-    payload = adapter.pull_snapshot(settings.get("pos_sync_credentials", {}))
+        mode = str(custom_provider.get("mode", "static")).strip().lower()
+        if mode != "static":
+            raise PosSyncError(
+                f"Provider '{provider}' mode '{mode}' is not supported yet.",
+                hint="Use mode 'static' for imported providers.",
+                status_code=400,
+            )
+
+        static_rows = _normalize_static_taps(custom_provider.get("static_taps", []))
+        payload = PosSyncPayload(
+            taps=[
+                PosTapRecord(
+                    number=int(row.get("number", 0) or 0),
+                    label=str(row.get("label", "") or "").strip(),
+                    item_name=str(row.get("item_name", "") or "").strip(),
+                    serving_size=str(row.get("serving_size", "") or "").strip(),
+                    price_label=str(row.get("price_label", "") or "").strip(),
+                    available=_coerce_bool(row.get("available"), True),
+                )
+                for row in static_rows
+                if int(row.get("number", 0) or 0) > 0
+            ]
+        )
 
     raw_taps = data.get("taps", [])
     taps = raw_taps if isinstance(raw_taps, list) else []

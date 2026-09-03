@@ -434,7 +434,7 @@ content %}
             <label>Common POS System</label>
             <select id="posSystem" class="form-control">
               <option value="">Select an option</option>
-              {% for option in ["Square", "Toast", "Lightspeed", "Shopify POS", "Aloha", "Barmetrix", "Other"] %}
+              {% for option in ["Square", "Toast", "Clover", "Lightspeed", "Arryved", "Shopify POS", "Aloha", "Barmetrix", "Other"] %}
                 {% if (settings.pos_system or '') == option %}
                 <option value="{{ option }}" selected>{{ option }}</option>
                 {% else %}
@@ -493,17 +493,69 @@ content %}
             <label>POS Sync Provider</label>
             <select id="posSyncProvider" class="form-control">
               <option value="">Select provider</option>
-              {% for provider in pos_sync_providers %}
-                {% if (settings.pos_sync_provider or '') == provider %}
-                <option value="{{ provider }}" selected>{{ provider | upper }}</option>
+              {% for provider in pos_sync_provider_catalog %}
+                {% if (settings.pos_sync_provider or '') == provider.key %}
+                <option value="{{ provider.key }}" selected>{{ provider.name }}</option>
                 {% else %}
-                <option value="{{ provider }}">{{ provider | upper }}</option>
+                <option value="{{ provider.key }}">{{ provider.name }}</option>
                 {% endif %}
               {% endfor %}
             </select>
             <small class="muted"
               >Mock provider is available as a sandbox proof-of-concept.</small
             >
+          </div>
+          <div class="form-group">
+            <label>Provider Catalog</label>
+            <div id="posProviderCatalogList" class="stack-gap-sm"></div>
+            <small class="muted"
+              >Add providers directly in app or import a provider JSON payload.</small
+            >
+          </div>
+          <div class="form-group">
+            <label>New Provider Key</label>
+            <input
+              type="text"
+              id="newPosProviderKey"
+              class="form-control"
+              placeholder="example: square-sandbox"
+            />
+            <label style="margin-top: 0.5rem">New Provider Name</label>
+            <input
+              type="text"
+              id="newPosProviderName"
+              class="form-control"
+              placeholder="example: Square Sandbox"
+            />
+            <div class="form-actions" style="margin-top: 0.5rem">
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="addPosProvider()"
+              >
+                Add Provider
+              </button>
+              <span id="posProviderAddMsg" class="save-msg"></span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Import Providers JSON</label>
+            <textarea
+              id="posProviderImportJson"
+              class="form-control"
+              rows="6"
+              placeholder='{"providers":[{"key":"sample-static","name":"Sample Static","mode":"static","static_taps":[{"number":1,"label":"Tap 1","item_name":"IPA","serving_size":"16 oz","price_label":"$6.00","available":true}]}]}'
+            ></textarea>
+            <div class="form-actions" style="margin-top: 0.5rem">
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="importPosProviders()"
+              >
+                Import Providers
+              </button>
+              <span id="posProviderImportMsg" class="save-msg"></span>
+            </div>
           </div>
           <div class="form-group">
             <label>Provider API Key (placeholder)</label>
@@ -1057,6 +1109,9 @@ content %}
   );
   const TAPS = JSON.parse(`{{ (taps or []) | tojson }}`);
   const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
+  const INITIAL_POS_PROVIDER_CATALOG = JSON.parse(
+    `{{ (pos_sync_provider_catalog or []) | tojson }}`,
+  );
 
   function renderDisplayTapAssignments() {
     const container = document.getElementById("displayTapAssignments");
@@ -1567,6 +1622,148 @@ content %}
     }
   }
 
+  function renderPosProviderCatalog(catalog = []) {
+    const list = document.getElementById("posProviderCatalogList");
+    if (!list) return;
+
+    list.innerHTML = "";
+    if (!Array.isArray(catalog) || !catalog.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No providers configured.";
+      list.appendChild(empty);
+      return;
+    }
+
+    catalog.forEach((provider) => {
+      const row = document.createElement("div");
+      row.className = "settings-url-row";
+      const key = String(provider.key || "").trim();
+      const name = String(provider.name || key.toUpperCase()).trim();
+      const mode = String(provider.mode || "adapter").trim();
+      const source = String(provider.source || "custom").trim();
+      row.innerHTML = `
+        <div>
+          <strong>${name}</strong>
+          <small class="muted" style="display:block">key=${key} • mode=${mode} • ${source}</small>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  function refreshPosProviderSelect(catalog = []) {
+    const select = document.getElementById("posSyncProvider");
+    if (!select) return;
+
+    const selectedBefore = select.value || "";
+    select.innerHTML = '<option value="">Select provider</option>';
+    if (Array.isArray(catalog)) {
+      catalog.forEach((provider) => {
+        if (!provider || !provider.key) return;
+        const option = document.createElement("option");
+        option.value = String(provider.key).trim().toLowerCase();
+        option.textContent = String(provider.name || provider.key).trim();
+        select.appendChild(option);
+      });
+    }
+
+    const hasSelection = Array.from(select.options).some(
+      (option) => option.value === selectedBefore,
+    );
+    if (hasSelection) {
+      select.value = selectedBefore;
+    }
+  }
+
+  async function addPosProvider() {
+    const keyInput = document.getElementById("newPosProviderKey");
+    const nameInput = document.getElementById("newPosProviderName");
+    const msg = document.getElementById("posProviderAddMsg");
+    if (!keyInput || !nameInput) return;
+
+    const key = keyInput.value.trim();
+    const name = nameInput.value.trim();
+    if (!key || !name) {
+      if (msg) msg.textContent = "Provider key and name are required.";
+      return;
+    }
+
+    if (msg) msg.textContent = "Saving...";
+    try {
+      const response = await fetch(`${INGRESS}/api/pos/providers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, name, mode: "static", static_taps: [] }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error || `Unable to add provider (${response.status})`);
+      }
+
+      renderPosProviderCatalog(body.providers || []);
+      refreshPosProviderSelect(body.providers || []);
+      if (body.provider && body.provider.key) {
+        const select = document.getElementById("posSyncProvider");
+        if (select) {
+          select.value = String(body.provider.key).trim().toLowerCase();
+        }
+      }
+      keyInput.value = "";
+      nameInput.value = "";
+      if (msg) msg.textContent = "✓ Provider added.";
+    } catch (err) {
+      console.error("Unable to add POS provider", err);
+      if (msg) {
+        msg.textContent = err?.message || "Unable to add provider.";
+      }
+    }
+  }
+
+  async function importPosProviders() {
+    const input = document.getElementById("posProviderImportJson");
+    const msg = document.getElementById("posProviderImportMsg");
+    if (!input) return;
+
+    const raw = input.value.trim();
+    if (!raw) {
+      if (msg) msg.textContent = "Paste provider JSON first.";
+      return;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch (err) {
+      if (msg) msg.textContent = "Invalid JSON payload.";
+      return;
+    }
+
+    if (msg) msg.textContent = "Importing...";
+    try {
+      const response = await fetch(`${INGRESS}/api/pos/providers/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error || `Import failed (${response.status})`);
+      }
+
+      renderPosProviderCatalog(body.catalog || []);
+      refreshPosProviderSelect(body.catalog || []);
+      if (msg) {
+        msg.textContent = `✓ Imported ${body.added_or_updated || 0} provider(s).`;
+      }
+    } catch (err) {
+      console.error("Unable to import POS providers", err);
+      if (msg) {
+        msg.textContent = err?.message || "Unable to import providers.";
+      }
+    }
+  }
+
   async function runPosSyncNow() {
     const msg = document.getElementById("posSyncMsg");
     if (msg) msg.textContent = "Syncing...";
@@ -1966,6 +2163,8 @@ content %}
   loadKegTypeChoices();
   loadPourOptions();
   renderTeamUsers(TEAM_USERS || []);
+  renderPosProviderCatalog(INITIAL_POS_PROVIDER_CATALOG || []);
+  refreshPosProviderSelect(INITIAL_POS_PROVIDER_CATALOG || []);
   refreshDefaultKegTypeOptions();
   refreshDefaultPourPresetOptions();
   initExternalReadonlyLinks();
