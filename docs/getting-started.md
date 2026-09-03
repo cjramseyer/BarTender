@@ -1,6 +1,6 @@
 # BarTender Getting Started Guide
 
-Last updated: 2026-09-01
+Last updated: 2026-09-03
 Audience: first-time users
 
 ## Quick Setup
@@ -10,6 +10,10 @@ Audience: first-time users
 3. Install the BarTender add-on.
 4. Start the add-on.
 5. Open BarTender from the Home Assistant sidebar.
+
+Optional standalone view:
+
+- In the top-right Menu dropdown, click Open in New Window to launch the main app in its own browser tab/window while keeping ingress.
 
 ## First-Time Configuration
 
@@ -115,6 +119,12 @@ Auto-fill behavior note:
 
 - Check dashboard and taps page for current assignment.
 - Open display service if using a wallboard.
+
+### Step 6b: Verify Standalone Window Launch
+
+- In the top navigation, open Menu.
+- Click Open in New Window.
+- Confirm a new tab/window opens to the BarTender ingress route and renders without the embedded Home Assistant shell.
 
 ### Step 7: Verify Printable Menu
 
