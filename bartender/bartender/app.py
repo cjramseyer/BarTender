@@ -65,7 +65,7 @@ EXTERNAL_API_MODE = str(os.environ.get("EXTERNAL_API_MODE", "")).strip().lower()
     "yes",
     "on",
 )
-TELEMETRY_HEARTBEAT_URL = "https://bartender-telemetry.cj-a3.workers.dev/v1/heartbeat"
+TELEMETRY_HEARTBEAT_URL = "https://bartender-telemetry.td2.info/v1/heartbeat"
 EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
 DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE = 120
 _EXTERNAL_API_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
