@@ -295,6 +295,31 @@ def test_settings_save_without_owner_pin_keeps_existing_owner_pin(tmp_path):
     assert app_module.load_data()["settings"]["owner_pin"] == "2468"
 
 
+def test_settings_shows_homebrewer_display_default_message(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "homebrewer"
+    data["settings"]["display_count"] = 1
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/settings", follow_redirects=False)
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Number of Displays" in body
+    assert "Homebrewer installs default to 1 display." in body
+    assert 'id="displayCount"' in body
+    assert 'disabled' in body
+    assert 'value="1"' in body
+
+
 def test_authenticated_layout_shows_logout_link(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

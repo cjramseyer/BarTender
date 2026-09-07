@@ -261,7 +261,6 @@ content %}
             />
             <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
           </div>
-          {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
           <div class="form-group" id="commercialDisplaySettings">
             <label for="displayCount">Number of Displays</label>
             <input
@@ -270,12 +269,18 @@ content %}
               min="1"
               max="12"
               class="form-control"
+              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}disabled{% endif %}
               value="{{ settings.display_count or 1 }}"
             />
+            {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
             <small class="muted">Choose how many display boards this installation should serve.</small>
             <div id="displayTapAssignments" class="stack-gap-sm" style="margin-top: 0.75rem;"></div>
+            {% else %}
+            <small class="muted">
+              Homebrewer installs default to 1 display. Switch Business Type to Commercial to enable multiple displays.
+            </small>
+            {% endif %}
           </div>
-          {% endif %}
           <div class="form-group">
             <label>Dashboard Manage Button Position</label>
             <div class="radio-group">
