@@ -1,9 +1,11 @@
 import os
 import sys
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -165,7 +167,7 @@ def test_unchanged_settings_do_not_create_an_audit_event(tmp_path):
     assert app_module.load_data()["team_audit"] == []
 
 
-def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path):
+def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path, caplog):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
     owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
@@ -190,11 +192,14 @@ def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path):
         def __exit__(self, exc_type, exc_value, traceback):
             return False
 
+    caplog.set_level(logging.INFO, logger=app_module.app.logger.name)
     with patch.object(app_module, "urlopen", return_value=Response()) as urlopen_mock:
         app_module._send_anonymous_telemetry_heartbeat()
         app_module._send_anonymous_telemetry_heartbeat()
 
     assert urlopen_mock.call_count == 1
+    assert "Anonymous telemetry heartbeat sent." in caplog.messages
+    assert "Anonymous telemetry heartbeat skipped: already sent today." in caplog.messages
     request_payload = urlopen_mock.call_args.args[0]
     assert json.loads(request_payload.data) == {
         "installation_id": app_module.load_data()["settings"]["anonymous_telemetry_installation_id"],
@@ -202,6 +207,25 @@ def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path):
         "addon_version": app_module.APP_VERSION,
     }
     assert app_module.load_data()["settings"]["anonymous_telemetry_last_heartbeat_date"]
+
+
+def test_anonymous_telemetry_logs_cloudflare_rejection(tmp_path, caplog):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["anonymous_telemetry_enabled"] = True
+    app_module.save_data(data)
+
+    caplog.set_level(logging.WARNING, logger=app_module.app.logger.name)
+    with patch.object(
+        app_module,
+        "urlopen",
+        side_effect=HTTPError("https://example.invalid", 503, "Unavailable", {}, None),
+    ):
+        app_module._send_anonymous_telemetry_heartbeat()
+
+    assert "Anonymous telemetry heartbeat rejected with HTTP status 503." in caplog.messages
+    settings = app_module.load_data()["settings"]
+    assert settings["anonymous_telemetry_last_heartbeat_date"] == ""
 
 
 def test_manager_cannot_change_bar_name_or_api_tokens(tmp_path):
