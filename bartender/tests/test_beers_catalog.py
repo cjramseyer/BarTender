@@ -104,7 +104,6 @@ def test_beer_details_round_trip_through_api_and_csv(tmp_path):
         "glassware": "Pint",
         "supplier": "North Pole Supply",
         "distributor": "Local Distribution",
-        "purchase_cost": "125.50",
         "sku": "IPA-001",
         "upc": "012345678901",
         "recipe_url": "https://example.com/recipe",
@@ -119,7 +118,7 @@ def test_beer_details_round_trip_through_api_and_csv(tmp_path):
     csv_payload = (
         ",".join(app_module.BEER_CSV_HEADER)
         + "\n"
-        + "CSV Lager,Lager,BJCP 1A,kegged,CSV Brewer,CSV Brewery,4.8,18,2026-08-01,2026-08-15,2026-11-15,available,Crisp lager,Barley,3,6,36-40 F,Pilsner,CSV Supply,CSV Distribution,99.95,LGR-001,098765432109,https://example.com/lager,Notes\n"
+        + "CSV Lager,Lager,BJCP 1A,kegged,CSV Brewer,CSV Brewery,4.8,18,2026-08-01,2026-08-15,2026-11-15,available,Crisp lager,Barley,3,6,36-40 F,Pilsner,CSV Supply,CSV Distribution,LGR-001,098765432109,https://example.com/lager,Notes\n"
     ).encode("utf-8")
     import_response = client.post(
         "/api/beers/import/csv",
@@ -130,5 +129,42 @@ def test_beer_details_round_trip_through_api_and_csv(tmp_path):
 
     imported = next(beer for beer in app_module.load_data()["beers"] if beer["name"] == "CSV Lager")
     assert imported["allergens"] == ["Barley"]
-    assert imported["purchase_cost"] == "99.95"
     assert imported["recipe_url"] == "https://example.com/lager"
+
+
+def test_beers_page_renders_supplier_and_distributor_datalists(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    app_module.save_data({
+        **app_module.DEFAULT_DATA,
+        "beers": [
+            {
+                "id": 1,
+                "name": "Hazy IPA",
+                "type": "IPA",
+                "supplier": "Acme Hops & Grain",
+                "distributor": "Metro Beverage Distributing",
+            },
+        ],
+    })
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/beers")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+
+    assert 'id="beerSupplierOptions"' in html
+    assert 'id="beerDistributorOptions"' in html
+    assert '<option value="Acme Hops &amp; Grain">' in html
+    assert '<option value="Metro Beverage Distributing">' in html
+    assert 'list="beerSupplierOptions"' in html
+    assert 'list="beerDistributorOptions"' in html
+    assert 'name="beer_allergen_choice"' in html
+    assert 'value="Barley"' in html
+    assert 'value="Wheat"' in html
+    assert 'value="Lactose"' in html

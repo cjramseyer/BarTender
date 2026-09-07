@@ -165,3 +165,142 @@ def test_pours_are_recorded_in_analytics_and_audit_trails(tmp_path):
     assert data["team_audit"][0]["actor_name"] == "Staff One"
     assert data["team_audit"][0]["details"]["source"] == "tap"
     assert data["team_audit"][1]["details"]["source"] == "keg"
+
+
+def test_keg_extended_fields_persist_and_update(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    create_res = client.post(
+        "/api/kegs",
+        json={
+            "name": "Keg 10",
+            "serial_number": "SN-9988",
+            "coupler_type": "Sankey D (US)",
+            "ownership_type": "Owned",
+            "location": "Cold Room A",
+            "serving_psi": "12",
+            "gas_type": "CO2 (100%)",
+            "status": "empty",
+            "size": "Corny (5 gal)",
+            "cleaned_date": "2026-09-01",
+        },
+        headers=headers,
+    )
+    assert create_res.status_code == 201
+    keg = create_res.get_json()
+    assert keg["serial_number"] == "SN-9988"
+    assert keg["coupler_type"] == "Sankey D (US)"
+    assert keg["ownership_type"] == "Owned"
+    assert keg["location"] == "Cold Room A"
+    assert keg["serving_psi"] == "12"
+    assert keg["gas_type"] == "CO2 (100%)"
+    assert keg["cleaned_date"] == "2026-09-01"
+
+    update_res = client.put(
+        f"/api/kegs/{keg['id']}",
+        json={
+            "location": "Walk-in Cooler 2",
+            "serving_psi": "14",
+            "kicked_date": "2026-09-07",
+        },
+        headers=headers,
+    )
+    assert update_res.status_code == 200
+    updated = update_res.get_json()
+    assert updated["location"] == "Walk-in Cooler 2"
+    assert updated["serving_psi"] == "14"
+    assert updated["kicked_date"] == "2026-09-07"
+    assert updated["serial_number"] == "SN-9988"
+
+
+def test_tap_extended_fields_persist_and_update(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    create_res = client.post(
+        "/api/taps",
+        json={
+            "number": 1,
+            "label": "Left Nitro",
+            "location": "Main Bar Tower",
+            "status": "active",
+            "tap_handle": "Nitro Handle",
+            "faucet_type": "Stout / Nitro",
+            "line_length_feet": "12",
+            "line_inner_diameter": "3/16\" ID",
+            "line_material": "Barrier / EVABarrier",
+            "target_pressure_psi": "30",
+            "target_temperature": "38°F",
+            "clean_interval_days": 14,
+            "last_cleaned_date": "2026-09-01",
+            "last_serviced_date": "2026-08-01",
+        },
+        headers=headers,
+    )
+    assert create_res.status_code == 201
+    tap = create_res.get_json()
+    assert tap["location"] == "Main Bar Tower"
+    assert tap["status"] == "active"
+    assert tap["tap_handle"] == "Nitro Handle"
+    assert tap["faucet_type"] == "Stout / Nitro"
+    assert tap["line_length_feet"] == "12"
+    assert tap["line_inner_diameter"] == "3/16\" ID"
+    assert tap["line_material"] == "Barrier / EVABarrier"
+    assert tap["target_pressure_psi"] == "30"
+    assert tap["target_temperature"] == "38°F"
+    assert tap["clean_interval_days"] == 14
+    assert tap["last_cleaned_date"] == "2026-09-01"
+    assert tap["last_serviced_date"] == "2026-08-01"
+
+    update_res = client.put(
+        f"/api/taps/{tap['id']}",
+        json={
+            "status": "cleaning",
+            "last_cleaned_date": "2026-09-07",
+            "target_pressure_psi": "32",
+        },
+        headers=headers,
+    )
+    assert update_res.status_code == 200
+    updated = update_res.get_json()
+    assert updated["status"] == "cleaning"
+    assert updated["last_cleaned_date"] == "2026-09-07"
+    assert updated["target_pressure_psi"] == "32"
+    assert updated["faucet_type"] == "Stout / Nitro"
+
+
+def test_taps_page_renders_location_and_line_fields_only_in_pro_mode(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    # Default Homebrewer mode
+    homebrewer_res = client.get("/taps")
+    assert homebrewer_res.status_code == 200
+    homebrewer_html = homebrewer_res.get_data(as_text=True)
+    assert 'id="tapLocation"' not in homebrewer_html
+    assert 'id="tapLineLengthFeet"' not in homebrewer_html
+    assert 'id="tapLineInnerDiameter"' not in homebrewer_html
+    assert 'id="tapLineMaterial"' not in homebrewer_html
+    assert 'id="tapLastCleanedDate"' not in homebrewer_html
+
+    # Pro mode
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+
+    pro_res = client.get("/taps")
+    assert pro_res.status_code == 200
+    pro_html = pro_res.get_data(as_text=True)
+    assert 'id="tapLocation"' in pro_html
+    assert 'id="tapLineLengthFeet"' in pro_html
+    assert 'id="tapLineInnerDiameter"' in pro_html
+    assert 'id="tapLineMaterial"' in pro_html
+    assert 'id="tapLastCleanedDate"' in pro_html

@@ -25,10 +25,24 @@
   <div class="tap-card" data-id="{{ tap.id }}">
     <div class="tap-card-header">
       <span class="tap-number">Tap #{{ tap.number }}</span>
-      {% if tap.label %}<span class="tap-label-badge">{{ tap.label }}</span>{%
-      endif %}
+      <div>
+        {% if (settings.brewery_type or 'homebrewer') == 'pro' and tap.status and tap.status != 'active' %}
+        <span class="badge badge-cleaning">{{ tap.status | title }}</span>
+        {% endif %}
+        {% if tap.label %}<span class="tap-label-badge">{{ tap.label }}</span>{% endif %}
+      </div>
     </div>
     <div class="tap-card-body">
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' and tap.location %}<p class="muted"><strong>Location:</strong> {{ tap.location }}</p>{% endif %}
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' and tap.faucet_type %}<p class="muted"><strong>Faucet:</strong> {{ tap.faucet_type }}</p>{% endif %}
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' and (tap.target_pressure_psi or tap.target_temperature) %}
+      <p class="muted">
+        <strong>Targets:</strong>
+        {% if tap.target_pressure_psi %}{{ tap.target_pressure_psi }} PSI{% endif %}
+        {% if tap.target_pressure_psi and tap.target_temperature %} • {% endif %}
+        {% if tap.target_temperature %}{{ tap.target_temperature }}{% endif %}
+      </p>
+      {% endif %}
       {% if keg %}
       <p class="keg-on-tap">{{ keg.name }}</p>
       <div
@@ -72,7 +86,11 @@
       <p class="muted">Tapped: {{ keg.tapped_date }}</p>
       {% endif %} {% else %}
       <p class="muted no-keg">— No keg assigned —</p>
-      {% endif %} {% if tap.notes %}
+      {% endif %}
+      {% if tap.last_cleaned_date %}
+      <p class="muted">Line Cleaned: {{ tap.last_cleaned_date }}</p>
+      {% endif %}
+      {% if tap.notes %}
       <p class="muted">{{ tap.notes }}</p>
       {% endif %}
     </div>
@@ -159,6 +177,149 @@
           />
         </div>
       </div>
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+      <div class="form-row">
+        <div class="form-group">
+          <label>Location / Tower</label>
+          <input
+            type="text"
+            id="tapLocation"
+            class="form-control"
+            list="tapLocationOptions"
+            placeholder="e.g. Main Bar Tower A"
+          />
+          <datalist id="tapLocationOptions">
+            {% for loc in location_choices %}
+            <option value="{{ loc }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="tapStatus" class="form-control">
+            <option value="active" selected>Active / Serving</option>
+            <option value="cleaning">Cleaning</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="offline">Offline</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Faucet Type</label>
+          <input
+            type="text"
+            id="tapFaucetType"
+            class="form-control"
+            list="tapFaucetOptions"
+            placeholder="e.g. Forward-Sealing (Standard)"
+          />
+          <datalist id="tapFaucetOptions">
+            {% for faucet in faucet_choices %}
+            <option value="{{ faucet }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label>Tap Handle / Badge</label>
+          <input
+            type="text"
+            id="tapHandle"
+            class="form-control"
+            placeholder="e.g. Custom Wooden Logo Tap"
+          />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Line Length (ft)</label>
+          <input
+            type="text"
+            id="tapLineLengthFeet"
+            class="form-control"
+            placeholder="e.g. 10"
+          />
+        </div>
+        <div class="form-group">
+          <label>Line Inner Diameter</label>
+          <input
+            type="text"
+            id="tapLineInnerDiameter"
+            class="form-control"
+            list="tapDiameterOptions"
+            placeholder="e.g. 3/16&quot; ID"
+          />
+          <datalist id="tapDiameterOptions">
+            {% for dia in diameter_choices %}
+            <option value="{{ dia }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label>Line Tubing Material</label>
+          <input
+            type="text"
+            id="tapLineMaterial"
+            class="form-control"
+            list="tapMaterialOptions"
+            placeholder="e.g. Barrier / EVABarrier"
+          />
+          <datalist id="tapMaterialOptions">
+            {% for mat in material_choices %}
+            <option value="{{ mat }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Target Pressure (PSI)</label>
+          <input
+            type="text"
+            id="tapTargetPressurePsi"
+            class="form-control"
+            placeholder="e.g. 12"
+          />
+        </div>
+        <div class="form-group">
+          <label>Target Temp</label>
+          <input
+            type="text"
+            id="tapTargetTemperature"
+            class="form-control"
+            placeholder="e.g. 38°F"
+          />
+        </div>
+        <div class="form-group">
+          <label>Clean Cycle (Days)</label>
+          <input
+            type="number"
+            id="tapCleanIntervalDays"
+            class="form-control"
+            min="1"
+            value="14"
+          />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Last Line Cleaned Date</label>
+          <input
+            type="date"
+            id="tapLastCleanedDate"
+            class="form-control"
+          />
+        </div>
+        <div class="form-group">
+          <label>Last Serviced / Rebuilt Date</label>
+          <input
+            type="date"
+            id="tapLastServicedDate"
+            class="form-control"
+          />
+        </div>
+      </div>
+      {% endif %}
       <div class="form-group">
         <label>Assigned Keg</label>
         <select id="tapKeg" class="form-control">
@@ -269,10 +430,32 @@
     return `Tap ${maxValue + 1}`;
   }
 
+  function setInputValue(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.value = val ?? "";
+  }
+
+  function getInputValue(id, fallback = "") {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : fallback;
+  }
+
   function openAddTap() {
     document.getElementById("tapModalTitle").textContent = "Add Tap";
     document.getElementById("tapForm").reset();
     document.getElementById("tapId").value = "";
+    setInputValue("tapLocation", "");
+    setInputValue("tapStatus", "active");
+    setInputValue("tapHandle", "");
+    setInputValue("tapFaucetType", "");
+    setInputValue("tapLineLengthFeet", "");
+    setInputValue("tapLineInnerDiameter", "");
+    setInputValue("tapLineMaterial", "");
+    setInputValue("tapTargetPressurePsi", "");
+    setInputValue("tapTargetTemperature", "");
+    setInputValue("tapCleanIntervalDays", "14");
+    setInputValue("tapLastCleanedDate", "");
+    setInputValue("tapLastServicedDate", "");
     buildTapKegOptions();
     document.getElementById("tapNumber").value =
       document.querySelectorAll(".tap-card").length + 1;
@@ -403,9 +586,21 @@
     document.getElementById("tapModalTitle").textContent = "Edit Tap";
     document.getElementById("tapId").value = tap.id;
     document.getElementById("tapNumber").value = tap.number;
-    document.getElementById("tapLabel").value = tap.label;
+    document.getElementById("tapLabel").value = tap.label || "";
+    setInputValue("tapLocation", tap.location || "");
+    setInputValue("tapStatus", tap.status || "active");
+    setInputValue("tapHandle", tap.tap_handle || "");
+    setInputValue("tapFaucetType", tap.faucet_type || "");
+    setInputValue("tapLineLengthFeet", tap.line_length_feet || "");
+    setInputValue("tapLineInnerDiameter", tap.line_inner_diameter || "");
+    setInputValue("tapLineMaterial", tap.line_material || "");
+    setInputValue("tapTargetPressurePsi", tap.target_pressure_psi || "");
+    setInputValue("tapTargetTemperature", tap.target_temperature || "");
+    setInputValue("tapCleanIntervalDays", tap.clean_interval_days || 14);
+    setInputValue("tapLastCleanedDate", tap.last_cleaned_date || "");
+    setInputValue("tapLastServicedDate", tap.last_serviced_date || "");
     buildTapKegOptions(tap.id, tap.keg_id);
-    document.getElementById("tapNotes").value = tap.notes;
+    document.getElementById("tapNotes").value = tap.notes || "";
     openModal("tapModal");
   }
 
@@ -413,11 +608,28 @@
     e.preventDefault();
     const id = document.getElementById("tapId").value;
     const kegVal = document.getElementById("tapKeg").value;
+    const cleanIntervalEl = document.getElementById("tapCleanIntervalDays");
+    const cleanIntervalRaw = cleanIntervalEl ? cleanIntervalEl.value : "14";
+    const cleanInterval = Number.isNaN(parseInt(cleanIntervalRaw, 10))
+      ? 14
+      : Math.max(1, parseInt(cleanIntervalRaw, 10));
     const body = {
-      number: parseInt(document.getElementById("tapNumber").value),
-      label: document.getElementById("tapLabel").value,
-      keg_id: kegVal ? parseInt(kegVal) : null,
-      notes: document.getElementById("tapNotes").value,
+      number: parseInt(document.getElementById("tapNumber").value, 10),
+      label: document.getElementById("tapLabel").value.trim(),
+      location: getInputValue("tapLocation"),
+      status: getInputValue("tapStatus", "active"),
+      tap_handle: getInputValue("tapHandle"),
+      faucet_type: getInputValue("tapFaucetType"),
+      line_length_feet: getInputValue("tapLineLengthFeet"),
+      line_inner_diameter: getInputValue("tapLineInnerDiameter"),
+      line_material: getInputValue("tapLineMaterial"),
+      target_pressure_psi: getInputValue("tapTargetPressurePsi"),
+      target_temperature: getInputValue("tapTargetTemperature"),
+      clean_interval_days: cleanInterval,
+      last_cleaned_date: getInputValue("tapLastCleanedDate"),
+      last_serviced_date: getInputValue("tapLastServicedDate"),
+      keg_id: kegVal ? parseInt(kegVal, 10) : null,
+      notes: document.getElementById("tapNotes").value.trim(),
     };
     const method = id ? "PUT" : "POST";
     const url = id ? `${INGRESS}/api/taps/${id}` : `${INGRESS}/api/taps`;

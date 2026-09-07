@@ -77,6 +77,9 @@
         keg.custom_size or '—' }}{% else %}{{ keg.size or keg.type or '—' }}{%
         endif %}
       </p>
+      {% if keg.serial_number %}<p><strong>Serial/Tag:</strong> {{ keg.serial_number }}</p>{% endif %}
+      {% if keg.coupler_type %}<p><strong>Coupler:</strong> {{ keg.coupler_type }}</p>{% endif %}
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' and keg.location %}<p><strong>Location:</strong> {{ keg.location }}</p>{% endif %}
       <p><strong>Beer:</strong> {{ beer_name }}</p>
       <p><strong>Brewery:</strong> {{ beer_brewer or '—' }}</p>
       <p>
@@ -89,8 +92,18 @@
         %}{{ keg.current_volume }} {{ keg.volume_unit or '—' }}{% else %}—{%
         endif %}
       </p>
+      {% if keg.serving_psi or keg.gas_type %}
+      <p>
+        <strong>Dispense:</strong>
+        {% if keg.serving_psi %}{{ keg.serving_psi }} PSI{% endif %}
+        {% if keg.serving_psi and keg.gas_type %} • {% endif %}
+        {% if keg.gas_type %}{{ keg.gas_type }}{% endif %}
+      </p>
+      {% endif %}
       <p><strong>Percent Full:</strong> {{ fill_pct }}%</p>
       <p><strong>Filled:</strong> {{ filled_display }}</p>
+      {% if keg.kicked_date %}<p><strong>Kicked:</strong> {{ keg.kicked_date }}</p>{% endif %}
+      {% if keg.cleaned_date %}<p><strong>Cleaned:</strong> {{ keg.cleaned_date }}</p>{% endif %}
       <p><strong>Keg Age:</strong> <span class="keg-age-value">—</span></p>
       <p><strong>Beer Age:</strong> <span class="beer-age-value">—</span></p>
       <p><strong>Notes:</strong> {{ notes_display }}</p>
@@ -133,15 +146,26 @@
     </div>
     <form id="kegForm" onsubmit="submitKeg(event)">
       <input type="hidden" id="kegId" />
-      <div class="form-group">
-        <label>Keg Name</label>
-        <input
-          type="text"
-          id="kegName"
-          class="form-control"
-          placeholder="e.g. Keg 1"
-        />
-        <small class="muted"> Required only when status is Full. </small>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Keg Name</label>
+          <input
+            type="text"
+            id="kegName"
+            class="form-control"
+            placeholder="e.g. Keg 1"
+          />
+          <small class="muted"> Required only when status is Full. </small>
+        </div>
+        <div class="form-group">
+          <label>Serial / Tag / Barcode</label>
+          <input
+            type="text"
+            id="kegSerialNumber"
+            class="form-control"
+            placeholder="e.g. KEG-0042"
+          />
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -189,6 +213,81 @@
             placeholder="e.g. 19 L"
           />
         </div>
+        {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+        <div class="form-group">
+          <label>Location</label>
+          <input
+            type="text"
+            id="kegLocation"
+            class="form-control"
+            list="kegLocationOptions"
+            placeholder="e.g. Walk-in Cooler"
+          />
+          <datalist id="kegLocationOptions">
+            {% for loc in location_choices %}
+            <option value="{{ loc }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        {% endif %}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Coupler Type</label>
+          <input
+            type="text"
+            id="kegCouplerType"
+            class="form-control"
+            list="kegCouplerOptions"
+            placeholder="e.g. Sankey D (US)"
+          />
+          <datalist id="kegCouplerOptions">
+            {% for coupler in coupler_choices %}
+            <option value="{{ coupler }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label>Ownership</label>
+          <input
+            type="text"
+            id="kegOwnershipType"
+            class="form-control"
+            list="kegOwnershipOptions"
+            placeholder="e.g. Owned"
+          />
+          <datalist id="kegOwnershipOptions">
+            {% for ownership in ownership_choices %}
+            <option value="{{ ownership }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Serving Pressure (PSI)</label>
+          <input
+            type="text"
+            id="kegServingPsi"
+            class="form-control"
+            placeholder="e.g. 12"
+          />
+        </div>
+        <div class="form-group">
+          <label>Gas Blend</label>
+          <input
+            type="text"
+            id="kegGasType"
+            class="form-control"
+            list="kegGasOptions"
+            placeholder="e.g. CO2 (100%)"
+          />
+          <datalist id="kegGasOptions">
+            {% for gas in gas_choices %}
+            <option value="{{ gas }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -198,6 +297,16 @@
         <div class="form-group">
           <label>Tapped Date</label>
           <input type="date" id="kegTapped" class="form-control" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Kicked Date</label>
+          <input type="date" id="kegKicked" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Cleaned Date</label>
+          <input type="date" id="kegCleaned" class="form-control" />
         </div>
       </div>
       <div class="form-row">
@@ -669,11 +778,29 @@
     toggleCustomSize();
   }
 
+  function setKegInputValue(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.value = val ?? "";
+  }
+
+  function getKegInputValue(id, fallback = "") {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : fallback;
+  }
+
   function openAddKeg() {
     document.getElementById("kegModalTitle").textContent = "Add Keg";
     document.getElementById("kegForm").reset();
     document.getElementById("kegId").value = "";
     document.getElementById("kegName").value = nextIncrementedName(KEGS, "Keg");
+    setKegInputValue("kegSerialNumber", "");
+    setKegInputValue("kegLocation", "");
+    setKegInputValue("kegCouplerType", "");
+    setKegInputValue("kegOwnershipType", "");
+    setKegInputValue("kegServingPsi", "");
+    setKegInputValue("kegGasType", "");
+    setKegInputValue("kegKicked", "");
+    setKegInputValue("kegCleaned", "");
     document.getElementById("kegBeer").value = "";
     document.getElementById("kegStatus").value = "empty";
     applyStatusConstraintForCleaning("");
@@ -750,17 +877,25 @@
   function editKeg(keg) {
     document.getElementById("kegModalTitle").textContent = "Edit Keg";
     document.getElementById("kegId").value = keg.id;
-    document.getElementById("kegName").value = keg.name;
+    document.getElementById("kegName").value = keg.name || "";
+    setKegInputValue("kegSerialNumber", keg.serial_number);
+    setKegInputValue("kegLocation", keg.location);
+    setKegInputValue("kegCouplerType", keg.coupler_type);
+    setKegInputValue("kegOwnershipType", keg.ownership_type);
+    setKegInputValue("kegServingPsi", keg.serving_psi);
+    setKegInputValue("kegGasType", keg.gas_type);
+    setKegInputValue("kegKicked", keg.kicked_date);
+    setKegInputValue("kegCleaned", keg.cleaned_date);
     document.getElementById("kegBeer").value = keg.beer_id || "";
     document.getElementById("kegStatus").value = keg.status;
     applyStatusConstraintForCleaning(keg.status);
     populateKegSizeOptions(keg.size || "");
-    document.getElementById("kegCustomSize").value = keg.custom_size;
+    document.getElementById("kegCustomSize").value = keg.custom_size || "";
     document.getElementById("kegLineCleaning").checked = !!keg.line_cleaning_keg;
     applyLineCleaningConstraint(keg.id);
     document.getElementById("kegOnDeck").checked = !!keg.on_deck;
-    document.getElementById("kegNotes").value = keg.notes;
-    document.getElementById("kegTapped").value = keg.tapped_date;
+    document.getElementById("kegNotes").value = keg.notes || "";
+    document.getElementById("kegTapped").value = keg.tapped_date || "";
     document.getElementById("kegFilled").value =
       keg.filled_date || keg.purchased_date || "";
     document.getElementById("kegCurrentVolume").value =
@@ -799,6 +934,12 @@
 
     const body = {
       name: kegName,
+      serial_number: getKegInputValue("kegSerialNumber"),
+      location: getKegInputValue("kegLocation"),
+      coupler_type: getKegInputValue("kegCouplerType"),
+      ownership_type: getKegInputValue("kegOwnershipType"),
+      serving_psi: getKegInputValue("kegServingPsi"),
+      gas_type: getKegInputValue("kegGasType"),
       beer_id: beerId,
       status,
       size: document.getElementById("kegSize").value,
@@ -810,6 +951,8 @@
       notes: document.getElementById("kegNotes").value,
       tapped_date: document.getElementById("kegTapped").value,
       filled_date: document.getElementById("kegFilled").value,
+      kicked_date: getKegInputValue("kegKicked"),
+      cleaned_date: getKegInputValue("kegCleaned"),
       percent_full: parsedPercent,
     };
     const method = id ? "PUT" : "POST";

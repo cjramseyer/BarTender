@@ -135,6 +135,82 @@ COMMON_POS_SYSTEMS = [
     "Other",
 ]
 
+STANDARD_COUPLER_TYPES = [
+    "Sankey D (US)",
+    "Sankey S (Euro)",
+    "Ball Lock",
+    "Pin Lock",
+    "A (German Slider)",
+    "G (Grundy)",
+    "M",
+    "KeyKeg",
+]
+
+STANDARD_OWNERSHIP_TYPES = [
+    "Owned",
+    "Leased",
+    "Deposit",
+    "Brewery Owned",
+]
+
+STANDARD_GAS_TYPES = [
+    "CO2 (100%)",
+    "Nitro Blend (70/30)",
+    "Nitro Blend (75/25)",
+    "Pure N2 (100%)",
+    "Beer Gas (60/40)",
+]
+
+STANDARD_FAUCET_TYPES = [
+    "Forward-Sealing (Standard)",
+    "Flow Control",
+    "Stout / Nitro",
+    "Czech Side-Pull",
+    "Rear-Sealing (Standard)",
+]
+
+STANDARD_LINE_DIAMETERS = [
+    "3/16\" ID",
+    "1/4\" ID",
+    "5/16\" ID",
+    "3/8\" ID",
+    "4mm ID",
+    "5mm ID",
+]
+
+STANDARD_LINE_MATERIALS = [
+    "Barrier / EVABarrier",
+    "Vinyl",
+    "Polyethylene",
+    "Stainless Steel",
+    "Copper",
+]
+
+STANDARD_TAP_STATUSES = [
+    "active",
+    "cleaning",
+    "maintenance",
+    "offline",
+]
+
+STANDARD_BEER_ALLERGENS = [
+    "Barley",
+    "Wheat",
+    "Gluten",
+    "Rye",
+    "Oats",
+    "Lactose",
+    "Tree Nuts",
+    "Peanuts",
+    "Soy",
+    "Sulfites",
+    "Honey",
+    "Coconut",
+    "Fruit",
+    "Eggs",
+    "Isinglass",
+]
+
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
@@ -364,11 +440,12 @@ DEFAULT_DATA = {
         "keg_type_choices": STANDARD_KEG_TYPE_CHOICES,
         "menu_qr_mode": "both",
         "display_title_on_tap": "On Draft",
-        "display_count": 1,
+        "display_count": 2,
         "display_tap_assignments": [],
         "pour_options": [
             {"name": "Pint", "amount": 16, "unit": "oz"},
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
+            {"name": "Growler", "amount": 64, "unit": "oz"},
             {"name": "Taste", "amount": 2, "unit": "oz"},
         ],
         "default_pour_preset": "16|oz|Pint",
@@ -488,7 +565,7 @@ def load_data() -> dict:
         )
         data["settings"]["display_tap_assignments"] = _normalize_display_tap_assignments(
             data["settings"].get("display_tap_assignments"),
-            data["settings"].get("display_count", 1),
+            data["settings"].get("display_count", 2),
         )
         data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
             data["settings"].get("audit_retention_days")
@@ -758,17 +835,17 @@ def _normalize_display_title_on_tap(value) -> str:
 
 def _normalize_display_count(value, brewery_type: str | None = None) -> int:
     normalized_type = _normalize_brewery_type(brewery_type)
-    count = _coerce_int(value, 1)
+    count = _coerce_int(value, 2)
     if count is None:
-        return 1
+        return 2
     if normalized_type != "pro":
-        return 1
+        return 2
     return max(1, min(12, count))
 
 
-def _normalize_display_tap_assignments(value, display_count: int = 1) -> list[list[int]]:
+def _normalize_display_tap_assignments(value, display_count: int = 2) -> list[list[int]]:
     raw = value if isinstance(value, list) else []
-    count = max(1, _coerce_int(display_count, 1) or 1)
+    count = max(1, _coerce_int(display_count, 2) or 2)
     normalized = []
     for index in range(count):
         numbers = []
@@ -1002,7 +1079,7 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
     )
     settings["display_tap_assignments"] = _normalize_display_tap_assignments(
         settings.get("display_tap_assignments"),
-        settings.get("display_count", 1),
+        settings.get("display_count", 2),
     )
     settings["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
         settings.get("analytics_low_keg_threshold_percent")
@@ -1689,11 +1766,13 @@ def _default_pour_options(measurement: str) -> list[dict]:
         return [
             {"name": "Pint", "amount": 473, "unit": "ml"},
             {"name": "Half Pint", "amount": 237, "unit": "ml"},
+            {"name": "Growler", "amount": 1893, "unit": "ml"},
             {"name": "Taste", "amount": 59, "unit": "ml"},
         ]
     return [
         {"name": "Pint", "amount": 16, "unit": "oz"},
         {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Growler", "amount": 64, "unit": "oz"},
         {"name": "Taste", "amount": 2, "unit": "oz"},
     ]
 
@@ -1919,7 +1998,6 @@ def _normalize_beers(raw_beers) -> list[dict]:
             "glassware": str(entry.get("glassware", "")).strip(),
             "supplier": str(entry.get("supplier", "")).strip(),
             "distributor": str(entry.get("distributor", "")).strip(),
-            "purchase_cost": str(entry.get("purchase_cost", "")).strip(),
             "sku": str(entry.get("sku", "")).strip(),
             "upc": str(entry.get("upc", "")).strip(),
             "recipe_url": str(entry.get("recipe_url", "")).strip(),
@@ -2116,6 +2194,8 @@ def _apply_needs_cleaning_transition(
     if reaches_empty and incoming_status not in ("cleaning", "retired"):
         updated_keg["status"] = "cleaning"
         updated_keg["percent_full"] = 0
+        if not updated_keg.get("kicked_date"):
+            updated_keg["kicked_date"] = _today_utc_date()
 
 
 def _sync_percent_for_volume_change(
@@ -2260,6 +2340,7 @@ def _reset_keg_to_clean_ready(keg: dict) -> None:
     keg["tapped_date"] = ""
     keg["on_deck"] = False
     keg["keg_age_days"] = 0
+    keg["cleaned_date"] = _today_utc_date()
 
 
 def _validate_full_keg_requirements(keg_like: dict):
@@ -2463,11 +2544,47 @@ def stock():
 def kegs():
     data = load_data()
     ingress_path = _effective_ingress_path()
+    coupler_choices = sorted(
+        {
+            str(keg.get("coupler_type", "")).strip()
+            for keg in data.get("kegs", [])
+            if str(keg.get("coupler_type", "")).strip()
+        } | set(STANDARD_COUPLER_TYPES),
+        key=lambda v: v.lower(),
+    )
+    ownership_choices = sorted(
+        {
+            str(keg.get("ownership_type", "")).strip()
+            for keg in data.get("kegs", [])
+            if str(keg.get("ownership_type", "")).strip()
+        } | set(STANDARD_OWNERSHIP_TYPES),
+        key=lambda v: v.lower(),
+    )
+    location_choices = sorted(
+        {
+            str(keg.get("location", "")).strip()
+            for keg in data.get("kegs", [])
+            if str(keg.get("location", "")).strip()
+        },
+        key=lambda v: v.lower(),
+    )
+    gas_choices = sorted(
+        {
+            str(keg.get("gas_type", "")).strip()
+            for keg in data.get("kegs", [])
+            if str(keg.get("gas_type", "")).strip()
+        } | set(STANDARD_GAS_TYPES),
+        key=lambda v: v.lower(),
+    )
     return render_template(
         "kegs.html",
         settings=data["settings"],
         kegs=data["kegs"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
+        coupler_choices=coupler_choices,
+        ownership_choices=ownership_choices,
+        location_choices=location_choices,
+        gas_choices=gas_choices,
         ingress=ingress_path,
     )
 
@@ -2484,11 +2601,36 @@ def beers():
         },
         key=lambda value: value.lower(),
     )
+    supplier_choices = sorted(
+        {
+            str(beer.get("supplier", "")).strip()
+            for beer in data.get("beers", [])
+            if str(beer.get("supplier", "")).strip()
+        },
+        key=lambda value: value.lower(),
+    )
+    distributor_choices = sorted(
+        {
+            str(beer.get("distributor", "")).strip()
+            for beer in data.get("beers", [])
+            if str(beer.get("distributor", "")).strip()
+        },
+        key=lambda value: value.lower(),
+    )
+    allergen_choices = STANDARD_BEER_ALLERGENS.copy()
+    for beer in data.get("beers", []):
+        for allergen in beer.get("allergens", []):
+            cleaned = str(allergen).strip()
+            if cleaned and not any(cleaned.lower() == choice.lower() for choice in allergen_choices):
+                allergen_choices.append(cleaned)
     return render_template(
         "beers.html",
         settings=data["settings"],
         beers=sorted(data.get("beers", []), key=lambda beer: str(beer.get("name", "")).lower()),
         beer_type_choices=beer_type_choices,
+        supplier_choices=supplier_choices,
+        distributor_choices=distributor_choices,
+        allergen_choices=allergen_choices,
         ingress=ingress_path,
     )
 
@@ -2497,11 +2639,47 @@ def beers():
 def taps():
     data = load_data()
     ingress_path = _effective_ingress_path()
+    faucet_choices = sorted(
+        {
+            str(tap.get("faucet_type", "")).strip()
+            for tap in data.get("taps", [])
+            if str(tap.get("faucet_type", "")).strip()
+        } | set(STANDARD_FAUCET_TYPES),
+        key=lambda v: v.lower(),
+    )
+    diameter_choices = sorted(
+        {
+            str(tap.get("line_inner_diameter", "")).strip()
+            for tap in data.get("taps", [])
+            if str(tap.get("line_inner_diameter", "")).strip()
+        } | set(STANDARD_LINE_DIAMETERS),
+        key=lambda v: v.lower(),
+    )
+    material_choices = sorted(
+        {
+            str(tap.get("line_material", "")).strip()
+            for tap in data.get("taps", [])
+            if str(tap.get("line_material", "")).strip()
+        } | set(STANDARD_LINE_MATERIALS),
+        key=lambda v: v.lower(),
+    )
+    location_choices = sorted(
+        {
+            str(tap.get("location", "")).strip()
+            for tap in data.get("taps", [])
+            if str(tap.get("location", "")).strip()
+        },
+        key=lambda v: v.lower(),
+    )
     return render_template(
         "taps.html",
         settings=data["settings"],
         taps=data["taps"],
         kegs=data["kegs"],
+        faucet_choices=faucet_choices,
+        diameter_choices=diameter_choices,
+        material_choices=material_choices,
+        location_choices=location_choices,
         ingress=ingress_path,
     )
 
@@ -3675,7 +3853,6 @@ BEER_CSV_HEADER = [
     "glassware",
     "supplier",
     "distributor",
-    "purchase_cost",
     "sku",
     "upc",
     "recipe_url",
@@ -3711,7 +3888,7 @@ def _validate_beer_csv_row(row: dict, row_number: int):
     if packaging not in {"kegged", "bottled_can"}:
         return f"Row {row_number}: packaging must be 'kegged' or 'bottled_can'."
 
-    for field in ("abv", "ibu", "color_srm", "color_ebc", "purchase_cost"):
+    for field in ("abv", "ibu", "color_srm", "color_ebc"):
         raw = str(row.get(field, "") or "").strip()
         if raw and not re.fullmatch(r"\d+(?:\.\d+)?", raw):
             return f"Row {row_number}: '{field}' must be numeric or blank."
@@ -3778,7 +3955,6 @@ def _parse_beer_csv_rows(file_bytes: bytes):
             "glassware": normalized.get("glassware", "").strip(),
             "supplier": normalized.get("supplier", "").strip(),
             "distributor": normalized.get("distributor", "").strip(),
-            "purchase_cost": normalized.get("purchase_cost", "").strip(),
             "sku": normalized.get("sku", "").strip(),
             "upc": normalized.get("upc", "").strip(),
             "recipe_url": normalized.get("recipe_url", "").strip(),
@@ -3859,7 +4035,6 @@ def api_add_beer():
         "glassware": str(body.get("glassware", "")).strip(),
         "supplier": str(body.get("supplier", "")).strip(),
         "distributor": str(body.get("distributor", "")).strip(),
-        "purchase_cost": str(body.get("purchase_cost", "")).strip(),
         "sku": str(body.get("sku", "")).strip(),
         "upc": str(body.get("upc", "")).strip(),
         "recipe_url": str(body.get("recipe_url", "")).strip(),
@@ -3885,7 +4060,7 @@ def api_update_beer(beer_id: int):
             "name", "type", "style_guideline", "brewer", "brewery", "abv", "ibu",
             "brewed_on", "packaged_on", "best_by_date", "availability_status", "description",
             "color_srm", "color_ebc", "serving_temperature", "glassware", "supplier",
-            "distributor", "purchase_cost", "sku", "upc", "recipe_url", "notes",
+            "distributor", "sku", "upc", "recipe_url", "notes",
         ):
             if field in body:
                 beer[field] = str(body.get(field, "")).strip()
@@ -4016,6 +4191,7 @@ def api_add_keg():
     keg = {
         "id": _next_id(data["kegs"]),
         "name": body.get("name", ""),
+        "serial_number": str(body.get("serial_number", "")).strip(),
         "beer_id": beer_id,
         "beer_name": str(body.get("beer_name", "")).strip(),
         "beer_type": str(body.get("beer_type", "")).strip(),
@@ -4023,6 +4199,11 @@ def api_add_keg():
         "size": _normalize_builtin_keg_type_label(body.get("size", "")) or default_keg_size,
         "custom_size": body.get("custom_size", ""),
         "status": initial_status,
+        "coupler_type": str(body.get("coupler_type", "")).strip(),
+        "ownership_type": str(body.get("ownership_type", "")).strip(),
+        "location": str(body.get("location", "")).strip(),
+        "serving_psi": str(body.get("serving_psi", "")).strip(),
+        "gas_type": str(body.get("gas_type", "")).strip(),
         "beer_brewer": body.get("beer_brewer", body.get("brewery", "")),
         "beer_abv": body.get("beer_abv", body.get("abv", "")),
         "beer_ibu": body.get("beer_ibu", ""),
@@ -4040,6 +4221,8 @@ def api_add_keg():
         "notes": body.get("notes", ""),
         "tapped_date": body.get("tapped_date", ""),
         "filled_date": incoming_filled_date,
+        "kicked_date": str(body.get("kicked_date", "")).strip(),
+        "cleaned_date": str(body.get("cleaned_date", "")).strip(),
         "percent_full": _clamp_percent_full(body.get("percent_full"), _default_percent_for_status(initial_status)),
         "created_at": timestamp,
         "updated_at": timestamp,
@@ -4126,6 +4309,7 @@ def api_add_kegs_bulk():
         keg = {
             "id": _next_id(simulated_data["kegs"]),
             "name": item.get("name", ""),
+            "serial_number": str(item.get("serial_number", "")).strip(),
             "beer_id": beer_id,
             "beer_name": str(item.get("beer_name", "")).strip(),
             "beer_type": str(item.get("beer_type", "")).strip(),
@@ -4133,6 +4317,11 @@ def api_add_kegs_bulk():
             "size": _normalize_builtin_keg_type_label(item.get("size", "")) or default_keg_size,
             "custom_size": item.get("custom_size", ""),
             "status": initial_status,
+            "coupler_type": str(item.get("coupler_type", "")).strip(),
+            "ownership_type": str(item.get("ownership_type", "")).strip(),
+            "location": str(item.get("location", "")).strip(),
+            "serving_psi": str(item.get("serving_psi", "")).strip(),
+            "gas_type": str(item.get("gas_type", "")).strip(),
             "beer_brewer": item.get("beer_brewer", item.get("brewery", "")),
             "beer_abv": item.get("beer_abv", item.get("abv", "")),
             "beer_ibu": item.get("beer_ibu", ""),
@@ -4149,6 +4338,8 @@ def api_add_kegs_bulk():
             "notes": item.get("notes", ""),
             "tapped_date": item.get("tapped_date", ""),
             "filled_date": incoming_filled_date,
+            "kicked_date": str(item.get("kicked_date", "")).strip(),
+            "cleaned_date": str(item.get("cleaned_date", "")).strip(),
             "percent_full": _clamp_percent_full(item.get("percent_full"), _default_percent_for_status(initial_status)),
             "created_at": timestamp,
             "updated_at": timestamp,
@@ -4273,12 +4464,18 @@ def api_update_keg(keg_id: int):
 
             for field in (
                 "name",
+                "serial_number",
                 "beer_id",
                 "beer_name",
                 "type",
                 "size",
                 "custom_size",
                 "status",
+                "coupler_type",
+                "ownership_type",
+                "location",
+                "serving_psi",
+                "gas_type",
                 "beer_brewer",
                 "beer_abv",
                 "beer_ibu",
@@ -4292,6 +4489,8 @@ def api_update_keg(keg_id: int):
                 "notes",
                 "tapped_date",
                 "filled_date",
+                "kicked_date",
+                "cleaned_date",
                 "percent_full",
             ):
                 if field in body:
@@ -4638,6 +4837,18 @@ def api_add_tap():
         "label": body.get("label", ""),
         "keg_id": parsed_keg_id,
         "ever_assigned_keg": parsed_keg_id is not None,
+        "location": str(body.get("location", "")).strip(),
+        "status": str(body.get("status", "active")).strip().lower() or "active",
+        "tap_handle": str(body.get("tap_handle", "")).strip(),
+        "faucet_type": str(body.get("faucet_type", "")).strip(),
+        "line_length_feet": str(body.get("line_length_feet", "")).strip(),
+        "line_inner_diameter": str(body.get("line_inner_diameter", "")).strip(),
+        "line_material": str(body.get("line_material", "")).strip(),
+        "target_pressure_psi": str(body.get("target_pressure_psi", "")).strip(),
+        "target_temperature": str(body.get("target_temperature", "")).strip(),
+        "clean_interval_days": _coerce_int(body.get("clean_interval_days"), 14) or 14,
+        "last_cleaned_date": str(body.get("last_cleaned_date", "")).strip(),
+        "last_serviced_date": str(body.get("last_serviced_date", "")).strip(),
         "notes": body.get("notes", ""),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -4709,6 +4920,18 @@ def api_add_taps_bulk():
             "label": item.get("label", ""),
             "keg_id": keg_id,
             "ever_assigned_keg": keg_id is not None,
+            "location": str(item.get("location", "")).strip(),
+            "status": str(item.get("status", "active")).strip().lower() or "active",
+            "tap_handle": str(item.get("tap_handle", "")).strip(),
+            "faucet_type": str(item.get("faucet_type", "")).strip(),
+            "line_length_feet": str(item.get("line_length_feet", "")).strip(),
+            "line_inner_diameter": str(item.get("line_inner_diameter", "")).strip(),
+            "line_material": str(item.get("line_material", "")).strip(),
+            "target_pressure_psi": str(item.get("target_pressure_psi", "")).strip(),
+            "target_temperature": str(item.get("target_temperature", "")).strip(),
+            "clean_interval_days": _coerce_int(item.get("clean_interval_days"), 14) or 14,
+            "last_cleaned_date": str(item.get("last_cleaned_date", "")).strip(),
+            "last_serviced_date": str(item.get("last_serviced_date", "")).strip(),
             "notes": item.get("notes", ""),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -4734,9 +4957,28 @@ def api_update_tap(tap_id: int):
     for tap in data["taps"]:
         if tap["id"] == tap_id:
             body = request.get_json(force=True)
-            for field in ("number", "label", "notes"):
+            for field in (
+                "number",
+                "label",
+                "location",
+                "status",
+                "tap_handle",
+                "faucet_type",
+                "line_length_feet",
+                "line_inner_diameter",
+                "line_material",
+                "target_pressure_psi",
+                "target_temperature",
+                "clean_interval_days",
+                "last_cleaned_date",
+                "last_serviced_date",
+                "notes",
+            ):
                 if field in body:
-                    tap[field] = body[field]
+                    if field == "clean_interval_days":
+                        tap[field] = _coerce_int(body.get(field), 14) or 14
+                    else:
+                        tap[field] = body[field]
             if "keg_id" in body:
                 raw_keg_id = body.get("keg_id")
                 parsed_keg_id = _coerce_int(raw_keg_id, None)
@@ -4801,12 +5043,18 @@ def _keg_csv_rows(kegs: list[dict]) -> list[list]:
         "id",
         "created_at",
         "name",
+        "serial_number",
         "beer_id",
         "beer_name",
         "type",
         "size",
         "custom_size",
         "status",
+        "coupler_type",
+        "ownership_type",
+        "location",
+        "serving_psi",
+        "gas_type",
         "beer_brewer",
         "beer_abv",
         "beer_ibu",
@@ -4817,6 +5065,8 @@ def _keg_csv_rows(kegs: list[dict]) -> list[list]:
         "notes",
         "tapped_date",
         "filled_date",
+        "kicked_date",
+        "cleaned_date",
         "percent_full",
         "updated_at",
     ]
@@ -4827,7 +5077,26 @@ def _keg_csv_rows(kegs: list[dict]) -> list[list]:
 
 
 def _tap_csv_rows(taps: list[dict]) -> list[list]:
-    header = ["id", "number", "label", "keg_id", "notes", "updated_at"]
+    header = [
+        "id",
+        "number",
+        "label",
+        "location",
+        "status",
+        "tap_handle",
+        "faucet_type",
+        "line_length_feet",
+        "line_inner_diameter",
+        "line_material",
+        "target_pressure_psi",
+        "target_temperature",
+        "clean_interval_days",
+        "last_cleaned_date",
+        "last_serviced_date",
+        "keg_id",
+        "notes",
+        "updated_at",
+    ]
     rows = [header]
     for tap in taps:
         rows.append([tap.get(field, "") for field in header])

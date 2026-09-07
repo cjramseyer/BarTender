@@ -466,12 +466,14 @@ def test_default_pour_preset_prefers_pint_and_includes_taste(tmp_path):
     assert data["settings"]["pour_options"] == [
         {"name": "Pint", "amount": 16, "unit": "oz"},
         {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Growler", "amount": 64, "unit": "oz"},
         {"name": "Taste", "amount": 2, "unit": "oz"},
     ]
 
     data["settings"]["pour_options"] = [
         {"name": "Half Pint", "amount": 8, "unit": "oz"},
         {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Growler", "amount": 64, "unit": "oz"},
         {"name": "Taste", "amount": 2, "unit": "oz"},
     ]
     data["settings"]["default_pour_preset"] = ""

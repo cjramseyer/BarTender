@@ -45,7 +45,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
-- **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, cost, and recipe/source details
+- **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, and recipe/source details
 - **Beer CSV Import/Export** — Bulk add or back up catalog entries using a canonical CSV schema with preview validation before apply
 - **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog
 - **Tap Management** — Assign kegs to numbered, labelled tap lines with single-tap keg assignment protection
@@ -68,7 +68,7 @@ The Beer Catalog supports a single canonical CSV format for quick bulk updates a
 Header row:
 
 ```csv
-name,type,style_guideline,packaging,brewer,brewery,abv,ibu,brewed_on,packaged_on,best_by_date,availability_status,description,allergens,color_srm,color_ebc,serving_temperature,glassware,supplier,distributor,purchase_cost,sku,upc,recipe_url,notes
+name,type,style_guideline,packaging,brewer,brewery,abv,ibu,brewed_on,packaged_on,best_by_date,availability_status,description,allergens,color_srm,color_ebc,serving_temperature,glassware,supplier,distributor,sku,upc,recipe_url,notes
 ```
 
 Rules:
@@ -76,7 +76,7 @@ Rules:
 - `name` is required for every row.
 - Header names must match exactly, including lowercase spelling.
 - `packaging` must be `kegged` or `bottled_can`.
-- `abv`, `ibu`, `color_srm`, `color_ebc`, and `purchase_cost` must be numeric when present.
+- `abv`, `ibu`, `color_srm`, and `color_ebc` must be numeric when present.
 - `allergens` is a comma-separated list in CSV and is stored as structured data.
 - Blank rows are ignored.
 - Unsupported columns or missing required names are rejected in preview before import is applied.
@@ -84,8 +84,8 @@ Rules:
 Example:
 
 ```csv
-name,type,style_guideline,packaging,brewer,brewery,abv,ibu,brewed_on,packaged_on,best_by_date,availability_status,description,allergens,color_srm,color_ebc,serving_temperature,glassware,supplier,distributor,purchase_cost,sku,upc,recipe_url,notes
-Hazy IPA,IPA,BJCP 21C,kegged,North Pole,Drift House,6.4,42,2024-01-02,2024-01-16,2024-04-16,available,Citrus-forward hazy,,6,12,38-42 F,Pint,North Pole Supply,,125.50,IPA-001,,https://example.com/recipe,Citrusy
+name,type,style_guideline,packaging,brewer,brewery,abv,ibu,brewed_on,packaged_on,best_by_date,availability_status,description,allergens,color_srm,color_ebc,serving_temperature,glassware,supplier,distributor,sku,upc,recipe_url,notes
+Hazy IPA,IPA,BJCP 21C,kegged,North Pole,Drift House,6.4,42,2024-01-02,2024-01-16,2024-04-16,available,Citrus-forward hazy,,6,12,38-42 F,Pint,North Pole Supply,,,IPA-001,,https://example.com/recipe,Citrusy
 ```
 
 Use the **Export CSV** button in the Beer Catalog to generate a valid file, then re-import it with the **Import CSV** control to bulk-add catalog entries.
@@ -120,7 +120,7 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 - Updated pour behavior so pouring adjusts both `current_volume` and `percent_full`, with automatic `full` to `in_use` transition on first pour.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
 - Added Beer Catalog page and beer CRUD APIs (`/api/beers`).
-- Expanded Beer Catalog records and CSV import/export with freshness, serving, menu/allergen, supplier, cost, identifier, and recipe/source fields.
+- Expanded Beer Catalog records and CSV import/export with freshness, serving, menu/allergen, supplier, identifier, and recipe/source fields.
 - Added keg-to-beer linking so beer details are selected from the catalog, including fill-keg beer selection.
 - Added in-app API Reference page (`/api-reference`) with an API request tester.
 - Added default pour preset setting applied to pour selectors across dashboard and taps pages.

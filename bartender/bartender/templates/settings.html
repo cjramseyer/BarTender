@@ -73,7 +73,7 @@ content %}
                 {% endif %} Pro
               </label>
             </div>
-            <small class="muted">Homebrewer installs default to 1 display and manual pour tracking. Switch to Pro to unlock multiple displays, POS integration, and higher capacity.</small>
+            <small class="muted">Homebrewer installs default to 2 displays and manual pour tracking. Switch to Pro to unlock multiple displays, POS integration, and higher capacity.</small>
           </div>
           <div class="form-group">
             <label>Bar Logo URL (optional)</label>
@@ -270,7 +270,7 @@ content %}
               max="12"
               class="form-control"
               {% if (settings.brewery_type or 'homebrewer') != 'pro' %}disabled{% endif %}
-              value="{{ settings.display_count or 1 }}"
+              value="{{ settings.display_count or 2 }}"
             />
             <small
               id="displayCountProNote"
@@ -283,7 +283,7 @@ content %}
               class="muted"
               {% if (settings.brewery_type or 'homebrewer') == 'pro' %}hidden{% endif %}
             >
-              Homebrewer installs default to 1 display. Switch Bar Profile to Pro to enable multiple displays.
+              Homebrewer installs default to 2 displays. Switch Bar Profile to Pro to enable multiple displays.
             </small>
             <div
               id="displayTapAssignments"
@@ -1314,12 +1314,12 @@ content %}
     if (displayCountInput) {
       if (isPro) {
         const previousProValue = displayCountInput.dataset.previousProValue;
-        if (previousProValue && displayCountInput.value === "1") {
+        if (previousProValue && displayCountInput.value === "2") {
           displayCountInput.value = previousProValue;
         }
       } else {
         displayCountInput.dataset.previousProValue = displayCountInput.value;
-        displayCountInput.value = "1";
+        displayCountInput.value = "2";
       }
       displayCountInput.disabled = !isPro;
     }
@@ -1411,7 +1411,7 @@ content %}
     }
 
     if (payload.brewery_type !== "pro") {
-      payload.display_count = 1;
+      payload.display_count = 2;
       payload.display_tap_assignments = [];
       return payload;
     }
@@ -1585,9 +1585,9 @@ content %}
     }
     const displayCountInput = document.getElementById("displayCount");
     if (displayCountInput && savedSettings.display_count !== undefined) {
-      displayCountInput.value = String(savedSettings.display_count || 1);
+      displayCountInput.value = String(savedSettings.display_count || 2);
       displayCountInput.dataset.previousProValue = String(
-        savedSettings.display_count || 1,
+        savedSettings.display_count || 2,
       );
     }
     currentDisplayTapAssignments = normalizeDisplayTapAssignments(
