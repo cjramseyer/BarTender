@@ -2685,6 +2685,7 @@ def api_save_settings():
                 "restricted_fields": restricted_keys_found,
             }), 403
 
+    previous_settings = json.loads(json.dumps(data["settings"]))
     allowed = {
         "measurement",
         "theme",
@@ -2746,13 +2747,19 @@ def api_save_settings():
     if data["settings"]["owner_pin"]:
         session.pop("owner_pin_recovery_required", None)
 
-    _record_team_audit(
-        data,
-        current_user,
-        "settings_updated",
-        "settings",
-        {"bar_name": data["settings"].get("bar_name", "")},
+    changed_fields = sorted(
+        key
+        for key, value in data["settings"].items()
+        if previous_settings.get(key) != value
     )
+    if changed_fields:
+        _record_team_audit(
+            data,
+            current_user,
+            "settings_updated",
+            "settings",
+            {"changed_fields": changed_fields},
+        )
     save_data(data)
     return jsonify(data["settings"])
 
