@@ -706,7 +706,10 @@ def _send_anonymous_telemetry_heartbeat() -> None:
     request_payload = Request(
         TELEMETRY_HEARTBEAT_URL,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": f"BarTender/{APP_VERSION}",
+        },
         method="POST",
     )
     try:
@@ -758,7 +761,7 @@ def _normalize_display_count(value, brewery_type: str | None = None) -> int:
     count = _coerce_int(value, 1)
     if count is None:
         return 1
-    if normalized_type != "commercial":
+    if normalized_type != "pro":
         return 1
     return max(1, min(12, count))
 
@@ -781,7 +784,7 @@ def _normalize_display_tap_assignments(value, display_count: int = 1) -> list[li
 def _normalize_pour_mode(value, brewery_type: str | None = None) -> str:
     mode = str(value or "manual").strip().lower()
     normalized_type = _normalize_brewery_type(brewery_type)
-    if mode == "pos" and normalized_type != "commercial":
+    if mode == "pos" and normalized_type != "pro":
         return "manual"
     if mode in ("manual", "pos", "inline_device"):
         return mode
@@ -1772,7 +1775,9 @@ def _normalize_default_pour_preset(raw_default, pour_options: list[dict]) -> str
 
 def _normalize_brewery_type(value) -> str:
     normalized = str(value or "homebrewer").strip().lower()
-    if normalized in ("homebrewer", "commercial"):
+    if normalized == "commercial":
+        return "pro"
+    if normalized in ("homebrewer", "pro"):
         return normalized
     return "homebrewer"
 
@@ -1804,7 +1809,7 @@ def _normalize_pos_system(value, brewery_type: str | None = None, pour_mode: str
     normalized_mode = str(pour_mode or "manual").strip().lower()
     valid_choices = {str(choice).strip().lower() for choice in COMMON_POS_SYSTEMS}
     candidate = str(value or "").strip()
-    if normalized_type != "commercial" or normalized_mode != "pos":
+    if normalized_type != "pro" or normalized_mode != "pos":
         return ""
     if not candidate:
         return ""
@@ -2578,7 +2583,7 @@ def display_view():
     selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
 
     taps = data["taps"]
-    if data.get("settings", {}).get("brewery_type") == "commercial" and display_count > 1:
+    if data.get("settings", {}).get("brewery_type") == "pro" and display_count > 1:
         if selected_taps:
             taps = [tap for tap in data["taps"] if _coerce_int(tap.get("number"), None) in selected_taps]
         else:

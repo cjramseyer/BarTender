@@ -3,6 +3,7 @@ import sys
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -201,6 +202,7 @@ def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path, caplog)
     assert "Anonymous telemetry heartbeat sent." in caplog.messages
     assert "Anonymous telemetry heartbeat skipped: already sent today." in caplog.messages
     request_payload = urlopen_mock.call_args.args[0]
+    assert request_payload.get_header("User-agent") == f"BarTender/{app_module.APP_VERSION}"
     assert json.loads(request_payload.data) == {
         "installation_id": app_module.load_data()["settings"]["anonymous_telemetry_installation_id"],
         "app_version": app_module.APP_VERSION,
@@ -219,7 +221,7 @@ def test_anonymous_telemetry_logs_cloudflare_rejection(tmp_path, caplog):
     with patch.object(
         app_module,
         "urlopen",
-        side_effect=HTTPError("https://example.invalid", 503, "Unavailable", {}, None),
+        side_effect=HTTPError("https://example.invalid", 503, "Unavailable", Message(), None),
     ):
         app_module._send_anonymous_telemetry_heartbeat()
 
@@ -308,10 +310,16 @@ def test_brewery_type_defaults_to_homebrewer_and_normalizes_valid_values(tmp_pat
 
     assert data["settings"]["brewery_type"] == "homebrewer"
 
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["brewery_type"] == "pro"
+
+    # Backward compatibility for legacy commercial setting
     data["settings"]["brewery_type"] = "commercial"
     app_module.save_data(data)
     reloaded = app_module.load_data()
-    assert reloaded["settings"]["brewery_type"] == "commercial"
+    assert reloaded["settings"]["brewery_type"] == "pro"
 
     data["settings"]["brewery_type"] = "unsupported"
     app_module.save_data(data)
@@ -338,7 +346,7 @@ def test_on_tap_display_title_defaults_to_on_draft_and_saves(tmp_path):
     assert app_module.load_data()["settings"]["display_title_on_tap"] == "Draft List"
 
 
-def test_commercial_display_count_and_tap_assignments_save(tmp_path):
+def test_pro_display_count_and_tap_assignments_save(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
     owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
@@ -346,7 +354,7 @@ def test_commercial_display_count_and_tap_assignments_save(tmp_path):
     response = client.post(
         "/api/settings",
         json={
-            "brewery_type": "commercial",
+            "brewery_type": "pro",
             "display_count": 2,
             "display_tap_assignments": [[1, 2], [3, 4]],
         },
@@ -371,22 +379,22 @@ def test_pos_pour_mode_is_forbidden_for_homebrewer_settings(tmp_path):
     assert reloaded["settings"]["brewery_type"] == "homebrewer"
     assert reloaded["settings"]["pour_mode"] == "manual"
 
-    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["brewery_type"] = "pro"
     data["settings"]["pour_mode"] = "pos"
     app_module.save_data(data)
     assert app_module.load_data()["settings"]["pour_mode"] == "pos"
 
 
-def test_pos_system_is_available_only_for_commercial_pos_mode(tmp_path):
+def test_pos_system_is_available_only_for_pro_pos_mode(tmp_path):
     app_module = _load_app_module(tmp_path)
 
     data = app_module.load_data()
-    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["brewery_type"] = "pro"
     data["settings"]["pour_mode"] = "pos"
     data["settings"]["pos_system"] = "toast"
     app_module.save_data(data)
     reloaded = app_module.load_data()
-    assert reloaded["settings"]["brewery_type"] == "commercial"
+    assert reloaded["settings"]["brewery_type"] == "pro"
     assert reloaded["settings"]["pour_mode"] == "pos"
     assert reloaded["settings"]["pos_system"] == "Toast"
 

@@ -56,7 +56,7 @@ content %}
             />
           </div>
           <div class="form-group">
-            <label>Business Type</label>
+            <label>Bar Profile</label>
             <div class="radio-group">
               <label class="radio-label">
                 {% if (settings.brewery_type or 'homebrewer') == 'homebrewer' %}
@@ -66,14 +66,14 @@ content %}
                 {% endif %} Homebrewer
               </label>
               <label class="radio-label">
-                {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
-                <input type="radio" name="brewery_type" value="commercial" checked />
+                {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+                <input type="radio" name="brewery_type" value="pro" checked />
                 {% else %}
-                <input type="radio" name="brewery_type" value="commercial" />
-                {% endif %} Commercial
+                <input type="radio" name="brewery_type" value="pro" />
+                {% endif %} Pro
               </label>
             </div>
-            <small class="muted">Homebrewer is the default selection.</small>
+            <small class="muted">Homebrewer installs default to 1 display and manual pour tracking. Switch to Pro to unlock multiple displays, POS integration, and higher capacity.</small>
           </div>
           <div class="form-group">
             <label>Bar Logo URL (optional)</label>
@@ -117,19 +117,6 @@ content %}
             <label>Environment Mode</label>
             <div class="radio-group">
               <label class="radio-label">
-                {% if (settings.environment_mode or 'production') == 'sandbox'
-                %}
-                <input
-                  type="radio"
-                  name="environment_mode"
-                  value="sandbox"
-                  checked
-                />
-                {% else %}
-                <input type="radio" name="environment_mode" value="sandbox" />
-                {% endif %} Sandbox
-              </label>
-              <label class="radio-label">
                 {% if (settings.environment_mode or 'production') ==
                 'production' %}
                 <input
@@ -145,6 +132,19 @@ content %}
                   value="production"
                 />
                 {% endif %} Production
+              </label>
+              <label class="radio-label">
+                {% if (settings.environment_mode or 'production') == 'sandbox'
+                %}
+                <input
+                  type="radio"
+                  name="environment_mode"
+                  value="sandbox"
+                  checked
+                />
+                {% else %}
+                <input type="radio" name="environment_mode" value="sandbox" />
+                {% endif %} Sandbox
               </label>
             </div>
             <small class="muted"
@@ -261,7 +261,7 @@ content %}
             />
             <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
           </div>
-          <div class="form-group" id="commercialDisplaySettings">
+          <div class="form-group" id="proDisplaySettings">
             <label for="displayCount">Number of Displays</label>
             <input
               id="displayCount"
@@ -269,27 +269,27 @@ content %}
               min="1"
               max="12"
               class="form-control"
-              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}disabled{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}disabled{% endif %}
               value="{{ settings.display_count or 1 }}"
             />
             <small
-              id="displayCountCommercialNote"
+              id="displayCountProNote"
               class="muted"
-              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}hidden{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}hidden{% endif %}
               >Choose how many display boards this installation should serve.</small
             >
             <small
               id="displayCountHomebrewerNote"
               class="muted"
-              {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}hidden{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') == 'pro' %}hidden{% endif %}
             >
-              Homebrewer installs default to 1 display. Switch Business Type to Commercial to enable multiple displays.
+              Homebrewer installs default to 1 display. Switch Bar Profile to Pro to enable multiple displays.
             </small>
             <div
               id="displayTapAssignments"
               class="stack-gap-sm"
               style="margin-top: 0.75rem;"
-              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}hidden{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}hidden{% endif %}
             ></div>
           </div>
           <div class="form-group">
@@ -433,7 +433,7 @@ content %}
               <option value="manual" selected>Manual</option>
               {% else %}
               <option value="manual">Manual</option>
-              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
                 {% if (settings.pour_mode or 'manual') == 'pos' %}
                 <option value="pos" selected>POS (API)</option>
                 {% else %}
@@ -447,10 +447,10 @@ content %}
               {% endif %}
             </select>
             <small class="muted"
-              >POS mode is only available for Commercial setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
+              >POS mode is only available for Pro setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
             >
           </div>
-          {% if (settings.brewery_type or 'homebrewer') == 'commercial' and (settings.pour_mode or 'manual') == 'pos' %}
+          {% if (settings.brewery_type or 'homebrewer') == 'pro' and (settings.pour_mode or 'manual') == 'pos' %}
           <div class="form-group">
             <label>Common POS System</label>
             <select id="posSystem" class="form-control">
@@ -463,7 +463,7 @@ content %}
                 {% endif %}
               {% endfor %}
             </select>
-            <small class="muted">Choose the common POS provider used by this Commercial setup.</small>
+            <small class="muted">Choose the common POS provider used by this Pro setup.</small>
           </div>
           {% endif %}
           <div class="form-group">
@@ -1305,33 +1305,33 @@ content %}
   }
 
   function syncDisplaySettingsAvailability() {
-    const isCommercial = currentBreweryType() === "commercial";
+    const isPro = currentBreweryType() === "pro";
     const displayCountInput = document.getElementById("displayCount");
     const displayTapAssignments = document.getElementById("displayTapAssignments");
-    const commercialNote = document.getElementById("displayCountCommercialNote");
+    const proNote = document.getElementById("displayCountProNote");
     const homebrewerNote = document.getElementById("displayCountHomebrewerNote");
 
     if (displayCountInput) {
-      if (isCommercial) {
-        const previousCommercialValue = displayCountInput.dataset.previousCommercialValue;
-        if (previousCommercialValue && displayCountInput.value === "1") {
-          displayCountInput.value = previousCommercialValue;
+      if (isPro) {
+        const previousProValue = displayCountInput.dataset.previousProValue;
+        if (previousProValue && displayCountInput.value === "1") {
+          displayCountInput.value = previousProValue;
         }
       } else {
-        displayCountInput.dataset.previousCommercialValue = displayCountInput.value;
+        displayCountInput.dataset.previousProValue = displayCountInput.value;
         displayCountInput.value = "1";
       }
-      displayCountInput.disabled = !isCommercial;
+      displayCountInput.disabled = !isPro;
     }
 
-    if (commercialNote) {
-      commercialNote.hidden = !isCommercial;
+    if (proNote) {
+      proNote.hidden = !isPro;
     }
     if (homebrewerNote) {
-      homebrewerNote.hidden = isCommercial;
+      homebrewerNote.hidden = isPro;
     }
     if (displayTapAssignments) {
-      if (!isCommercial) {
+      if (!isPro) {
         currentDisplayTapAssignments = normalizeDisplayTapAssignments(
           collectSelectedDisplayTapAssignments(),
         );
@@ -1410,7 +1410,7 @@ content %}
       payload.anonymous_telemetry_enabled = anonymousTelemetryEnabledInput.checked;
     }
 
-    if (payload.brewery_type !== "commercial") {
+    if (payload.brewery_type !== "pro") {
       payload.display_count = 1;
       payload.display_tap_assignments = [];
       return payload;
@@ -1501,7 +1501,7 @@ content %}
       5000,
     );
 
-    if (payload.brewery_type !== "commercial") {
+    if (payload.brewery_type !== "pro") {
       payload.pour_mode = "manual";
       payload.pos_system = "";
     } else if (payload.pour_mode !== "pos") {
@@ -1586,7 +1586,7 @@ content %}
     const displayCountInput = document.getElementById("displayCount");
     if (displayCountInput && savedSettings.display_count !== undefined) {
       displayCountInput.value = String(savedSettings.display_count || 1);
-      displayCountInput.dataset.previousCommercialValue = String(
+      displayCountInput.dataset.previousProValue = String(
         savedSettings.display_count || 1,
       );
     }
