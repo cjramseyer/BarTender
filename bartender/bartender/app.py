@@ -2784,9 +2784,10 @@ def display_view():
     menu_qr_mode = _normalize_menu_qr_mode(data.get("settings", {}).get("menu_qr_mode"))
     qr_ready = _qr_is_available()
 
+    brewery_type = _normalize_brewery_type(data.get("settings", {}).get("brewery_type"))
     display_count = _normalize_display_count(
         data.get("settings", {}).get("display_count"),
-        data.get("settings", {}).get("brewery_type"),
+        brewery_type,
     )
     selected_display_index = max(1, min(display_count, _coerce_int(request.args.get("display"), 1) or 1))
     assignments = _normalize_display_tap_assignments(
@@ -2796,7 +2797,21 @@ def display_view():
     selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
 
     taps = data["taps"]
-    if data.get("settings", {}).get("brewery_type") == "pro" and display_count > 1:
+    on_deck_kegs = _build_on_deck_kegs(data)
+    show_taps = True
+    show_on_deck = True
+    show_bar_stock = _coerce_bool(data.get("settings", {}).get("bar_stock_enabled"), True)
+
+    if brewery_type == "homebrewer" and display_count > 1:
+        if selected_display_index == 1:
+            show_taps = True
+            show_on_deck = True
+            show_bar_stock = False
+        elif selected_display_index == 2:
+            show_taps = False
+            show_on_deck = False
+            show_bar_stock = True
+    elif brewery_type == "pro" and display_count > 1:
         if selected_taps:
             taps = [tap for tap in data["taps"] if _coerce_int(tap.get("number"), None) in selected_taps]
         else:
@@ -2808,11 +2823,14 @@ def display_view():
         taps=taps,
         kegs=data["kegs"],
         bar_stock=data["bar_stock"],
-        on_deck_kegs=_build_on_deck_kegs(data),
+        on_deck_kegs=on_deck_kegs,
         qr_image_path=qr_image_path,
         menu_qr_mode=menu_qr_mode,
         qr_ready=qr_ready,
         selected_display_index=selected_display_index,
+        show_taps=show_taps,
+        show_on_deck=show_on_deck,
+        show_bar_stock=show_bar_stock,
     )
 
 

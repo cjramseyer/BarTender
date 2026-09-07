@@ -852,3 +852,40 @@ def test_read_addon_version_from_env_and_supervisor(tmp_path, monkeypatch):
         assert app_module._read_addon_version() == "3.4.5"
         req = mock_url.call_args[0][0]
         assert req.get_header("X-supervisor-token") == "fake-token"
+
+
+def test_homebrewer_default_displays_split_taps_and_bar_stock(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "homebrewer"
+    data["settings"]["display_count"] = 2
+    data["settings"]["bar_stock_enabled"] = True
+    data["taps"] = [{"id": 1, "number": 1, "label": "Main Tap", "keg_id": 1}]
+    data["kegs"] = [{"id": 1, "name": "House IPA Keg", "status": "in_use", "percent_full": 80}]
+    data["bar_stock"] = [{"id": 1, "name": "Bourbon", "category": "Spirits", "quantity": 3, "unit": "bottles"}]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    # Display 1: Shows Taps, Does NOT show Bar Stock
+    res1 = client.get("/display?display=1")
+    assert res1.status_code == 200
+    html1 = res1.get_data(as_text=True)
+    assert "House IPA Keg" in html1
+    assert "Tap #1" in html1
+    assert "Bourbon" not in html1
+    assert "📦 Bar Stock" not in html1
+
+    # Display 2: Shows Bar Stock, Does NOT show Taps
+    res2 = client.get("/display?display=2")
+    assert res2.status_code == 200
+    html2 = res2.get_data(as_text=True)
+    assert "📦 Bar Stock" in html2
+    assert "Bourbon" in html2
+    assert "House IPA Keg" not in html2
+    assert "Tap #1" not in html2
