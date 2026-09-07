@@ -31,6 +31,7 @@ Primary runtime components:
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Analytics reset support for clearing historical pour data used in dashboard and forecasting calculations.
+- Owner-only, disabled-by-default anonymous usage-statistics opt-in for active-installation estimates.
 - Read-only display page.
 - In-app API reference and API tester page.
 - Runtime QR generation endpoint for printable menu.
@@ -255,16 +256,30 @@ POST /api/beers
 
 - Creates a beer catalog entry.
 - Required field: name.
+- New catalog fields are optional, so existing beer records remain compatible.
 - Request example:
 
 ```json
 {
   "name": "House IPA",
   "type": "IPA",
+  "style_guideline": "BJCP 21C",
   "brewer": "Local Brewing",
   "abv": "6.2",
   "ibu": "45",
   "brewed_on": "2026-08-15",
+  "packaged_on": "2026-08-29",
+  "best_by_date": "2026-11-29",
+  "availability_status": "seasonal",
+  "description": "Citrus-forward hazy IPA.",
+  "allergens": ["Wheat"],
+  "color_srm": "6",
+  "serving_temperature": "38-42 F",
+  "glassware": "Pint",
+  "supplier": "Local Supply",
+  "purchase_cost": "125.50",
+  "sku": "IPA-001",
+  "recipe_url": "https://example.com/recipes/house-ipa",
   "notes": "Seasonal batch"
 }
 ```
@@ -273,6 +288,8 @@ PUT /api/beers/<id>
 
 - Updates provided beer fields.
 - Behavior: linked kegs are refreshed with the updated beer details.
+
+Beer catalog CSV import and export use the canonical column order documented in `bartender/README.md`. The `allergens` CSV column accepts a comma-separated value and is stored as a list.
 
 DELETE /api/beers/<id>
 
@@ -481,6 +498,7 @@ GET /api/export/archive
 GET /api/beers/export/csv
 
 - Downloads beer catalog CSV as beers_YYYY-MM-DD.csv.
+- Includes all beer catalog fields using the canonical CSV header order.
 
 ### Printable Menu and QR
 
@@ -572,16 +590,51 @@ settings fields:
 - menu_qr_mode: string (off, display, print, both)
 - pour_options: array of preset objects (name, amount, unit)
 - default_pour_preset: string encoded as amount|unit|name
+- anonymous_telemetry_enabled: boolean (owner-only; default false)
+- anonymous_telemetry_installation_id: locally generated UUID, created only after opt-in
+- anonymous_telemetry_last_heartbeat_date: UTC date of the last successful heartbeat
+
+### Anonymous Usage Statistics
+
+Owners can enable **Settings -> Privacy -> Share Anonymous Usage Statistics**. When enabled, the management server sends at most one HTTPS heartbeat per UTC day. The payload contains only:
+
+```json
+{
+  "installation_id": "locally-generated-uuid",
+  "app_version": "version",
+  "addon_version": "version"
+}
+```
+
+The feature is disabled by default. Its payload does not include a bar name, Home Assistant or device identifier, user data, inventory, audit events, credentials, or logs. As with any HTTPS request, the receiving service can process the request's source IP address at the network layer; BarTender does not include it in the telemetry payload or store it locally.
 
 beer catalog fields:
 
 - id: integer
 - name: string
 - type: string
+- style_guideline: string
+- packaging: string (`kegged` or `bottled_can`)
 - brewer: string
+- brewery: string
 - abv: string
 - ibu: string
 - brewed_on: date string (YYYY-MM-DD)
+- packaged_on: date string (YYYY-MM-DD)
+- best_by_date: date string (YYYY-MM-DD)
+- availability_status: string (`available`, `seasonal`, `coming_soon`, or `retired`)
+- description: string for customer-facing menu copy
+- allergens: array of strings
+- color_srm: numeric string
+- color_ebc: numeric string
+- serving_temperature: string
+- glassware: string
+- supplier: string
+- distributor: string
+- purchase_cost: numeric string
+- sku: string
+- upc: string
+- recipe_url: string
 - notes: string
 - updated_at: ISO datetime string (UTC)
 

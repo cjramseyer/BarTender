@@ -1,7 +1,9 @@
 import os
 import sys
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -161,6 +163,45 @@ def test_unchanged_settings_do_not_create_an_audit_event(tmp_path):
 
     assert response.status_code == 200
     assert app_module.load_data()["team_audit"] == []
+
+
+def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+    manager_headers = {"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"}
+
+    assert client.post(
+        "/api/settings",
+        json={"anonymous_telemetry_enabled": True},
+        headers=manager_headers,
+    ).status_code == 403
+
+    data = app_module.load_data()
+    data["settings"]["anonymous_telemetry_enabled"] = True
+    app_module.save_data(data)
+
+    class Response:
+        status = 202
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    with patch.object(app_module, "urlopen", return_value=Response()) as urlopen_mock:
+        app_module._send_anonymous_telemetry_heartbeat()
+        app_module._send_anonymous_telemetry_heartbeat()
+
+    assert urlopen_mock.call_count == 1
+    request_payload = urlopen_mock.call_args.args[0]
+    assert json.loads(request_payload.data) == {
+        "installation_id": app_module.load_data()["settings"]["anonymous_telemetry_installation_id"],
+        "app_version": app_module.APP_VERSION,
+        "addon_version": app_module.APP_VERSION,
+    }
+    assert app_module.load_data()["settings"]["anonymous_telemetry_last_heartbeat_date"]
 
 
 def test_manager_cannot_change_bar_name_or_api_tokens(tmp_path):

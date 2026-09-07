@@ -84,3 +84,51 @@ def test_beer_csv_preview_validates_rows_before_apply(tmp_path):
     payload = response.get_json()
     assert payload["summary"]["beers"] == 1
     assert payload["errors"]
+
+
+def test_beer_details_round_trip_through_api_and_csv(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    beer_details = {
+        "name": "Hazy IPA",
+        "type": "IPA",
+        "style_guideline": "BJCP 21C",
+        "packaged_on": "2026-09-01",
+        "best_by_date": "2026-12-01",
+        "availability_status": "seasonal",
+        "description": "Citrus-forward hazy.",
+        "allergens": ["Lactose", "Wheat"],
+        "color_srm": "6",
+        "color_ebc": "12",
+        "serving_temperature": "38-42 F",
+        "glassware": "Pint",
+        "supplier": "North Pole Supply",
+        "distributor": "Local Distribution",
+        "purchase_cost": "125.50",
+        "sku": "IPA-001",
+        "upc": "012345678901",
+        "recipe_url": "https://example.com/recipe",
+    }
+
+    create_response = client.post("/api/beers", json=beer_details)
+    assert create_response.status_code == 201
+    created = create_response.get_json()
+    for key, value in beer_details.items():
+        assert created[key] == value
+
+    csv_payload = (
+        ",".join(app_module.BEER_CSV_HEADER)
+        + "\n"
+        + "CSV Lager,Lager,BJCP 1A,kegged,CSV Brewer,CSV Brewery,4.8,18,2026-08-01,2026-08-15,2026-11-15,available,Crisp lager,Barley,3,6,36-40 F,Pilsner,CSV Supply,CSV Distribution,99.95,LGR-001,098765432109,https://example.com/lager,Notes\n"
+    ).encode("utf-8")
+    import_response = client.post(
+        "/api/beers/import/csv",
+        data={"file": (io.BytesIO(csv_payload), "beers.csv")},
+        content_type="multipart/form-data",
+    )
+    assert import_response.status_code == 200
+
+    imported = next(beer for beer in app_module.load_data()["beers"] if beer["name"] == "CSV Lager")
+    assert imported["allergens"] == ["Barley"]
+    assert imported["purchase_cost"] == "99.95"
+    assert imported["recipe_url"] == "https://example.com/lager"

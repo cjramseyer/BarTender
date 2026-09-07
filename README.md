@@ -27,7 +27,7 @@ Sample dashboard with seeded data:
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
-- **Beer Catalog** — Manage reusable beer records (name, type, brewer, ABV/IBU, brewed date, notes)
+- **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, cost, and recipe/source details
 - **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line, with single-tap keg assignment protection
 - **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode in Pour Presets, keg type choices/default, pour defaults, and printable menu QR mode in General
@@ -36,6 +36,7 @@ Sample dashboard with seeded data:
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, low-volume alerts, and a reset option for clearing historical pour data from settings
+- **Anonymous Usage Statistics** — Owner-only, disabled-by-default opt-in that sends a daily anonymous installation ID and app/add-on versions to estimate active installations
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive with date-stamped filenames, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
@@ -74,11 +75,13 @@ Sample dashboard with seeded data:
 - Updated pour behavior so each pour also updates `percent_full`, and first pour transitions keg status from `full` to `in_use`.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
 - Added Beer Catalog management and linked kegs to selected beers (`beer_id`, `beer_name`) instead of direct beer-detail editing in keg forms.
+- Expanded Beer Catalog records with freshness, serving, menu/allergen, supplier, cost, identifier, and recipe/source fields, including CSV import/export support.
 - Added fill-keg flow that requires selecting a beer from the catalog when marking a keg full.
 - Added in-app API Reference page (`/api-reference`) and interactive API tester, with nav visibility controlled from Settings.
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
 - Added Team Access enhancements: a dedicated Team Access page, owner profile name management, per-user PIN, PIN reset, and disable/enable controls, with staff blocked from the management screen.
 - Added a role-aware Audit Log window with owner-only retention/clear controls, owner/manager export, and events for Analytics pours and inventory changes to bar stock, kegs, and taps.
+- Added an owner-only anonymous usage-statistics opt-in for daily active-installation estimates without collecting bar, inventory, user, device, or network data in its telemetry payload.
 - Added an analytics reset action in Settings for clearing historical pour data used in dashboard and forecasting calculations.
 - Added duplicate keg assignment protection for taps (already-connected kegs are shown as in-use and blocked for other taps).
 - Added bar stock category/size quality-of-life updates (expanded defaults and promoted popular custom sizes).
