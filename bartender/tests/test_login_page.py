@@ -315,6 +315,8 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     body = response.get_data(as_text=True)
     assert "Number of Displays" in body
     assert "Homebrewer installs default to 1 display." in body
+    assert "Basic settings save automatically." in body
+    assert "Save Advanced Settings" in body
     assert 'id="displayCount"' in body
     assert 'disabled' in body
     assert 'value="1"' in body

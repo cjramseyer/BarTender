@@ -272,14 +272,25 @@ content %}
               {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}disabled{% endif %}
               value="{{ settings.display_count or 1 }}"
             />
-            {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
-            <small class="muted">Choose how many display boards this installation should serve.</small>
-            <div id="displayTapAssignments" class="stack-gap-sm" style="margin-top: 0.75rem;"></div>
-            {% else %}
-            <small class="muted">
+            <small
+              id="displayCountCommercialNote"
+              class="muted"
+              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}hidden{% endif %}
+              >Choose how many display boards this installation should serve.</small
+            >
+            <small
+              id="displayCountHomebrewerNote"
+              class="muted"
+              {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}hidden{% endif %}
+            >
               Homebrewer installs default to 1 display. Switch Business Type to Commercial to enable multiple displays.
             </small>
-            {% endif %}
+            <div
+              id="displayTapAssignments"
+              class="stack-gap-sm"
+              style="margin-top: 0.75rem;"
+              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}hidden{% endif %}
+            ></div>
           </div>
           <div class="form-group">
             <label>Dashboard Manage Button Position</label>
@@ -872,7 +883,7 @@ content %}
       </details>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <button type="submit" class="btn btn-primary">Save Advanced Settings</button>
         <button
           type="button"
           class="btn btn-danger"
@@ -883,6 +894,9 @@ content %}
         <span id="saveMsg" class="save-msg"></span>
       </div>
       <p class="muted" style="margin-top: 0.65rem">
+        Basic settings save automatically. Use Save Advanced Settings for POS sync, API tokens, allowlists, and custom keg or pour configuration.
+      </p>
+      <p class="muted" style="margin-top: 0.35rem">
         This resets settings only. Beers, kegs, taps, team users, and audit
         history are kept. The app will return to first-time setup defaults.
       </p>
@@ -1134,6 +1148,87 @@ content %}
   const INITIAL_POS_PROVIDER_CATALOG = JSON.parse(
     `{{ (pos_sync_provider_catalog or []) | tojson }}`,
   );
+  const INITIAL_DISPLAY_TAP_ASSIGNMENTS = JSON.parse(
+    `{{ (settings.display_tap_assignments or []) | tojson }}`,
+  );
+
+  let currentDisplayTapAssignments = normalizeDisplayTapAssignments(
+    INITIAL_DISPLAY_TAP_ASSIGNMENTS,
+  );
+  let saveMsgTimeoutId = null;
+  let autoSaveTimeoutId = null;
+  let autoSaveInFlight = false;
+  let autoSaveQueued = false;
+
+  function normalizeDisplayTapAssignments(assignments = []) {
+    if (!Array.isArray(assignments)) {
+      return [];
+    }
+
+    return assignments.map((assignment) => {
+      if (!Array.isArray(assignment)) {
+        return [];
+      }
+
+      return assignment
+        .map((value) => Number.parseInt(value, 10))
+        .filter((value) => Number.isFinite(value) && value > 0);
+    });
+  }
+
+  function getCheckedRadioValue(name, fallback = "") {
+    const selected = document.querySelector(`input[name="${name}"]:checked`);
+    return selected ? selected.value : fallback;
+  }
+
+  function getClampedIntegerValue(inputId, fallback, minValue, maxValue) {
+    const input = document.getElementById(inputId);
+    if (!input) {
+      return fallback;
+    }
+
+    const parsed = Number.parseInt(input.value, 10);
+    const normalized = Math.max(
+      minValue,
+      Math.min(maxValue, Number.isFinite(parsed) ? parsed : fallback),
+    );
+    input.value = String(normalized);
+    return normalized;
+  }
+
+  function setSaveMessage(message, { persist = false } = {}) {
+    const saveMsg = document.getElementById("saveMsg");
+    if (!saveMsg) {
+      return;
+    }
+
+    if (saveMsgTimeoutId) {
+      window.clearTimeout(saveMsgTimeoutId);
+      saveMsgTimeoutId = null;
+    }
+
+    saveMsg.textContent = message;
+    if (message && !persist) {
+      saveMsgTimeoutId = window.setTimeout(() => {
+        if (saveMsg.textContent === message) {
+          saveMsg.textContent = "";
+        }
+      }, 2000);
+    }
+  }
+
+  function collectSelectedDisplayTapAssignments() {
+    const selects = document.querySelectorAll(".display-tap-assignment-select");
+    return Array.from(selects).map((select) =>
+      Array.from(select.selectedOptions)
+        .map((option) => Number.parseInt(option.value, 10))
+        .filter((value) => Number.isFinite(value) && value > 0),
+    );
+  }
+
+  function currentBreweryType() {
+    return getCheckedRadioValue("brewery_type", "homebrewer");
+  }
 
   function renderDisplayTapAssignments() {
     const container = document.getElementById("displayTapAssignments");
@@ -1142,13 +1237,9 @@ content %}
 
     const displayCount = Math.max(1, Math.min(12, Number.parseInt(displayCountInput.value, 10) || 1));
     displayCountInput.value = String(displayCount);
-
-    const existingAssignments = JSON.parse(
-      `{{ (settings.display_tap_assignments or []) | tojson }}`,
-    );
-    const normalizedAssignments = Array.isArray(existingAssignments)
-      ? existingAssignments
-      : [];
+    const normalizedAssignments = collectSelectedDisplayTapAssignments().length
+      ? normalizeDisplayTapAssignments(collectSelectedDisplayTapAssignments())
+      : currentDisplayTapAssignments;
     const tapList = Array.isArray(TAPS) ? TAPS : [];
     const tapNumbers = tapList
       .map((tap) => Number.parseInt(tap.number, 10))
@@ -1177,6 +1268,398 @@ content %}
         `;
       })
       .join("");
+
+    container.querySelectorAll(".display-tap-assignment-select").forEach((select) => {
+      select.addEventListener("change", () => {
+        currentDisplayTapAssignments = normalizeDisplayTapAssignments(
+          collectSelectedDisplayTapAssignments(),
+        );
+        scheduleAutoSave(100);
+      });
+    });
+  }
+
+  function syncDisplaySettingsAvailability() {
+    const isCommercial = currentBreweryType() === "commercial";
+    const displayCountInput = document.getElementById("displayCount");
+    const displayTapAssignments = document.getElementById("displayTapAssignments");
+    const commercialNote = document.getElementById("displayCountCommercialNote");
+    const homebrewerNote = document.getElementById("displayCountHomebrewerNote");
+
+    if (displayCountInput) {
+      if (isCommercial) {
+        const previousCommercialValue = displayCountInput.dataset.previousCommercialValue;
+        if (previousCommercialValue && displayCountInput.value === "1") {
+          displayCountInput.value = previousCommercialValue;
+        }
+      } else {
+        displayCountInput.dataset.previousCommercialValue = displayCountInput.value;
+        displayCountInput.value = "1";
+      }
+      displayCountInput.disabled = !isCommercial;
+    }
+
+    if (commercialNote) {
+      commercialNote.hidden = !isCommercial;
+    }
+    if (homebrewerNote) {
+      homebrewerNote.hidden = isCommercial;
+    }
+    if (displayTapAssignments) {
+      if (!isCommercial) {
+        currentDisplayTapAssignments = normalizeDisplayTapAssignments(
+          collectSelectedDisplayTapAssignments(),
+        );
+        displayTapAssignments.hidden = true;
+        displayTapAssignments.innerHTML = "";
+      } else {
+        displayTapAssignments.hidden = false;
+        renderDisplayTapAssignments();
+      }
+    }
+  }
+
+  function buildAutoSaveSettingsPayload() {
+    const payload = {
+      bar_name: document.getElementById("barName")
+        ? document.getElementById("barName").value.trim()
+        : "",
+      brewery_type: currentBreweryType(),
+      bar_logo_url: document.getElementById("barLogoUrl")
+        ? document.getElementById("barLogoUrl").value.trim()
+        : "",
+      external_base_url: document.getElementById("externalBaseUrl")
+        ? document.getElementById("externalBaseUrl").value.trim()
+        : "",
+      measurement: getCheckedRadioValue("measurement", "us"),
+      theme: getCheckedRadioValue("theme", "light"),
+      dashboard_manage_button_position: getCheckedRadioValue(
+        "dashboard_manage_button_position",
+        "top-right",
+      ),
+      bar_stock_enabled: document.getElementById("barStockEnabled")
+        ? document.getElementById("barStockEnabled").checked
+        : true,
+      analytics_enabled: document.getElementById("analyticsEnabled")
+        ? document.getElementById("analyticsEnabled").checked
+        : true,
+      api_reference_enabled: document.getElementById("apiReferenceEnabled")
+        ? document.getElementById("apiReferenceEnabled").checked
+        : true,
+      environment_mode: getCheckedRadioValue(
+        "environment_mode",
+        DEFAULT_ENVIRONMENT_MODE,
+      ),
+      display_title_on_tap: document.getElementById("displayTitleOnTap")
+        ? document.getElementById("displayTitleOnTap").value.trim() || "On Draft"
+        : "On Draft",
+      analytics_low_keg_threshold_percent: getClampedIntegerValue(
+        "analyticsLowThreshold",
+        25,
+        1,
+        100,
+      ),
+      analytics_days_left_method: document.getElementById("analyticsDaysMethod")
+        ? document.getElementById("analyticsDaysMethod").value
+        : "trailing_window",
+      analytics_days_left_window_days: getClampedIntegerValue(
+        "analyticsDaysWindow",
+        14,
+        3,
+        90,
+      ),
+      audit_retention_days: getClampedIntegerValue(
+        "auditRetentionDays",
+        30,
+        1,
+        180,
+      ),
+    };
+
+    const menuQrModeInput = document.getElementById("menuQrMode");
+    if (menuQrModeInput) {
+      payload.menu_qr_mode = menuQrModeInput.value;
+    }
+
+    if (payload.brewery_type !== "commercial") {
+      payload.display_count = 1;
+      payload.display_tap_assignments = [];
+      return payload;
+    }
+
+    payload.display_count = getClampedIntegerValue("displayCount", 1, 1, 12);
+    payload.display_tap_assignments = normalizeDisplayTapAssignments(
+      collectSelectedDisplayTapAssignments().length
+        ? collectSelectedDisplayTapAssignments()
+        : currentDisplayTapAssignments,
+    );
+    return payload;
+  }
+
+  function buildManualSettingsPayload() {
+    const payload = buildAutoSaveSettingsPayload();
+    payload.default_keg_type = document.getElementById("defaultKegType")
+      ? document.getElementById("defaultKegType").value
+      : "";
+    payload.keg_type_choices = collectKegTypeChoices();
+    payload.pour_options = collectPourOptions();
+    payload.default_pour_preset = document.getElementById("defaultPourPreset")
+      ? document.getElementById("defaultPourPreset").value
+      : "";
+    payload.pour_mode = document.getElementById("pourMode")
+      ? document.getElementById("pourMode").value
+      : DEFAULT_POUR_MODE;
+    payload.pos_system = document.getElementById("posSystem")
+      ? document.getElementById("posSystem").value
+      : "";
+    payload.pos_sync_enabled = document.getElementById("posSyncEnabled")
+      ? document.getElementById("posSyncEnabled").checked
+      : false;
+    payload.pos_sync_provider = document.getElementById("posSyncProvider")
+      ? document.getElementById("posSyncProvider").value
+      : "";
+    payload.pos_sync_credentials = {
+      api_key: document.getElementById("posSyncApiKey")
+        ? document.getElementById("posSyncApiKey").value
+        : "",
+      location_id: document.getElementById("posSyncLocationId")
+        ? document.getElementById("posSyncLocationId").value
+        : "",
+      merchant_id: document.getElementById("posSyncMerchantId")
+        ? document.getElementById("posSyncMerchantId").value
+        : "",
+    };
+    payload.pos_sync_provider_config_json = document.getElementById(
+      "posSyncProviderConfigJson",
+    )
+      ? document.getElementById("posSyncProviderConfigJson").value
+      : "";
+    payload.external_api_token_auth_enabled = document.getElementById(
+      "externalApiTokenAuthEnabled",
+    )
+      ? document.getElementById("externalApiTokenAuthEnabled").checked
+      : true;
+    payload.external_api_token = document.getElementById("externalApiToken")
+      ? document.getElementById("externalApiToken").value
+      : "";
+    payload.external_api_read_token = document.getElementById(
+      "externalApiReadToken",
+    )
+      ? document.getElementById("externalApiReadToken").value
+      : "";
+    payload.external_api_write_token = document.getElementById(
+      "externalApiWriteToken",
+    )
+      ? document.getElementById("externalApiWriteToken").value
+      : "";
+    payload.external_api_allowlist_enabled = document.getElementById(
+      "externalApiAllowlistEnabled",
+    )
+      ? document.getElementById("externalApiAllowlistEnabled").checked
+      : false;
+    payload.external_api_allowlist = document.getElementById("externalApiAllowlist")
+      ? document.getElementById("externalApiAllowlist").value
+      : "";
+    payload.external_api_rate_limit_enabled = document.getElementById(
+      "externalApiRateLimitEnabled",
+    )
+      ? document.getElementById("externalApiRateLimitEnabled").checked
+      : false;
+    payload.external_api_rate_limit_per_minute = getClampedIntegerValue(
+      "externalApiRateLimitPerMinute",
+      120,
+      1,
+      5000,
+    );
+
+    if (payload.brewery_type !== "commercial") {
+      payload.pour_mode = "manual";
+      payload.pos_system = "";
+    } else if (payload.pour_mode !== "pos") {
+      payload.pos_system = "";
+    }
+
+    return payload;
+  }
+
+  async function postSettingsPayload(body) {
+    const res = await fetch(`${INGRESS}/api/settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const saveBody = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(saveBody.error || `Save failed: ${res.status}`);
+    }
+    return saveBody;
+  }
+
+  function applySavedSettings(savedSettings, requestBody = {}) {
+    const savedTheme = savedSettings.theme || requestBody.theme || "light";
+    const savedManagePosition =
+      savedSettings.dashboard_manage_button_position ||
+      requestBody.dashboard_manage_button_position ||
+      "top-right";
+
+    document.documentElement.dataset.theme = savedTheme;
+    document.documentElement.dataset.managePos = savedManagePosition;
+    document.body.dataset.managePos = savedManagePosition;
+
+    const externalBaseUrlInput = document.getElementById("externalBaseUrl");
+    if (externalBaseUrlInput && typeof savedSettings.external_base_url === "string") {
+      externalBaseUrlInput.value = savedSettings.external_base_url;
+    }
+    const barNameInput = document.getElementById("barName");
+    if (barNameInput && typeof savedSettings.bar_name === "string") {
+      barNameInput.value = savedSettings.bar_name;
+    }
+    const barLogoUrlInput = document.getElementById("barLogoUrl");
+    if (barLogoUrlInput && typeof savedSettings.bar_logo_url === "string") {
+      barLogoUrlInput.value = savedSettings.bar_logo_url;
+    }
+    const displayTitleOnTapInput = document.getElementById("displayTitleOnTap");
+    if (
+      displayTitleOnTapInput &&
+      typeof savedSettings.display_title_on_tap === "string"
+    ) {
+      displayTitleOnTapInput.value = savedSettings.display_title_on_tap;
+    }
+    const analyticsLowThresholdInput = document.getElementById("analyticsLowThreshold");
+    if (
+      analyticsLowThresholdInput &&
+      savedSettings.analytics_low_keg_threshold_percent !== undefined
+    ) {
+      analyticsLowThresholdInput.value = String(
+        savedSettings.analytics_low_keg_threshold_percent,
+      );
+    }
+    const analyticsDaysMethodInput = document.getElementById("analyticsDaysMethod");
+    if (
+      analyticsDaysMethodInput &&
+      typeof savedSettings.analytics_days_left_method === "string"
+    ) {
+      analyticsDaysMethodInput.value = savedSettings.analytics_days_left_method;
+    }
+    const analyticsDaysWindowInput = document.getElementById("analyticsDaysWindow");
+    if (
+      analyticsDaysWindowInput &&
+      savedSettings.analytics_days_left_window_days !== undefined
+    ) {
+      analyticsDaysWindowInput.value = String(
+        savedSettings.analytics_days_left_window_days,
+      );
+    }
+    const auditRetentionDaysInput = document.getElementById("auditRetentionDays");
+    if (auditRetentionDaysInput && savedSettings.audit_retention_days !== undefined) {
+      auditRetentionDaysInput.value = String(savedSettings.audit_retention_days);
+    }
+    const displayCountInput = document.getElementById("displayCount");
+    if (displayCountInput && savedSettings.display_count !== undefined) {
+      displayCountInput.value = String(savedSettings.display_count || 1);
+      displayCountInput.dataset.previousCommercialValue = String(
+        savedSettings.display_count || 1,
+      );
+    }
+    currentDisplayTapAssignments = normalizeDisplayTapAssignments(
+      savedSettings.display_tap_assignments || currentDisplayTapAssignments,
+    );
+    syncDisplaySettingsAvailability();
+
+    if (document.getElementById("externalApiToken")) {
+      document.getElementById("externalApiToken").value =
+        savedSettings.external_api_token || "";
+    }
+    if (document.getElementById("externalApiReadToken")) {
+      document.getElementById("externalApiReadToken").value =
+        savedSettings.external_api_read_token || "";
+    }
+    if (document.getElementById("externalApiWriteToken")) {
+      document.getElementById("externalApiWriteToken").value =
+        savedSettings.external_api_write_token || "";
+    }
+    if (document.getElementById("externalApiAllowlist")) {
+      document.getElementById("externalApiAllowlist").value =
+        savedSettings.external_api_allowlist || "";
+    }
+    if (document.getElementById("externalApiRateLimitPerMinute")) {
+      document.getElementById("externalApiRateLimitPerMinute").value =
+        savedSettings.external_api_rate_limit_per_minute || 120;
+    }
+    if (
+      Array.isArray(savedSettings.keg_type_choices) &&
+      document.getElementById("kegTypeChoicesList")
+    ) {
+      replaceKegTypeChoices(
+        savedSettings.keg_type_choices,
+        savedSettings.default_keg_type || "",
+      );
+    }
+    if (Array.isArray(savedSettings.pour_options) && document.getElementById("pourOptionsList")) {
+      const pourOptionsList = document.getElementById("pourOptionsList");
+      pourOptionsList.innerHTML = "";
+      savedSettings.pour_options.forEach((option) => addPourOptionRow(option, { refresh: false }));
+      const defaultPourPresetSelect = document.getElementById("defaultPourPreset");
+      if (defaultPourPresetSelect) {
+        defaultPourPresetSelect.dataset.initialDefault =
+          savedSettings.default_pour_preset || "";
+        defaultPourPresetSelect.dataset.userSelected = "false";
+      }
+      refreshDefaultPourPresetOptions();
+    }
+    renderPosSyncStatus({
+      last_status: savedSettings.pos_sync_last_status || "never",
+      last_run_at: savedSettings.pos_sync_last_run_at || "",
+      last_error: savedSettings.pos_sync_last_error || "",
+      last_counts: savedSettings.pos_sync_last_counts || {},
+    });
+    updateExternalReadonlyLinks(savedSettings.external_base_url || "");
+    localStorage.setItem("bartender_theme", savedTheme);
+  }
+
+  async function submitSettingsPayload(
+    body,
+    { pendingMessage = "Saving...", successMessage = "✓ Saved!" } = {},
+  ) {
+    setSaveMessage(pendingMessage, { persist: true });
+    const savedSettings = await postSettingsPayload(body);
+    applySavedSettings(savedSettings, body);
+    setSaveMessage(successMessage);
+    return savedSettings;
+  }
+
+  function scheduleAutoSave(delay = 700) {
+    if (autoSaveTimeoutId) {
+      window.clearTimeout(autoSaveTimeoutId);
+    }
+    autoSaveTimeoutId = window.setTimeout(() => {
+      autoSaveTimeoutId = null;
+      void saveAutoSettings();
+    }, delay);
+  }
+
+  async function saveAutoSettings() {
+    if (autoSaveInFlight) {
+      autoSaveQueued = true;
+      return;
+    }
+
+    autoSaveInFlight = true;
+    try {
+      await submitSettingsPayload(buildAutoSaveSettingsPayload(), {
+        pendingMessage: "Saving changes...",
+        successMessage: "✓ Changes saved",
+      });
+    } catch (err) {
+      setSaveMessage(err?.message || "Save failed", { persist: true });
+      console.error(err);
+    } finally {
+      autoSaveInFlight = false;
+      if (autoSaveQueued) {
+        autoSaveQueued = false;
+        void saveAutoSettings();
+      }
+    }
   }
 
   function renderTeamUsers(users = []) {
@@ -2213,200 +2696,88 @@ content %}
 
   const displayCountInput = document.getElementById("displayCount");
   if (displayCountInput) {
-    displayCountInput.addEventListener("input", renderDisplayTapAssignments);
+    displayCountInput.addEventListener("input", () => {
+      renderDisplayTapAssignments();
+      scheduleAutoSave(700);
+    });
+    displayCountInput.addEventListener("blur", () => {
+      renderDisplayTapAssignments();
+      scheduleAutoSave(0);
+    });
   }
 
   const breweryTypeInputs = document.querySelectorAll('input[name="brewery_type"]');
   breweryTypeInputs.forEach((input) => {
     input.addEventListener("change", () => {
-      const isCommercial = document.querySelector('input[name="brewery_type"]:checked')?.value === "commercial";
-      const displaySettings = document.getElementById("commercialDisplaySettings");
-      if (displaySettings) {
-        displaySettings.hidden = !isCommercial;
-      }
-      if (isCommercial) {
-        renderDisplayTapAssignments();
-      }
+      syncDisplaySettingsAvailability();
+      scheduleAutoSave(100);
     });
   });
 
-  renderDisplayTapAssignments();
+  syncDisplaySettingsAvailability();
+
+  document
+    .querySelectorAll(
+      'input[name="measurement"], input[name="theme"], input[name="environment_mode"], input[name="dashboard_manage_button_position"]',
+    )
+    .forEach((input) => {
+      input.addEventListener("change", () => scheduleAutoSave(100));
+    });
+
+  [
+    "menuQrMode",
+    "barStockEnabled",
+    "apiReferenceEnabled",
+    "analyticsEnabled",
+    "analyticsDaysMethod",
+  ].forEach((inputId) => {
+    const input = document.getElementById(inputId);
+    if (!input) {
+      return;
+    }
+
+    input.addEventListener("change", () => scheduleAutoSave(100));
+  });
+
+  [
+    "barName",
+    "barLogoUrl",
+    "displayTitleOnTap",
+    "analyticsLowThreshold",
+    "analyticsDaysWindow",
+    "auditRetentionDays",
+    "externalBaseUrl",
+  ].forEach((inputId) => {
+    const input = document.getElementById(inputId);
+    if (!input) {
+      return;
+    }
+
+    if (inputId === "externalBaseUrl") {
+      input.addEventListener("input", () => {
+        updateExternalReadonlyLinks(input.value);
+        scheduleAutoSave(700);
+      });
+    } else {
+      input.addEventListener("input", () => scheduleAutoSave(700));
+    }
+    input.addEventListener("blur", () => scheduleAutoSave(0));
+  });
 
   async function saveSettings(e) {
     e.preventDefault();
-    const measurementInput = document.querySelector(
-      'input[name="measurement"]:checked',
-    );
-    const themeInput = document.querySelector('input[name="theme"]:checked');
-    const managePosInput = document.querySelector(
-      'input[name="dashboard_manage_button_position"]:checked',
-    );
-    const environmentModeInput = document.querySelector(
-      'input[name="environment_mode"]:checked',
-    );
-
-    const body = {
-      bar_name: document.getElementById("barName").value,
-      brewery_type: document.querySelector('input[name="brewery_type"]:checked')
-        ? document.querySelector('input[name="brewery_type"]:checked').value
-        : "homebrewer",
-      bar_logo_url: document.getElementById("barLogoUrl").value,
-      external_base_url: document.getElementById("externalBaseUrl").value,
-      default_keg_type: document.getElementById("defaultKegType").value,
-      keg_type_choices: collectKegTypeChoices(),
-      pos_system: document.getElementById("posSystem")
-        ? document.getElementById("posSystem").value
-        : "",
-      pos_sync_enabled: document.getElementById("posSyncEnabled")
-        ? document.getElementById("posSyncEnabled").checked
-        : false,
-      pos_sync_provider: document.getElementById("posSyncProvider")
-        ? document.getElementById("posSyncProvider").value
-        : "",
-      pos_sync_credentials: {
-        api_key: document.getElementById("posSyncApiKey")
-          ? document.getElementById("posSyncApiKey").value
-          : "",
-        location_id: document.getElementById("posSyncLocationId")
-          ? document.getElementById("posSyncLocationId").value
-          : "",
-        merchant_id: document.getElementById("posSyncMerchantId")
-          ? document.getElementById("posSyncMerchantId").value
-          : "",
-      },
-      pos_sync_provider_config_json: document.getElementById("posSyncProviderConfigJson")
-        ? document.getElementById("posSyncProviderConfigJson").value
-        : "",
-      measurement: measurementInput ? measurementInput.value : "us",
-      theme: themeInput ? themeInput.value : "light",
-      dashboard_manage_button_position: managePosInput
-        ? managePosInput.value
-        : "top-right",
-      bar_stock_enabled: document.getElementById("barStockEnabled").checked,
-      analytics_enabled: document.getElementById("analyticsEnabled").checked,
-      api_reference_enabled: document.getElementById("apiReferenceEnabled")
-        .checked,
-      external_api_token_auth_enabled: document.getElementById(
-        "externalApiTokenAuthEnabled",
-      ).checked,
-      external_api_token: document.getElementById("externalApiToken").value,
-      external_api_read_token: document.getElementById("externalApiReadToken")
-        .value,
-      external_api_write_token: document.getElementById("externalApiWriteToken")
-        .value,
-      external_api_allowlist_enabled: document.getElementById(
-        "externalApiAllowlistEnabled",
-      ).checked,
-      external_api_allowlist: document.getElementById("externalApiAllowlist")
-        .value,
-      external_api_rate_limit_enabled: document.getElementById(
-        "externalApiRateLimitEnabled",
-      ).checked,
-      external_api_rate_limit_per_minute: parseInt(
-        document.getElementById("externalApiRateLimitPerMinute").value,
-        10,
-      ),
-      pour_mode: document.getElementById("pourMode")
-        ? document.getElementById("pourMode").value
-        : DEFAULT_POUR_MODE,
-      environment_mode: environmentModeInput
-        ? environmentModeInput.value
-        : DEFAULT_ENVIRONMENT_MODE,
-    };
-
-    const breweryTypeInput = document.querySelector('input[name="brewery_type"]:checked');
-    const normalizedBreweryType = breweryTypeInput
-      ? breweryTypeInput.value
-      : "homebrewer";
-    if (normalizedBreweryType !== "commercial") {
-      body.pour_mode = "manual";
-      body.pos_system = "";
-      body.display_count = 1;
-      body.display_tap_assignments = [];
-    } else {
-      const displayCountValue = document.getElementById("displayCount")
-        ? Number.parseInt(document.getElementById("displayCount").value, 10)
-        : 1;
-      body.display_count = Math.max(1, Math.min(12, Number.isFinite(displayCountValue) ? displayCountValue : 1));
-      body.display_tap_assignments = Array.from(document.querySelectorAll(".display-tap-assignment-select")).map((select) =>
-        Array.from(select.selectedOptions).map((option) => Number.parseInt(option.value, 10)).filter((value) => Number.isFinite(value)),
-      );
-      if (body.pour_mode !== "pos") {
-        body.pos_system = "";
-      }
-    }
-
-    const menuQrModeInput = document.getElementById("menuQrMode");
-    if (menuQrModeInput) {
-      body.menu_qr_mode = menuQrModeInput.value;
-    }
-
-    const displayTitleOnTapInput = document.getElementById("displayTitleOnTap");
-    if (displayTitleOnTapInput) {
-      body.display_title_on_tap = displayTitleOnTapInput.value.trim() || "On Draft";
+    if (autoSaveTimeoutId) {
+      window.clearTimeout(autoSaveTimeoutId);
+      autoSaveTimeoutId = null;
     }
 
     try {
-      const res = await fetch(`${INGRESS}/api/settings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      await submitSettingsPayload(buildManualSettingsPayload(), {
+        pendingMessage: "Saving advanced settings...",
+        successMessage: "✓ Advanced settings saved",
       });
-      const saveBody = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(saveBody.error || `Save failed: ${res.status}`);
-      }
-
-      const savedSettings = saveBody;
-
-      document.getElementById("saveMsg").textContent = "✓ Saved!";
-      setTimeout(() => {
-        document.getElementById("saveMsg").textContent = "";
-      }, 2000);
-      document.documentElement.dataset.theme = body.theme;
-      document.documentElement.dataset.managePos =
-        body.dashboard_manage_button_position;
-      document.body.dataset.managePos = body.dashboard_manage_button_position;
-      if (document.getElementById("externalApiToken")) {
-        document.getElementById("externalApiToken").value =
-          savedSettings.external_api_token || "";
-      }
-      if (document.getElementById("externalApiReadToken")) {
-        document.getElementById("externalApiReadToken").value =
-          savedSettings.external_api_read_token || "";
-      }
-      if (document.getElementById("externalApiWriteToken")) {
-        document.getElementById("externalApiWriteToken").value =
-          savedSettings.external_api_write_token || "";
-      }
-      if (document.getElementById("externalApiAllowlist")) {
-        document.getElementById("externalApiAllowlist").value =
-          savedSettings.external_api_allowlist || "";
-      }
-      if (document.getElementById("externalApiRateLimitPerMinute")) {
-        document.getElementById("externalApiRateLimitPerMinute").value =
-          savedSettings.external_api_rate_limit_per_minute || 120;
-      }
-      if (
-        Array.isArray(savedSettings.keg_type_choices) &&
-        document.getElementById("kegTypeChoicesList")
-      ) {
-        replaceKegTypeChoices(
-          savedSettings.keg_type_choices,
-          savedSettings.default_keg_type || "",
-        );
-      }
-      renderPosSyncStatus({
-        last_status: savedSettings.pos_sync_last_status || "never",
-        last_run_at: savedSettings.pos_sync_last_run_at || "",
-        last_error: savedSettings.pos_sync_last_error || "",
-        last_counts: savedSettings.pos_sync_last_counts || {},
-      });
-      updateExternalReadonlyLinks(savedSettings.external_base_url || "");
-      localStorage.setItem("bartender_theme", body.theme);
     } catch (err) {
-      document.getElementById("saveMsg").textContent =
-        err?.message || "Save failed";
+      setSaveMessage(err?.message || "Save failed", { persist: true });
       console.error(err);
     }
   }
