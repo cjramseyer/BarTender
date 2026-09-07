@@ -18,6 +18,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from bartender.pos_sync.service import (
@@ -684,10 +685,12 @@ def _send_anonymous_telemetry_heartbeat() -> None:
     data = load_data()
     settings = data.get("settings", {})
     if not _coerce_bool(settings.get("anonymous_telemetry_enabled"), False):
+        app.logger.info("Anonymous telemetry heartbeat skipped: disabled.")
         return
 
     today = datetime.now(timezone.utc).date().isoformat()
     if settings.get("anonymous_telemetry_last_heartbeat_date") == today:
+        app.logger.info("Anonymous telemetry heartbeat skipped: already sent today.")
         return
 
     installation_id = str(settings.get("anonymous_telemetry_installation_id", "")).strip()
@@ -709,12 +712,27 @@ def _send_anonymous_telemetry_heartbeat() -> None:
     try:
         with urlopen(request_payload, timeout=5) as response:
             if response.status < 200 or response.status >= 300:
+                app.logger.warning(
+                    "Anonymous telemetry heartbeat rejected with HTTP status %s.",
+                    response.status,
+                )
                 return
-    except OSError:
+    except HTTPError as exc:
+        app.logger.warning(
+            "Anonymous telemetry heartbeat rejected with HTTP status %s.",
+            exc.code,
+        )
+        return
+    except OSError as exc:
+        app.logger.warning(
+            "Anonymous telemetry heartbeat failed: %s.",
+            type(exc).__name__,
+        )
         return
 
     settings["anonymous_telemetry_last_heartbeat_date"] = today
     save_data(data)
+    app.logger.info("Anonymous telemetry heartbeat sent.")
 
 
 def _schedule_anonymous_telemetry_heartbeat() -> None:
