@@ -93,9 +93,9 @@
         opacity: 0.6;
       }
       .container {
-        max-width: 1100px;
+        max-width: {% if settings.display_full_width %}100%{% else %}1100px{% endif %};
         margin: 0 auto;
-        padding: 2rem 1.25rem;
+        padding: {% if settings.display_full_width %}1.5rem 2rem{% else %}2rem 1.25rem{% endif %};
       }
       .section-title {
         font-size: 1.3rem;
@@ -428,6 +428,7 @@
 
     <div class="container">
       <!-- Taps -->
+      {% if show_taps is not defined or show_taps %}
       <div class="display-top-row">
         <div class="section-title">🍺 {{ settings.display_title_on_tap or 'On Draft' }}</div>
         {% if qr_image_path and qr_ready and menu_qr_mode in ('display', 'both')
@@ -449,7 +450,8 @@
         keg.percent_full is defined else (100 if keg and keg.status == 'full'
         else 50 if keg and keg.status == 'in_use' else 0) %} {% set
         visual_fill_pct = 12 if fill_pct > 0 and fill_pct < 12 else fill_pct %}
-        {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set beer_brewer
+        {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set beer_brewery
+        = keg.beer_brewery or keg.brewery if keg else '' %} {% set beer_brewer
         = keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if
         keg else '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set
         beer_brewed_on = keg.beer_brewed_on if keg else '' %}
@@ -486,7 +488,10 @@
                 replace('_', ' ') | title) }}</span
               >
             </p>
-            <p class="muted">Brewery: {{ beer_brewer or keg.brewery or '—' }}</p>
+            <p class="muted">Brewery: {{ beer_brewery or beer_brewer or '—' }}</p>
+            {% if beer_brewer and beer_brewery and beer_brewer != beer_brewery %}
+            <p class="muted">Brewer: {{ beer_brewer }}</p>
+            {% endif %}
             <p class="muted">
               ABV: {{ (beer_abv or keg.abv) ~ '%' if (beer_abv or keg.abv) else '—' }}
               · IBU: {{ beer_ibu or '—' }}
@@ -500,8 +505,9 @@
         <p class="muted">No taps configured.</p>
         {% endfor %}
       </div>
+      {% endif %}
 
-      {% if on_deck_kegs %}
+      {% if (show_on_deck is not defined or show_on_deck) and on_deck_kegs %}
       <div class="section-title">🔜 On Deck</div>
       <div class="stock-grid">
         {% for keg in on_deck_kegs %}
@@ -516,8 +522,22 @@
       {% endif %}
 
       <!-- Bar Stock -->
-      {% if settings.bar_stock_enabled and bar_stock %}
-      <div class="section-title">📦 Bar Stock</div>
+      {% if (show_bar_stock is not defined or show_bar_stock) and settings.bar_stock_enabled %}
+      <div class="display-top-row">
+        <div class="section-title">📦 Bar Stock</div>
+        {% if (show_taps is defined and not show_taps) and qr_image_path and qr_ready and menu_qr_mode in ('display', 'both') %}
+        <div class="qr-panel" role="complementary" aria-label="Menu QR code">
+          <div class="qr-panel-title">Menu QR</div>
+          <img
+            src="{{ qr_image_path }}"
+            alt="QR code for the tap menu"
+            loading="lazy"
+          />
+          <div class="qr-panel-note">Scan for menu</div>
+        </div>
+        {% endif %}
+      </div>
+      {% if bar_stock %}
       <div class="stock-grid">
         {% for item in bar_stock %}
         <div class="stock-card">
@@ -532,6 +552,9 @@
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <p class="muted">No bar stock items available.</p>
+      {% endif %}
       {% endif %}
     </div>
 

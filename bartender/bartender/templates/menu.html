@@ -58,9 +58,9 @@
       {% if on_tap %}
       <div class="menu-grid">
         {% for entry in on_tap %} {% set tap = entry.tap %} {% set keg =
-        entry.keg %} {% set fill_pct = entry.fill_pct %} {% set brewer =
-        keg.beer_brewer or keg.brewery %} {% set abv = keg.beer_abv or keg.abv
-        %}
+        entry.keg %} {% set fill_pct = entry.fill_pct %} {% set brewery =
+        keg.beer_brewery or keg.brewery %} {% set brewer = keg.beer_brewer %}
+        {% set abv = keg.beer_abv or keg.abv %}
         <article class="menu-item card">
           <div class="menu-item-header">
             <h2>Tap {{ tap.number }}</h2>
@@ -72,7 +72,10 @@
 
           <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
           <p class="muted">Type: {{ keg.type or '—' }}</p>
-          <p class="muted">Brewery: {{ brewer or '—' }}</p>
+          <p class="muted">Brewery: {{ brewery or brewer or '—' }}</p>
+          {% if brewer and brewery and brewer != brewery %}
+          <p class="muted">Brewer: {{ brewer }}</p>
+          {% endif %}
           <p class="muted">ABV: {{ abv or '—' }}{% if abv %}%{% endif %}</p>
           <p class="muted">IBU: {{ keg.beer_ibu or '—' }}</p>
           <p class="muted">Fill: {{ fill_pct }}%</p>

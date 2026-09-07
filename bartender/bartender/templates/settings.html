@@ -46,6 +46,12 @@ content %}
         <summary>General</summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
+            <label>App Version</label>
+            <div>
+              <span class="badge" style="background: var(--surface2); color: var(--text); border: 1px solid var(--border); font-size: 0.9rem; padding: 0.25rem 0.6rem;">v{{ app_version }}</span>
+            </div>
+          </div>
+          <div class="form-group">
             <label>Bar Name</label>
             <input
               type="text"
@@ -56,7 +62,7 @@ content %}
             />
           </div>
           <div class="form-group">
-            <label>Business Type</label>
+            <label>Bar Profile</label>
             <div class="radio-group">
               <label class="radio-label">
                 {% if (settings.brewery_type or 'homebrewer') == 'homebrewer' %}
@@ -66,14 +72,14 @@ content %}
                 {% endif %} Homebrewer
               </label>
               <label class="radio-label">
-                {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
-                <input type="radio" name="brewery_type" value="commercial" checked />
+                {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+                <input type="radio" name="brewery_type" value="pro" checked />
                 {% else %}
-                <input type="radio" name="brewery_type" value="commercial" />
-                {% endif %} Commercial
+                <input type="radio" name="brewery_type" value="pro" />
+                {% endif %} Pro
               </label>
             </div>
-            <small class="muted">Homebrewer is the default selection.</small>
+            <small class="muted">Homebrewer installs default to 2 displays and manual pour tracking. Switch to Pro to unlock multiple displays, POS integration, and higher capacity.</small>
           </div>
           <div class="form-group">
             <label>Bar Logo URL (optional)</label>
@@ -117,19 +123,6 @@ content %}
             <label>Environment Mode</label>
             <div class="radio-group">
               <label class="radio-label">
-                {% if (settings.environment_mode or 'production') == 'sandbox'
-                %}
-                <input
-                  type="radio"
-                  name="environment_mode"
-                  value="sandbox"
-                  checked
-                />
-                {% else %}
-                <input type="radio" name="environment_mode" value="sandbox" />
-                {% endif %} Sandbox
-              </label>
-              <label class="radio-label">
                 {% if (settings.environment_mode or 'production') ==
                 'production' %}
                 <input
@@ -145,6 +138,19 @@ content %}
                   value="production"
                 />
                 {% endif %} Production
+              </label>
+              <label class="radio-label">
+                {% if (settings.environment_mode or 'production') == 'sandbox'
+                %}
+                <input
+                  type="radio"
+                  name="environment_mode"
+                  value="sandbox"
+                  checked
+                />
+                {% else %}
+                <input type="radio" name="environment_mode" value="sandbox" />
+                {% endif %} Sandbox
               </label>
             </div>
             <small class="muted"
@@ -261,7 +267,19 @@ content %}
             />
             <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
           </div>
-          <div class="form-group" id="commercialDisplaySettings">
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.display_full_width %}
+              <input type="checkbox" id="displayFullWidth" checked />
+              {% else %}
+              <input type="checkbox" id="displayFullWidth" />
+              {% endif %} Full-Width Display Layout
+            </label>
+            <small class="muted"
+              >When enabled, the display view expands across 100% of the screen/browser width instead of centering within a fixed container.</small
+            >
+          </div>
+          <div class="form-group" id="proDisplaySettings">
             <label for="displayCount">Number of Displays</label>
             <input
               id="displayCount"
@@ -269,27 +287,27 @@ content %}
               min="1"
               max="12"
               class="form-control"
-              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}disabled{% endif %}
-              value="{{ settings.display_count or 1 }}"
+              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}disabled{% endif %}
+              value="{{ settings.display_count or 2 }}"
             />
             <small
-              id="displayCountCommercialNote"
+              id="displayCountProNote"
               class="muted"
-              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}hidden{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}hidden{% endif %}
               >Choose how many display boards this installation should serve.</small
             >
             <small
               id="displayCountHomebrewerNote"
               class="muted"
-              {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}hidden{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') == 'pro' %}hidden{% endif %}
             >
-              Homebrewer installs default to 1 display. Switch Business Type to Commercial to enable multiple displays.
+              Homebrewer installs default to 2 displays. Switch Bar Profile to Pro to enable multiple displays.
             </small>
             <div
               id="displayTapAssignments"
               class="stack-gap-sm"
               style="margin-top: 0.75rem;"
-              {% if (settings.brewery_type or 'homebrewer') != 'commercial' %}hidden{% endif %}
+              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}hidden{% endif %}
             ></div>
           </div>
           <div class="form-group">
@@ -433,7 +451,7 @@ content %}
               <option value="manual" selected>Manual</option>
               {% else %}
               <option value="manual">Manual</option>
-              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'commercial' %}
+              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
                 {% if (settings.pour_mode or 'manual') == 'pos' %}
                 <option value="pos" selected>POS (API)</option>
                 {% else %}
@@ -447,10 +465,10 @@ content %}
               {% endif %}
             </select>
             <small class="muted"
-              >POS mode is only available for Commercial setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
+              >POS mode is only available for Pro setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
             >
           </div>
-          {% if (settings.brewery_type or 'homebrewer') == 'commercial' and (settings.pour_mode or 'manual') == 'pos' %}
+          {% if (settings.brewery_type or 'homebrewer') == 'pro' and (settings.pour_mode or 'manual') == 'pos' %}
           <div class="form-group">
             <label>Common POS System</label>
             <select id="posSystem" class="form-control">
@@ -463,7 +481,7 @@ content %}
                 {% endif %}
               {% endfor %}
             </select>
-            <small class="muted">Choose the common POS provider used by this Commercial setup.</small>
+            <small class="muted">Choose the common POS provider used by this Pro setup.</small>
           </div>
           {% endif %}
           <div class="form-group">
@@ -964,6 +982,13 @@ content %}
             Use these external links for read-only access (served from port {{
             display_port }}).
           </p>
+          <p class="muted" style="margin-top: 0.5rem">
+            QR Status: {% if qr_ready %}
+            <strong style="color: #15803d">Ready</strong>
+            {% else %}
+            <strong style="color: #b45309">Unavailable</strong>
+            {% endif %}
+          </p>
           <div class="form-group" style="margin-top: 1rem">
             <label>External Base URL (optional)</label>
             <input
@@ -1024,49 +1049,128 @@ content %}
               Copy
             </button>
           </div>
-          <p class="muted" style="margin-top: 0.35rem">Display URL</p>
+          <p class="muted" style="margin-top: 0.75rem">Local Printable Menu URL</p>
           <div class="settings-url-row">
             <a
-              id="externalDisplayUrl"
+              id="localMenuUrl"
               class="settings-url-link"
-              href="{{ external_display_url }}"
+              href="{{ auto_external_menu_url }}"
               target="_blank"
               rel="noopener noreferrer"
-              >{{ external_display_url }}</a
+              >{{ auto_external_menu_url }}</a
             >
             <button
               type="button"
               class="btn btn-sm btn-secondary"
-              onclick="copyExternalUrl('externalDisplayUrl', this)"
+              onclick="copyExternalUrl('localMenuUrl', this)"
             >
               Copy
             </button>
           </div>
-          <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
-          <div class="settings-url-row">
-            <a
-              id="externalMenuUrl"
-              class="settings-url-link"
-              href="{{ external_menu_url }}"
-              target="_blank"
-              rel="noopener noreferrer"
-              >{{ external_menu_url }}</a
-            >
-            <button
-              type="button"
-              class="btn btn-sm btn-secondary"
-              onclick="copyExternalUrl('externalMenuUrl', this)"
-            >
-              Copy
-            </button>
+          <div id="externalMenuUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
+            <p class="muted" style="margin-top: 0.35rem">External Printable Menu URL</p>
+            <div class="settings-url-row">
+              <a
+                id="externalMenuUrl"
+                class="settings-url-link"
+                href="{{ external_menu_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ external_menu_url }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('externalMenuUrl', this)"
+              >
+                Copy
+              </button>
+            </div>
           </div>
-          <p class="muted" style="margin-top: 0.35rem">
-            QR Status: {% if qr_ready %}
-            <strong style="color: #15803d">Ready</strong>
+          <div id="displayUrlsContainer">
+            {% set active_display_count = (settings.display_count or 2) if (settings.brewery_type or 'homebrewer') == 'pro' else 2 %}
+            {% if active_display_count == 1 %}
+            <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
+            <div class="settings-url-row">
+              <a
+                id="localDisplayUrl"
+                class="settings-url-link"
+                href="{{ auto_external_display_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ auto_external_display_url }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('localDisplayUrl', this)"
+              >
+                Copy
+              </button>
+            </div>
+            <div id="externalDisplayUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
+              <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
+              <div class="settings-url-row">
+                <a
+                  id="externalDisplayUrl"
+                  class="settings-url-link"
+                  href="{{ external_display_url }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >{{ external_display_url }}</a
+                >
+                <button
+                  type="button"
+                  class="btn btn-sm btn-secondary"
+                  onclick="copyExternalUrl('externalDisplayUrl', this)"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
             {% else %}
-            <strong style="color: #b45309">Unavailable</strong>
+            {% for i in range(1, active_display_count + 1) %}
+            <p class="muted" style="margin-top: 0.75rem">Local Display {{ i }} URL</p>
+            <div class="settings-url-row">
+              <a
+                id="localDisplayUrl-{{ i }}"
+                class="settings-url-link"
+                href="{{ auto_external_display_url }}?display={{ i }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ auto_external_display_url }}?display={{ i }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('localDisplayUrl-{{ i }}', this)"
+              >
+                Copy
+              </button>
+            </div>
+            {% if settings.external_base_url %}
+            <p class="muted" style="margin-top: 0.35rem">External Display {{ i }} URL</p>
+            <div class="settings-url-row">
+              <a
+                id="externalDisplayUrl-{{ i }}"
+                class="settings-url-link"
+                href="{{ external_display_url }}?display={{ i }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ external_display_url }}?display={{ i }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('externalDisplayUrl-{{ i }}', this)"
+              >
+                Copy
+              </button>
+            </div>
             {% endif %}
-          </p>
+            {% endfor %}
+            {% endif %}
+          </div>
         </div>
       </details>
     </div>
@@ -1305,33 +1409,33 @@ content %}
   }
 
   function syncDisplaySettingsAvailability() {
-    const isCommercial = currentBreweryType() === "commercial";
+    const isPro = currentBreweryType() === "pro";
     const displayCountInput = document.getElementById("displayCount");
     const displayTapAssignments = document.getElementById("displayTapAssignments");
-    const commercialNote = document.getElementById("displayCountCommercialNote");
+    const proNote = document.getElementById("displayCountProNote");
     const homebrewerNote = document.getElementById("displayCountHomebrewerNote");
 
     if (displayCountInput) {
-      if (isCommercial) {
-        const previousCommercialValue = displayCountInput.dataset.previousCommercialValue;
-        if (previousCommercialValue && displayCountInput.value === "1") {
-          displayCountInput.value = previousCommercialValue;
+      if (isPro) {
+        const previousProValue = displayCountInput.dataset.previousProValue;
+        if (previousProValue && displayCountInput.value === "2") {
+          displayCountInput.value = previousProValue;
         }
       } else {
-        displayCountInput.dataset.previousCommercialValue = displayCountInput.value;
-        displayCountInput.value = "1";
+        displayCountInput.dataset.previousProValue = displayCountInput.value;
+        displayCountInput.value = "2";
       }
-      displayCountInput.disabled = !isCommercial;
+      displayCountInput.disabled = !isPro;
     }
 
-    if (commercialNote) {
-      commercialNote.hidden = !isCommercial;
+    if (proNote) {
+      proNote.hidden = !isPro;
     }
     if (homebrewerNote) {
-      homebrewerNote.hidden = isCommercial;
+      homebrewerNote.hidden = isPro;
     }
     if (displayTapAssignments) {
-      if (!isCommercial) {
+      if (!isPro) {
         currentDisplayTapAssignments = normalizeDisplayTapAssignments(
           collectSelectedDisplayTapAssignments(),
         );
@@ -1342,6 +1446,8 @@ content %}
         renderDisplayTapAssignments();
       }
     }
+
+    updateExternalReadonlyLinks();
   }
 
   function buildAutoSaveSettingsPayload() {
@@ -1378,6 +1484,9 @@ content %}
       display_title_on_tap: document.getElementById("displayTitleOnTap")
         ? document.getElementById("displayTitleOnTap").value.trim() || "On Draft"
         : "On Draft",
+      display_full_width: document.getElementById("displayFullWidth")
+        ? document.getElementById("displayFullWidth").checked
+        : false,
       analytics_low_keg_threshold_percent: getClampedIntegerValue(
         "analyticsLowThreshold",
         25,
@@ -1410,8 +1519,8 @@ content %}
       payload.anonymous_telemetry_enabled = anonymousTelemetryEnabledInput.checked;
     }
 
-    if (payload.brewery_type !== "commercial") {
-      payload.display_count = 1;
+    if (payload.brewery_type !== "pro") {
+      payload.display_count = 2;
       payload.display_tap_assignments = [];
       return payload;
     }
@@ -1501,7 +1610,7 @@ content %}
       5000,
     );
 
-    if (payload.brewery_type !== "commercial") {
+    if (payload.brewery_type !== "pro") {
       payload.pour_mode = "manual";
       payload.pos_system = "";
     } else if (payload.pour_mode !== "pos") {
@@ -1554,6 +1663,10 @@ content %}
     ) {
       displayTitleOnTapInput.value = savedSettings.display_title_on_tap;
     }
+    const displayFullWidthInput = document.getElementById("displayFullWidth");
+    if (displayFullWidthInput && savedSettings.display_full_width !== undefined) {
+      displayFullWidthInput.checked = Boolean(savedSettings.display_full_width);
+    }
     const analyticsLowThresholdInput = document.getElementById("analyticsLowThreshold");
     if (
       analyticsLowThresholdInput &&
@@ -1585,9 +1698,9 @@ content %}
     }
     const displayCountInput = document.getElementById("displayCount");
     if (displayCountInput && savedSettings.display_count !== undefined) {
-      displayCountInput.value = String(savedSettings.display_count || 1);
-      displayCountInput.dataset.previousCommercialValue = String(
-        savedSettings.display_count || 1,
+      displayCountInput.value = String(savedSettings.display_count || 2);
+      displayCountInput.dataset.previousProValue = String(
+        savedSettings.display_count || 2,
       );
     }
     currentDisplayTapAssignments = normalizeDisplayTapAssignments(
@@ -1989,24 +2102,87 @@ content %}
   }
 
   function updateExternalReadonlyLinks(externalBaseUrl = "") {
-    const displayLink = document.getElementById("externalDisplayUrl");
-    const menuLink = document.getElementById("externalMenuUrl");
-    const overrideBase = String(externalBaseUrl || "")
+    const overrideInput = document.getElementById("externalBaseUrl");
+    const rawOverride = externalBaseUrl !== "" ? externalBaseUrl : (overrideInput ? overrideInput.value : "");
+    const overrideBase = String(rawOverride || "")
       .trim()
       .replace(/\/+$/, "");
     const autoBase = String(AUTO_EXTERNAL_DISPLAY_URL || "")
       .trim()
       .replace(/\/+$/, "");
-    const base = overrideBase || autoBase;
+    const autoMenuBase = String(AUTO_EXTERNAL_MENU_URL || "")
+      .trim()
+      .replace(/\/+$/, "");
+    const hasOverride = Boolean(overrideBase);
 
-    if (displayLink && base) {
-      displayLink.href = `${base}/`;
-      displayLink.textContent = `${base}/`;
+    const localMenuLink = document.getElementById("localMenuUrl");
+    if (localMenuLink && autoMenuBase) {
+      localMenuLink.href = autoMenuBase;
+      localMenuLink.textContent = autoMenuBase;
     }
-    if (menuLink && base) {
-      menuLink.href = `${base}/menu`;
-      menuLink.textContent = `${base}/menu`;
+
+    const externalMenuBlock = document.getElementById("externalMenuUrlBlock");
+    const externalMenuLink = document.getElementById("externalMenuUrl");
+    if (externalMenuBlock) {
+      externalMenuBlock.style.display = hasOverride ? "" : "none";
     }
+    if (externalMenuLink && hasOverride) {
+      externalMenuLink.href = `${overrideBase}/menu`;
+      externalMenuLink.textContent = `${overrideBase}/menu`;
+    }
+
+    const container = document.getElementById("displayUrlsContainer");
+    if (!container) return;
+
+    const isPro = currentBreweryType() === "pro";
+    const displayCountInput = document.getElementById("displayCount");
+    const displayCount = isPro
+      ? getClampedIntegerValue("displayCount", 2, 1, 12)
+      : 2;
+
+    let html = "";
+    if (displayCount === 1) {
+      html += `
+        <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
+        <div class="settings-url-row">
+          <a id="localDisplayUrl" class="settings-url-link" href="${autoBase}/" target="_blank" rel="noopener noreferrer">${autoBase}/</a>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('localDisplayUrl', this)">Copy</button>
+        </div>
+      `;
+      if (hasOverride) {
+        html += `
+          <div id="externalDisplayUrlBlock">
+            <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
+            <div class="settings-url-row">
+              <a id="externalDisplayUrl" class="settings-url-link" href="${overrideBase}/" target="_blank" rel="noopener noreferrer">${overrideBase}/</a>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('externalDisplayUrl', this)">Copy</button>
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      for (let i = 1; i <= displayCount; i++) {
+        const localUrl = `${autoBase}/?display=${i}`;
+        html += `
+          <p class="muted" style="margin-top: 0.75rem">Local Display ${i} URL</p>
+          <div class="settings-url-row">
+            <a id="localDisplayUrl-${i}" class="settings-url-link" href="${localUrl}" target="_blank" rel="noopener noreferrer">${localUrl}</a>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('localDisplayUrl-${i}', this)">Copy</button>
+          </div>
+        `;
+        if (hasOverride) {
+          const extUrl = `${overrideBase}/?display=${i}`;
+          html += `
+            <p class="muted" style="margin-top: 0.35rem">External Display ${i} URL</p>
+            <div class="settings-url-row">
+              <a id="externalDisplayUrl-${i}" class="settings-url-link" href="${extUrl}" target="_blank" rel="noopener noreferrer">${extUrl}</a>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('externalDisplayUrl-${i}', this)">Copy</button>
+            </div>
+          `;
+        }
+      }
+    }
+    container.innerHTML = html;
   }
 
   async function clearExternalBaseUrlOverride() {
@@ -2727,10 +2903,12 @@ content %}
   if (displayCountInput) {
     displayCountInput.addEventListener("input", () => {
       renderDisplayTapAssignments();
+      updateExternalReadonlyLinks();
       scheduleAutoSave(700);
     });
     displayCountInput.addEventListener("blur", () => {
       renderDisplayTapAssignments();
+      updateExternalReadonlyLinks();
       scheduleAutoSave(0);
     });
   }
@@ -2760,6 +2938,7 @@ content %}
     "analyticsEnabled",
     "analyticsDaysMethod",
     "anonymousTelemetryEnabled",
+    "displayFullWidth",
   ].forEach((inputId) => {
     const input = document.getElementById(inputId);
     if (!input) {

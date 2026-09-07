@@ -3,6 +3,7 @@ import sys
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -201,10 +202,12 @@ def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path, caplog)
     assert "Anonymous telemetry heartbeat sent." in caplog.messages
     assert "Anonymous telemetry heartbeat skipped: already sent today." in caplog.messages
     request_payload = urlopen_mock.call_args.args[0]
+    assert request_payload.get_header("User-agent") == f"BarTender/{app_module.APP_VERSION}"
     assert json.loads(request_payload.data) == {
         "installation_id": app_module.load_data()["settings"]["anonymous_telemetry_installation_id"],
         "app_version": app_module.APP_VERSION,
         "addon_version": app_module.APP_VERSION,
+        "brewery_type": "homebrewer",
     }
     assert app_module.load_data()["settings"]["anonymous_telemetry_last_heartbeat_date"]
 
@@ -219,7 +222,7 @@ def test_anonymous_telemetry_logs_cloudflare_rejection(tmp_path, caplog):
     with patch.object(
         app_module,
         "urlopen",
-        side_effect=HTTPError("https://example.invalid", 503, "Unavailable", {}, None),
+        side_effect=HTTPError("https://example.invalid", 503, "Unavailable", Message(), None),
     ):
         app_module._send_anonymous_telemetry_heartbeat()
 
@@ -308,10 +311,16 @@ def test_brewery_type_defaults_to_homebrewer_and_normalizes_valid_values(tmp_pat
 
     assert data["settings"]["brewery_type"] == "homebrewer"
 
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    reloaded = app_module.load_data()
+    assert reloaded["settings"]["brewery_type"] == "pro"
+
+    # Backward compatibility for legacy commercial setting
     data["settings"]["brewery_type"] = "commercial"
     app_module.save_data(data)
     reloaded = app_module.load_data()
-    assert reloaded["settings"]["brewery_type"] == "commercial"
+    assert reloaded["settings"]["brewery_type"] == "pro"
 
     data["settings"]["brewery_type"] = "unsupported"
     app_module.save_data(data)
@@ -325,20 +334,23 @@ def test_on_tap_display_title_defaults_to_on_draft_and_saves(tmp_path):
 
     data = app_module.load_data()
     assert data["settings"]["display_title_on_tap"] == "On Draft"
+    assert data["settings"]["display_full_width"] is False
 
     response = client.post(
         "/api/settings",
-        json={"display_title_on_tap": "Draft List"},
+        json={"display_title_on_tap": "Draft List", "display_full_width": True},
         headers=owner_headers,
     )
 
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["display_title_on_tap"] == "Draft List"
+    assert payload["display_full_width"] is True
     assert app_module.load_data()["settings"]["display_title_on_tap"] == "Draft List"
+    assert app_module.load_data()["settings"]["display_full_width"] is True
 
 
-def test_commercial_display_count_and_tap_assignments_save(tmp_path):
+def test_pro_display_count_and_tap_assignments_save(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
     owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
@@ -346,7 +358,7 @@ def test_commercial_display_count_and_tap_assignments_save(tmp_path):
     response = client.post(
         "/api/settings",
         json={
-            "brewery_type": "commercial",
+            "brewery_type": "pro",
             "display_count": 2,
             "display_tap_assignments": [[1, 2], [3, 4]],
         },
@@ -371,22 +383,22 @@ def test_pos_pour_mode_is_forbidden_for_homebrewer_settings(tmp_path):
     assert reloaded["settings"]["brewery_type"] == "homebrewer"
     assert reloaded["settings"]["pour_mode"] == "manual"
 
-    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["brewery_type"] = "pro"
     data["settings"]["pour_mode"] = "pos"
     app_module.save_data(data)
     assert app_module.load_data()["settings"]["pour_mode"] == "pos"
 
 
-def test_pos_system_is_available_only_for_commercial_pos_mode(tmp_path):
+def test_pos_system_is_available_only_for_pro_pos_mode(tmp_path):
     app_module = _load_app_module(tmp_path)
 
     data = app_module.load_data()
-    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["brewery_type"] = "pro"
     data["settings"]["pour_mode"] = "pos"
     data["settings"]["pos_system"] = "toast"
     app_module.save_data(data)
     reloaded = app_module.load_data()
-    assert reloaded["settings"]["brewery_type"] == "commercial"
+    assert reloaded["settings"]["brewery_type"] == "pro"
     assert reloaded["settings"]["pour_mode"] == "pos"
     assert reloaded["settings"]["pos_system"] == "Toast"
 
@@ -458,12 +470,14 @@ def test_default_pour_preset_prefers_pint_and_includes_taste(tmp_path):
     assert data["settings"]["pour_options"] == [
         {"name": "Pint", "amount": 16, "unit": "oz"},
         {"name": "Half Pint", "amount": 8, "unit": "oz"},
+        {"name": "Growler", "amount": 64, "unit": "oz"},
         {"name": "Taste", "amount": 2, "unit": "oz"},
     ]
 
     data["settings"]["pour_options"] = [
         {"name": "Half Pint", "amount": 8, "unit": "oz"},
         {"name": "Pint", "amount": 16, "unit": "oz"},
+        {"name": "Growler", "amount": 64, "unit": "oz"},
         {"name": "Taste", "amount": 2, "unit": "oz"},
     ]
     data["settings"]["default_pour_preset"] = ""
@@ -804,6 +818,75 @@ def test_audit_retention_days_defaults_and_clips_to_range(tmp_path):
     )
     assert response.status_code == 200
     assert response.get_json()["audit_retention_days"] == 180
-
     data = app_module.load_data()
     assert data["settings"]["audit_retention_days"] == 180
+
+
+def test_read_addon_version_from_env_and_supervisor(tmp_path, monkeypatch):
+    app_module = _load_app_module(tmp_path)
+
+    # 1. Environment variable
+    monkeypatch.setenv("ADDON_VERSION", "1.2.3")
+    assert app_module._read_addon_version() == "1.2.3"
+    monkeypatch.delenv("ADDON_VERSION", raising=False)
+
+    monkeypatch.setenv("APP_VERSION", "2.3.4")
+    assert app_module._read_addon_version() == "2.3.4"
+    monkeypatch.delenv("APP_VERSION", raising=False)
+
+    # 2. Supervisor API
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "fake-token")
+
+    class FakeSupervisorResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"result": "ok", "data": {"version": "3.4.5"}}).encode("utf-8")
+
+    with patch.object(app_module, "urlopen", return_value=FakeSupervisorResponse()) as mock_url:
+        assert app_module._read_addon_version() == "3.4.5"
+        req = mock_url.call_args[0][0]
+        assert req.get_header("X-supervisor-token") == "fake-token"
+
+
+def test_homebrewer_default_displays_split_taps_and_bar_stock(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "homebrewer"
+    data["settings"]["display_count"] = 2
+    data["settings"]["bar_stock_enabled"] = True
+    data["taps"] = [{"id": 1, "number": 1, "label": "Main Tap", "keg_id": 1}]
+    data["kegs"] = [{"id": 1, "name": "House IPA Keg", "status": "in_use", "percent_full": 80}]
+    data["bar_stock"] = [{"id": 1, "name": "Bourbon", "category": "Spirits", "quantity": 3, "unit": "bottles"}]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    # Display 1: Shows Taps, Does NOT show Bar Stock
+    res1 = client.get("/display?display=1")
+    assert res1.status_code == 200
+    html1 = res1.get_data(as_text=True)
+    assert "House IPA Keg" in html1
+    assert "Tap #1" in html1
+    assert "Bourbon" not in html1
+    assert "📦 Bar Stock" not in html1
+
+    # Display 2: Shows Bar Stock, Does NOT show Taps
+    res2 = client.get("/display?display=2")
+    assert res2.status_code == 200
+    html2 = res2.get_data(as_text=True)
+    assert "📦 Bar Stock" in html2
+    assert "Bourbon" in html2
+    assert "House IPA Keg" not in html2
+    assert "Tap #1" not in html2

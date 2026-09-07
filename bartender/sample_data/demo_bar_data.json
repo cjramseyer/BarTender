@@ -45,6 +45,11 @@
         "unit": "oz"
       },
       {
+        "name": "Growler",
+        "amount": 64,
+        "unit": "oz"
+      },
+      {
         "name": "Taste",
         "amount": 2,
         "unit": "oz"
