@@ -41,8 +41,8 @@
       <th>Brewery</th>
       <th>ABV</th>
       <th>IBU</th>
-      <th>Brewed On</th>
-      <th>Notes</th>
+      <th>Status</th>
+      <th>Best By</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -59,8 +59,8 @@
       <td>{{ beer.brewery or '—' }}</td>
       <td>{{ beer.abv or '—' }}{% if beer.abv %}%{% endif %}</td>
       <td>{{ beer.ibu or '—' }}</td>
-      <td>{{ beer.brewed_on or '—' }}</td>
-      <td>{{ beer.notes or '—' }}</td>
+      <td>{{ beer.availability_status or 'available' | title }}</td>
+      <td>{{ beer.best_by_date or '—' }}</td>
       <td>
         <button
           class="btn btn-sm btn-secondary"
@@ -129,6 +129,10 @@
             {% endfor %}
           </datalist>
         </div>
+        <div class="form-group">
+          <label>Style Guideline</label>
+          <input type="text" id="beerStyleGuideline" class="form-control" placeholder="e.g. BJCP 21C" />
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -173,12 +177,53 @@
             placeholder="e.g. 42"
           />
         </div>
+        <div class="form-group">
+          <label>Availability</label>
+          <select id="beerAvailabilityStatus" class="form-control">
+            <option value="available">Available</option>
+            <option value="seasonal">Seasonal</option>
+            <option value="coming_soon">Coming soon</option>
+            <option value="retired">Retired</option>
+          </select>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label>Brewed On</label>
           <input type="date" id="beerBrewedOn" class="form-control" />
         </div>
+        <div class="form-group">
+          <label>Packaged On</label>
+          <input type="date" id="beerPackagedOn" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label>Best By</label>
+          <input type="date" id="beerBestByDate" class="form-control" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="beerDescription" class="form-control" rows="2" placeholder="Short customer-facing description"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Allergens</label>
+        <input type="text" id="beerAllergens" class="form-control" placeholder="e.g. Lactose, Wheat, Almond" />
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Color (SRM)</label><input type="number" id="beerColorSrm" class="form-control" min="0" step="0.1" /></div>
+        <div class="form-group"><label>Color (EBC)</label><input type="number" id="beerColorEbc" class="form-control" min="0" step="0.1" /></div>
+        <div class="form-group"><label>Serving Temperature</label><input type="text" id="beerServingTemperature" class="form-control" placeholder="e.g. 38-42 F" /></div>
+        <div class="form-group"><label>Glassware</label><input type="text" id="beerGlassware" class="form-control" placeholder="e.g. Pint" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Supplier</label><input type="text" id="beerSupplier" class="form-control" /></div>
+        <div class="form-group"><label>Distributor</label><input type="text" id="beerDistributor" class="form-control" /></div>
+        <div class="form-group"><label>Purchase Cost</label><input type="number" id="beerPurchaseCost" class="form-control" min="0" step="0.01" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>SKU</label><input type="text" id="beerSku" class="form-control" /></div>
+        <div class="form-group"><label>UPC</label><input type="text" id="beerUpc" class="form-control" /></div>
+        <div class="form-group"><label>Recipe or Source URL</label><input type="url" id="beerRecipeUrl" class="form-control" placeholder="https://" /></div>
       </div>
       <div class="form-group">
         <label>Notes</label>
@@ -210,11 +255,27 @@
     document.getElementById("beerName").value = beer.name || "";
     document.getElementById("beerPackaging").value = beer.packaging || "kegged";
     document.getElementById("beerType").value = beer.type || "";
+    document.getElementById("beerStyleGuideline").value = beer.style_guideline || "";
     document.getElementById("beerBrewer").value = beer.brewer || "";
     document.getElementById("beerBrewery").value = beer.brewery || "";
     document.getElementById("beerAbv").value = beer.abv || "";
     document.getElementById("beerIbu").value = beer.ibu || "";
     document.getElementById("beerBrewedOn").value = beer.brewed_on || "";
+    document.getElementById("beerPackagedOn").value = beer.packaged_on || "";
+    document.getElementById("beerBestByDate").value = beer.best_by_date || "";
+    document.getElementById("beerAvailabilityStatus").value = beer.availability_status || "available";
+    document.getElementById("beerDescription").value = beer.description || "";
+    document.getElementById("beerAllergens").value = (beer.allergens || []).join(", ");
+    document.getElementById("beerColorSrm").value = beer.color_srm || "";
+    document.getElementById("beerColorEbc").value = beer.color_ebc || "";
+    document.getElementById("beerServingTemperature").value = beer.serving_temperature || "";
+    document.getElementById("beerGlassware").value = beer.glassware || "";
+    document.getElementById("beerSupplier").value = beer.supplier || "";
+    document.getElementById("beerDistributor").value = beer.distributor || "";
+    document.getElementById("beerPurchaseCost").value = beer.purchase_cost || "";
+    document.getElementById("beerSku").value = beer.sku || "";
+    document.getElementById("beerUpc").value = beer.upc || "";
+    document.getElementById("beerRecipeUrl").value = beer.recipe_url || "";
     document.getElementById("beerNotes").value = beer.notes || "";
     openModal("beerModal");
   }
@@ -226,11 +287,27 @@
       name: document.getElementById("beerName").value.trim(),
       packaging: document.getElementById("beerPackaging").value,
       type: document.getElementById("beerType").value.trim(),
+      style_guideline: document.getElementById("beerStyleGuideline").value.trim(),
       brewer: document.getElementById("beerBrewer").value.trim(),
       brewery: document.getElementById("beerBrewery").value.trim(),
       abv: document.getElementById("beerAbv").value.trim(),
       ibu: document.getElementById("beerIbu").value.trim(),
       brewed_on: document.getElementById("beerBrewedOn").value,
+      packaged_on: document.getElementById("beerPackagedOn").value,
+      best_by_date: document.getElementById("beerBestByDate").value,
+      availability_status: document.getElementById("beerAvailabilityStatus").value,
+      description: document.getElementById("beerDescription").value.trim(),
+      allergens: document.getElementById("beerAllergens").value.split(",").map((item) => item.trim()).filter(Boolean),
+      color_srm: document.getElementById("beerColorSrm").value.trim(),
+      color_ebc: document.getElementById("beerColorEbc").value.trim(),
+      serving_temperature: document.getElementById("beerServingTemperature").value.trim(),
+      glassware: document.getElementById("beerGlassware").value.trim(),
+      supplier: document.getElementById("beerSupplier").value.trim(),
+      distributor: document.getElementById("beerDistributor").value.trim(),
+      purchase_cost: document.getElementById("beerPurchaseCost").value.trim(),
+      sku: document.getElementById("beerSku").value.trim(),
+      upc: document.getElementById("beerUpc").value.trim(),
+      recipe_url: document.getElementById("beerRecipeUrl").value.trim(),
       notes: document.getElementById("beerNotes").value.trim(),
     };
 
@@ -264,7 +341,7 @@
     if (!beers.length) {
       tableBody.innerHTML = `
         <tr>
-          <td colspan="10" class="muted text-center">
+            <td colspan="10" class="muted text-center">
             No beers match your search.
           </td>
         </tr>
@@ -283,8 +360,8 @@
             <td>${beer.brewery || "—"}</td>
             <td>${beer.abv ? `${beer.abv}%` : "—"}</td>
             <td>${beer.ibu || "—"}</td>
-            <td>${beer.brewed_on || "—"}</td>
-            <td>${beer.notes || "—"}</td>
+            <td>${(beer.availability_status || "available").replaceAll("_", " ")}</td>
+            <td>${beer.best_by_date || "—"}</td>
             <td>
               <button class="btn btn-sm btn-secondary" onclick="editBeer(${JSON.stringify(beer)})">
                 Edit
