@@ -69,6 +69,60 @@ def test_staff_cannot_access_settings_page_or_api(tmp_path):
     assert api_response.get_json()["error"] == "Insufficient permissions"
 
 
+def test_staff_can_view_audit_events(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    staff_headers = {"X-BarTender-User-Id": "staff-1", "X-BarTender-Role": "staff"}
+
+    audit_response = client.get("/api/team/audit", headers=staff_headers)
+    assert audit_response.status_code == 200
+    assert audit_response.get_json() == {"audit": []}
+
+    with client.session_transaction() as session:
+        session["user_id"] = "staff-1"
+        session["user_name"] = "Staff One"
+        session["user_role"] = "staff"
+    page_response = client.get("/audit", headers=staff_headers)
+    assert page_response.status_code == 200
+    assert "Audit Log" in page_response.get_data(as_text=True)
+
+
+def test_audit_export_and_clear_permissions(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["team_audit"] = [{"id": "1", "action": "settings_updated"}]
+    data["settings"]["owner_pin"] = "2468"
+    app_module.save_data(data)
+
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+    manager_headers = {"X-BarTender-User-Id": "manager-1", "X-BarTender-Role": "manager"}
+    staff_headers = {"X-BarTender-User-Id": "staff-1", "X-BarTender-Role": "staff"}
+
+    manager_export = client.get("/api/team/audit/export", headers=manager_headers)
+    assert manager_export.status_code == 200
+    assert "attachment;" in manager_export.headers["Content-Disposition"]
+    assert manager_export.get_json() == [{"id": "1", "action": "settings_updated"}]
+
+    assert client.get("/api/team/audit/export", headers=staff_headers).status_code == 403
+    assert client.post("/api/team/audit/clear", headers=manager_headers).status_code == 403
+    assert client.post("/api/team/audit/clear", headers=owner_headers).status_code == 403
+    assert client.post(
+        "/api/team/audit/clear",
+        json={"owner_pin": "0000"},
+        headers=owner_headers,
+    ).status_code == 403
+
+    owner_clear = client.post(
+        "/api/team/audit/clear",
+        json={"owner_pin": "2468"},
+        headers=owner_headers,
+    )
+    assert owner_clear.status_code == 200
+    assert owner_clear.get_json() == {"cleared": 1}
+    assert app_module.load_data()["team_audit"] == []
+
+
 def test_settings_changes_are_audited(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -111,6 +165,14 @@ def test_manager_cannot_change_bar_name_or_api_tokens(tmp_path):
     )
     assert token_response.status_code == 403
     assert token_response.get_json()["error"] == "Insufficient permissions"
+
+    audit_retention_response = client.post(
+        "/api/settings",
+        json={"audit_retention_days": 90},
+        headers=manager_headers,
+    )
+    assert audit_retention_response.status_code == 403
+    assert audit_retention_response.get_json()["error"] == "Insufficient permissions"
 
 
 def test_owner_can_change_bar_name_and_api_tokens(tmp_path):

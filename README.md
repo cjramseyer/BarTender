@@ -32,6 +32,7 @@ Sample dashboard with seeded data:
 - **Tap Management** — Assign kegs to numbered taps and label each line, with single-tap keg assignment protection
 - **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode in Pour Presets, keg type choices/default, pour defaults, and printable menu QR mode in General
 - **Team Access** — Dedicated owner/manager-only Team Access screen for owner profile management, per-user PINs, PIN resets, disable/enable controls, and staff access restrictions
+- **Audit Trail** — Read-only audit log available to all signed-in users from the Menu; owners can configure retention and clear the log with their Owner PIN, while owners and managers can export it
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, low-volume alerts, and a reset option for clearing historical pour data from settings
@@ -77,6 +78,7 @@ Sample dashboard with seeded data:
 - Added in-app API Reference page (`/api-reference`) and interactive API tester, with nav visibility controlled from Settings.
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
 - Added Team Access enhancements: a dedicated Team Access page, owner profile name management, per-user PIN, PIN reset, and disable/enable controls, with staff blocked from the management screen.
+- Added a role-aware Audit Log window with owner-only retention/clear controls, owner/manager export, and events for Analytics pours and inventory changes to bar stock, kegs, and taps.
 - Added an analytics reset action in Settings for clearing historical pour data used in dashboard and forecasting calculations.
 - Added duplicate keg assignment protection for taps (already-connected kegs are shown as in-use and blocked for other taps).
 - Added bar stock category/size quality-of-life updates (expanded defaults and promoted popular custom sizes).
@@ -145,7 +147,9 @@ The add-on exposes a JSON REST API at the ingress URL.
 | GET    | `/api/team/users`                  | List team users (staff sees only self)                    |
 | POST   | `/api/team/users`                  | Create/update users and team access actions               |
 | POST   | `/api/team/users/delete`           | Delete a non-owner user                                   |
-| GET    | `/api/team/audit`                  | List team audit events                                    |
+| GET    | `/api/team/audit`                  | List audit events (owner, manager, and staff)             |
+| GET    | `/api/team/audit/export`           | Download audit events as JSON (owner and manager)         |
+| POST   | `/api/team/audit/clear`            | Clear audit events with Owner PIN (owner only)            |
 | POST   | `/api/analytics/reset`             | Clear historical pour events used in analytics            |
 | GET    | `/api/export/json`                 | Export portable versioned JSON backup                     |
 | GET    | `/api/export/archive`              | Export ZIP archive backup                                 |

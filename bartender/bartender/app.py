@@ -795,7 +795,7 @@ def _team_can(role: str, action: str) -> bool:
         "settings": {"owner", "manager"},
         "team_manage": {"owner", "manager"},
         "team_view": {"owner", "manager", "staff"},
-        "audit_view": {"owner", "manager"},
+        "audit_view": {"owner", "manager", "staff"},
     }
     return action in allowed and normalized in allowed[action]
 
@@ -1247,6 +1247,7 @@ def _record_pour_event(
     source: str,
     tap_id=None,
     preset_name: str = "",
+    actor: dict | None = None,
 ) -> None:
     normalized_unit = _normalize_volume_unit(unit)
     event = {
@@ -1261,6 +1262,21 @@ def _record_pour_event(
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     data.setdefault("pour_events", []).append(event)
+    if actor is not None:
+        _record_team_audit(
+            data,
+            actor,
+            "pour_recorded",
+            f"keg:{keg.get('id')}",
+            {
+                "keg_name": keg.get("name", ""),
+                "tap_id": tap_id,
+                "amount": event["amount"],
+                "unit": normalized_unit,
+                "source": source,
+                "preset_name": preset_name,
+            },
+        )
 
 
 def _build_on_deck_kegs(data: dict) -> list[dict]:
@@ -2313,6 +2329,21 @@ def analytics_view():
     )
 
 
+@app.route("/audit")
+def audit_view():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "audit_view"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    return render_template(
+        "audit.html",
+        settings=data["settings"],
+        audit_events=data.get("team_audit", []),
+        ingress=_effective_ingress_path(),
+    )
+
+
 @app.route("/stock")
 def stock():
     data = load_data()
@@ -2644,6 +2675,7 @@ def api_save_settings():
         "owner_pin",
         "pos_sync_credentials",
         "pos_sync_provider_config_json",
+        "audit_retention_days",
     }
     if current_user.get("role") != "owner":
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -3191,6 +3223,44 @@ def api_get_team_audit():
     return jsonify({"audit": data.get("team_audit", [])})
 
 
+@app.route("/api/team/audit/export", methods=["GET"])
+def api_export_team_audit():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") not in {"owner", "manager"}:
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    date_stamp = _export_date_stamp()
+    return send_file(
+        io.BytesIO(json.dumps(data.get("team_audit", []), indent=2).encode("utf-8")),
+        mimetype="application/json",
+        as_attachment=True,
+        download_name=f"bartender_audit_{date_stamp}.json",
+    )
+
+
+@app.route("/api/team/audit/clear", methods=["POST"])
+def api_clear_team_audit():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
+    if not expected_pin:
+        return jsonify({"error": "An Owner PIN must be configured before clearing audit events."}), 409
+
+    body = request.get_json(silent=True) or {}
+    supplied_pin = str(body.get("owner_pin", "") or "").strip()
+    if not secrets.compare_digest(expected_pin, supplied_pin):
+        return jsonify({"error": "Invalid Owner PIN."}), 403
+
+    cleared_count = len(data.get("team_audit", []))
+    data["team_audit"] = []
+    save_data(data)
+    return jsonify({"cleared": cleared_count})
+
+
 @app.route("/api/settings/logo/upload", methods=["POST"])
 def api_upload_bar_logo():
     uploaded_file = request.files.get("file")
@@ -3316,6 +3386,7 @@ def api_list_stock():
 @app.route("/api/stock", methods=["POST"])
 def api_add_stock():
     data = load_data()
+    current_user = _get_current_team_user()
     if not _bar_stock_enabled(data):
         return jsonify({"error": "Bar stock feature is disabled"}), 403
     body = request.get_json(force=True)
@@ -3335,6 +3406,13 @@ def api_add_stock():
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     data["bar_stock"].append(item)
+    _record_team_audit(
+        data,
+        current_user,
+        "stock_created",
+        f"stock:{item['id']}",
+        {key: item.get(key) for key in ("name", "category", "quantity", "unit")},
+    )
     save_data(data)
     return jsonify(item), 201
 
@@ -3342,6 +3420,7 @@ def api_add_stock():
 @app.route("/api/stock/<int:item_id>", methods=["PUT"])
 def api_update_stock(item_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     if not _bar_stock_enabled(data):
         return jsonify({"error": "Bar stock feature is disabled"}), 403
     for item in data["bar_stock"]:
@@ -3357,6 +3436,16 @@ def api_update_stock(item_id: int):
             if "size_label" in body and "unit" not in body:
                 item["unit"] = body.get("size_label") or ""
             item["updated_at"] = datetime.now(timezone.utc).isoformat()
+            _record_team_audit(
+                data,
+                current_user,
+                "stock_updated",
+                f"stock:{item_id}",
+                {
+                    "changed_fields": sorted(body.keys()),
+                    **{key: item.get(key) for key in ("name", "category", "quantity", "unit")},
+                },
+            )
             save_data(data)
             return jsonify(item)
     return jsonify({"error": "Not found"}), 404
@@ -3365,9 +3454,19 @@ def api_update_stock(item_id: int):
 @app.route("/api/stock/<int:item_id>", methods=["DELETE"])
 def api_delete_stock(item_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     if not _bar_stock_enabled(data):
         return jsonify({"error": "Bar stock feature is disabled"}), 403
+    deleted_item = next((item for item in data["bar_stock"] if item["id"] == item_id), None)
     data["bar_stock"] = [i for i in data["bar_stock"] if i["id"] != item_id]
+    if deleted_item is not None:
+        _record_team_audit(
+            data,
+            current_user,
+            "stock_deleted",
+            f"stock:{item_id}",
+            {key: deleted_item.get(key) for key in ("name", "category", "quantity", "unit")},
+        )
     save_data(data)
     return jsonify({"ok": True})
 
@@ -3726,6 +3825,7 @@ def api_list_kegs():
 @app.route("/api/kegs", methods=["POST"])
 def api_add_keg():
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(force=True)
     initial_status = _normalize_keg_status(body.get("status", "empty"))
     incoming_filled_date = body.get("filled_date", body.get("purchased_date", ""))
@@ -3806,6 +3906,13 @@ def api_add_keg():
             "code": "ON_DECK_REQUIRES_FILLED_KEG",
         }), 409
     data["kegs"].append(keg)
+    _record_team_audit(
+        data,
+        current_user,
+        "keg_created",
+        f"keg:{keg['id']}",
+        {key: keg.get(key) for key in ("name", "beer_name", "status", "type", "size")},
+    )
     save_data(data)
     return jsonify(keg), 201
 
@@ -3813,6 +3920,7 @@ def api_add_keg():
 @app.route("/api/kegs/bulk", methods=["POST"])
 def api_add_kegs_bulk():
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(force=True)
     items = body if isinstance(body, list) else body.get("items", [])
     if not isinstance(items, list) or not items:
@@ -3915,6 +4023,13 @@ def api_add_kegs_bulk():
         simulated_data["kegs"].append(keg)
         created.append(keg)
 
+    _record_team_audit(
+        simulated_data,
+        current_user,
+        "kegs_bulk_created",
+        "kegs",
+        {"count": len(created), "keg_ids": [keg["id"] for keg in created]},
+    )
     save_data(simulated_data)
     return jsonify({"ok": True, "created": created, "count": len(created)}), 201
 
@@ -3922,6 +4037,7 @@ def api_add_kegs_bulk():
 @app.route("/api/kegs/<int:keg_id>", methods=["PUT"])
 def api_update_keg(keg_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     for keg in data["kegs"]:
         if keg["id"] == keg_id:
             previous_keg = dict(keg)
@@ -4103,6 +4219,16 @@ def api_update_keg(keg_id: int):
 
             keg.pop("purchased_date", None)
             keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+            _record_team_audit(
+                data,
+                current_user,
+                "keg_updated",
+                f"keg:{keg_id}",
+                {
+                    "changed_fields": sorted(body.keys()),
+                    **{key: keg.get(key) for key in ("name", "beer_name", "status", "percent_full", "current_volume", "volume_unit")},
+                },
+            )
             save_data(data)
             return jsonify(keg)
     return jsonify({"error": "Not found"}), 404
@@ -4111,6 +4237,7 @@ def api_update_keg(keg_id: int):
 @app.route("/api/kegs/<int:keg_id>/fill", methods=["POST"])
 def api_fill_keg(keg_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(silent=True) or {}
     for keg in data["kegs"]:
         if keg["id"] == keg_id:
@@ -4157,6 +4284,13 @@ def api_fill_keg(keg_id: int):
             keg["percent_full"] = _clamp_percent_full(body.get("percent_full"), 100)
             keg["on_deck"] = False
             keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+            _record_team_audit(
+                data,
+                current_user,
+                "keg_filled",
+                f"keg:{keg_id}",
+                {key: keg.get(key) for key in ("name", "beer_name", "status", "percent_full", "filled_date")},
+            )
             save_data(data)
             return jsonify(keg)
     return jsonify({"error": "Not found"}), 404
@@ -4165,6 +4299,7 @@ def api_fill_keg(keg_id: int):
 @app.route("/api/kegs/<int:keg_id>/clean", methods=["POST"])
 def api_clean_keg(keg_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     for keg in data["kegs"]:
         if keg["id"] != keg_id:
             continue
@@ -4177,6 +4312,13 @@ def api_clean_keg(keg_id: int):
 
         _reset_keg_to_clean_ready(keg)
         keg["updated_at"] = datetime.now(timezone.utc).isoformat()
+        _record_team_audit(
+            data,
+            current_user,
+            "keg_cleaned",
+            f"keg:{keg_id}",
+            {key: keg.get(key) for key in ("name", "status", "percent_full")},
+        )
         save_data(data)
         return jsonify(keg)
 
@@ -4186,6 +4328,7 @@ def api_clean_keg(keg_id: int):
 @app.route("/api/kegs/<int:keg_id>/pour", methods=["POST"])
 def api_pour_keg(keg_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(force=True)
 
     amount = _coerce_float(body.get("amount"), None)
@@ -4198,7 +4341,15 @@ def api_pour_keg(keg_id: int):
         payload, status = _apply_pour_to_keg(data, keg, amount, body.get("unit"))
         if status != 200:
             return jsonify(payload), status
-        _record_pour_event(data, keg, amount, body.get("unit"), "keg", preset_name=str(body.get("preset_name", "")))
+        _record_pour_event(
+            data,
+            keg,
+            amount,
+            body.get("unit"),
+            "keg",
+            preset_name=str(body.get("preset_name", "")),
+            actor=current_user,
+        )
         save_data(data)
         return jsonify(payload)
 
@@ -4208,6 +4359,7 @@ def api_pour_keg(keg_id: int):
 @app.route("/api/taps/<int:tap_id>/pour", methods=["POST"])
 def api_pour_tap(tap_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(force=True)
 
     amount = _coerce_float(body.get("amount"), None)
@@ -4234,7 +4386,16 @@ def api_pour_tap(tap_id: int):
         payload, status = _apply_pour_to_keg(data, keg, amount, body.get("unit"))
         if status != 200:
             return jsonify(payload), status
-        _record_pour_event(data, keg, amount, body.get("unit"), "tap", tap_id=tap_id, preset_name=str(body.get("preset_name", "")))
+        _record_pour_event(
+            data,
+            keg,
+            amount,
+            body.get("unit"),
+            "tap",
+            tap_id=tap_id,
+            preset_name=str(body.get("preset_name", "")),
+            actor=current_user,
+        )
         save_data(data)
         return jsonify(payload)
 
@@ -4244,6 +4405,7 @@ def api_pour_tap(tap_id: int):
 @app.route("/api/kegs/<int:keg_id>", methods=["DELETE"])
 def api_delete_keg(keg_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     assigned_taps = [tap for tap in data["taps"] if tap.get("keg_id") == keg_id]
     if assigned_taps:
         tap_numbers = [tap.get("number") for tap in assigned_taps if tap.get("number") is not None]
@@ -4254,7 +4416,16 @@ def api_delete_keg(keg_id: int):
             "tap_numbers": tap_numbers,
         }), 409
 
+    deleted_keg = next((keg for keg in data["kegs"] if keg["id"] == keg_id), None)
     data["kegs"] = [k for k in data["kegs"] if k["id"] != keg_id]
+    if deleted_keg is not None:
+        _record_team_audit(
+            data,
+            current_user,
+            "keg_deleted",
+            f"keg:{keg_id}",
+            {key: deleted_keg.get(key) for key in ("name", "beer_name", "status", "type", "size")},
+        )
     save_data(data)
     return jsonify({"ok": True})
 
@@ -4282,6 +4453,7 @@ def api_list_taps():
 @app.route("/api/taps", methods=["POST"])
 def api_add_tap():
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(force=True)
     raw_keg_id = body.get("keg_id")
     parsed_keg_id = _coerce_int(raw_keg_id, None)
@@ -4309,6 +4481,13 @@ def api_add_tap():
     }
     _set_keg_tapped_date_if_missing(data, tap.get("keg_id"))
     data["taps"].append(tap)
+    _record_team_audit(
+        data,
+        current_user,
+        "tap_created",
+        f"tap:{tap['id']}",
+        {key: tap.get(key) for key in ("number", "label", "keg_id")},
+    )
     save_data(data)
     return jsonify(tap), 201
 
@@ -4316,6 +4495,7 @@ def api_add_tap():
 @app.route("/api/taps/bulk", methods=["POST"])
 def api_add_taps_bulk():
     data = load_data()
+    current_user = _get_current_team_user()
     body = request.get_json(force=True)
     items = body if isinstance(body, list) else body.get("items", [])
     if not isinstance(items, list) or not items:
@@ -4374,6 +4554,13 @@ def api_add_taps_bulk():
         simulated_data["taps"].append(tap)
         created.append(tap)
 
+    _record_team_audit(
+        simulated_data,
+        current_user,
+        "taps_bulk_created",
+        "taps",
+        {"count": len(created), "tap_ids": [tap["id"] for tap in created]},
+    )
     save_data(simulated_data)
     return jsonify({"ok": True, "created": created, "count": len(created)}), 201
 
@@ -4381,6 +4568,7 @@ def api_add_taps_bulk():
 @app.route("/api/taps/<int:tap_id>", methods=["PUT"])
 def api_update_tap(tap_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
     for tap in data["taps"]:
         if tap["id"] == tap_id:
             body = request.get_json(force=True)
@@ -4409,6 +4597,16 @@ def api_update_tap(tap_id: int):
                     tap["ever_assigned_keg"] = True
             _set_keg_tapped_date_if_missing(data, tap.get("keg_id"))
             tap["updated_at"] = datetime.now(timezone.utc).isoformat()
+            _record_team_audit(
+                data,
+                current_user,
+                "tap_updated",
+                f"tap:{tap_id}",
+                {
+                    "changed_fields": sorted(body.keys()),
+                    **{key: tap.get(key) for key in ("number", "label", "keg_id")},
+                },
+            )
             save_data(data)
             return jsonify(tap)
     return jsonify({"error": "Not found"}), 404
@@ -4417,7 +4615,17 @@ def api_update_tap(tap_id: int):
 @app.route("/api/taps/<int:tap_id>", methods=["DELETE"])
 def api_delete_tap(tap_id: int):
     data = load_data()
+    current_user = _get_current_team_user()
+    deleted_tap = next((tap for tap in data["taps"] if tap["id"] == tap_id), None)
     data["taps"] = [t for t in data["taps"] if t["id"] != tap_id]
+    if deleted_tap is not None:
+        _record_team_audit(
+            data,
+            current_user,
+            "tap_deleted",
+            f"tap:{tap_id}",
+            {key: deleted_tap.get(key) for key in ("number", "label", "keg_id")},
+        )
     save_data(data)
     return jsonify({"ok": True})
 

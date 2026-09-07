@@ -654,6 +654,7 @@ content %}
       <details class="settings-collapsible">
         <summary>Audit Trail</summary>
         <div class="settings-collapsible-body">
+          {% if current_user_role == 'owner' %}
           <div class="form-group">
             <label>Audit Retention (days)</label>
             <input
@@ -669,8 +670,12 @@ content %}
               >Keep audit entries for 1–180 days. Default is 30 days.</small
             >
           </div>
+          {% endif %}
           <div class="form-group">
             <label>All Audit Events</label>
+            <p class="muted" style="margin-top: 0.35rem">
+              <a href="{{ ingress }}/audit">Open the full audit log</a>
+            </p>
             <div
               id="teamAuditList"
               class="stack-gap-sm"

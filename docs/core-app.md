@@ -1,6 +1,6 @@
 # BarTender Core App and Add-on Documentation
 
-Last updated: 2026-09-01
+Last updated: 2026-09-07
 Doc scope: Home Assistant add-on (web app + display service)
 
 ## Overview
@@ -27,6 +27,7 @@ Primary runtime components:
 - Tap CRUD with keg assignment.
 - Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
 - Team Access management from a dedicated owner/manager-only page with profile PIN controls, user management, and staff restriction.
+- Audit Log with role-aware read-only viewing, JSON export, Owner PIN-protected clearing, and inventory activity tracking.
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Analytics reset support for clearing historical pour data used in dashboard and forecasting calculations.
@@ -125,6 +126,7 @@ POST /api/settings
 ```
 
 - 200 response: updated settings object.
+- `audit_retention_days` is owner-only; managers cannot update it.
 
 menu_qr_mode values:
 
@@ -158,7 +160,31 @@ POST /api/team/users/delete
 
 GET /api/team/audit
 
-- Returns audit trail for team actions.
+- Returns the audit trail for owner, manager, and staff roles.
+- Includes Analytics pour events and successful changes to bar stock, kegs, and taps.
+
+GET /api/team/audit/export
+
+- Downloads audit events as a date-stamped JSON file.
+- Requires owner or manager permissions.
+
+POST /api/team/audit/clear
+
+- Clears all audit events.
+- Requires owner permissions and a JSON body containing the configured Owner PIN:
+
+```json
+{
+  "owner_pin": "1234"
+}
+```
+
+### Audit Log UI
+
+- The in-app Menu opens `/audit` in a separate read-only window.
+- All signed-in users can view events.
+- Export is available to owners and managers; the clear control is shown only to owners.
+- Audit retention remains configured in **Settings -> Audit Trail** and is owner-only.
 
 POST /api/analytics/reset
 
