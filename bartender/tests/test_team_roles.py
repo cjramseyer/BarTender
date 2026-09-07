@@ -333,17 +333,20 @@ def test_on_tap_display_title_defaults_to_on_draft_and_saves(tmp_path):
 
     data = app_module.load_data()
     assert data["settings"]["display_title_on_tap"] == "On Draft"
+    assert data["settings"]["display_full_width"] is False
 
     response = client.post(
         "/api/settings",
-        json={"display_title_on_tap": "Draft List"},
+        json={"display_title_on_tap": "Draft List", "display_full_width": True},
         headers=owner_headers,
     )
 
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["display_title_on_tap"] == "Draft List"
+    assert payload["display_full_width"] is True
     assert app_module.load_data()["settings"]["display_title_on_tap"] == "Draft List"
+    assert app_module.load_data()["settings"]["display_full_width"] is True
 
 
 def test_pro_display_count_and_tap_assignments_save(tmp_path):

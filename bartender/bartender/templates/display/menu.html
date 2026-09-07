@@ -74,9 +74,9 @@
         opacity: 0.7;
       }
       .container {
-        max-width: 1100px;
+        max-width: {% if settings.display_full_width %}100%{% else %}1100px{% endif %};
         margin: 0 auto;
-        padding: 1.5rem 1.25rem 2rem;
+        padding: {% if settings.display_full_width %}1.5rem 2rem{% else %}1.5rem 1.25rem 2rem{% endif %};
       }
       .section-title {
         font-size: 1.15rem;
@@ -178,9 +178,9 @@
       {% if on_tap %}
       <div class="menu-grid">
         {% for entry in on_tap %} {% set tap = entry.tap %} {% set keg =
-        entry.keg %} {% set fill_pct = entry.fill_pct %} {% set brewer =
-        keg.beer_brewer or keg.brewery %} {% set abv = keg.beer_abv or keg.abv
-        %}
+        entry.keg %} {% set fill_pct = entry.fill_pct %} {% set brewery =
+        keg.beer_brewery or keg.brewery %} {% set brewer = keg.beer_brewer %}
+        {% set abv = keg.beer_abv or keg.abv %}
         <article class="menu-item">
           <div class="menu-item-header">
             <h2>Tap {{ tap.number }}</h2>
@@ -190,7 +190,7 @@
             >
           </div>
           <p class="menu-item-name">{{ keg.name or 'Untitled Keg' }}</p>
-          <p class="muted">{{ brewer or '—' }}</p>
+          <p class="muted">{{ brewery or brewer or '—' }}</p>
           <p class="muted">{{ abv or '—' }}{% if abv %}%{% endif %}</p>
           <p class="muted">{{ keg.beer_ibu or '—' }}</p>
           <p class="muted">{{ fill_pct }}%</p>

@@ -33,8 +33,9 @@
   is defined else (100 if keg.status == 'full' else 50 if keg.status == 'in_use'
   else 0) %} {% set visual_fill_pct = 12 if fill_pct > 0 and fill_pct < 12 else
   fill_pct %} {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set
-  beer_name = keg.beer_name or '—' %} {% set beer_brewer =
-  keg.beer_brewer or keg.brewery %} {% set beer_abv = keg.beer_abv or keg.abv %}
+  beer_name = keg.beer_name or '—' %} {% set beer_brewery =
+  keg.beer_brewery or keg.brewery %} {% set beer_brewer = keg.beer_brewer %}
+  {% set beer_abv = keg.beer_abv or keg.abv %}
   {% set filled_display = keg.filled_date or '—' %} {% set notes_display =
   keg.notes or '—' %}
   <div
@@ -81,7 +82,10 @@
       {% if keg.coupler_type %}<p><strong>Coupler:</strong> {{ keg.coupler_type }}</p>{% endif %}
       {% if (settings.brewery_type or 'homebrewer') == 'pro' and keg.location %}<p><strong>Location:</strong> {{ keg.location }}</p>{% endif %}
       <p><strong>Beer:</strong> {{ beer_name }}</p>
-      <p><strong>Brewery:</strong> {{ beer_brewer or '—' }}</p>
+      <p><strong>Brewery:</strong> {{ beer_brewery or beer_brewer or '—' }}</p>
+      {% if beer_brewer and beer_brewery and beer_brewer != beer_brewery %}
+      <p><strong>Brewer:</strong> {{ beer_brewer }}</p>
+      {% endif %}
       <p>
         <strong>ABV:</strong> {{ beer_abv or '—' }}{% if beer_abv %}%{% endif %}
       </p>

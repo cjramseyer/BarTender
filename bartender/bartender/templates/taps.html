@@ -18,7 +18,8 @@
   keg.percent_full is defined else (100 if keg and keg.status == 'full' else 50
   if keg and keg.status == 'in_use' else 0) %} {% set visual_fill_pct = 12 if
   fill_pct > 0 and fill_pct < 12 else fill_pct %} {% set low_fill = fill_pct >
-  0 and fill_pct < 12 %} {% set beer_brewer =
+  0 and fill_pct < 12 %} {% set beer_brewery =
+  keg.beer_brewery or keg.brewery if keg else '' %} {% set beer_brewer =
   keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if keg else
   '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set beer_brewed_on =
   keg.beer_brewed_on if keg else '' %}
@@ -51,7 +52,7 @@
         aria-label="{{ keg.name or 'Keg' }} is {{ fill_pct }} percent full"
       >
         <div class="keg-level-shell">
-          <div class="keg-level-fill{% if low_fill %} is-low{% endif %}" style="height: {{ visual_fill_pct }}%;"></div>
+          <div class="keg-level-fill js-keg-level-fill" data-fill-pct="{{ fill_pct }}"></div>
           <div class="keg-level-bands" aria-hidden="true"></div>
           <div class="keg-level-spout" aria-hidden="true"></div>
         </div>
@@ -66,7 +67,10 @@
         >
       </p>
       <p class="muted">Type: {{ keg.type or '—' }}</p>
-      <p class="muted">Brewery: {{ beer_brewer or keg.brewery or '—' }}</p>
+      <p class="muted">Brewery: {{ beer_brewery or beer_brewer or '—' }}</p>
+      {% if beer_brewer and beer_brewery and beer_brewer != beer_brewery %}
+      <p class="muted">Brewer: {{ beer_brewer }}</p>
+      {% endif %}
       <p class="muted">
         ABV: {{ (beer_abv or keg.abv) ~ '%' if (beer_abv or keg.abv) else '—' }}
       </p>
@@ -118,8 +122,9 @@
           {% endfor %}
         </select>
         <button
-          class="btn btn-sm btn-secondary"
-          onclick="pourTap({{ tap.id }})"
+          class="btn btn-sm btn-secondary js-pour-tap-btn"
+          data-tap-id="{{ tap.id }}"
+          type="button"
         >
           Pour
         </button>
@@ -130,12 +135,17 @@
       {% endif %} {% endif %}
       <div class="tap-action-row">
         <button
-          class="btn btn-sm btn-secondary"
-          onclick="editTap({{ tap | tojson | forceescape }})"
+          class="btn btn-sm btn-secondary js-edit-tap-btn"
+          data-tap-id="{{ tap.id }}"
+          type="button"
         >
           Edit
         </button>
-        <button class="btn btn-sm btn-danger" onclick="deleteTap({{ tap.id }})">
+        <button
+          class="btn btn-sm btn-danger js-delete-tap-btn"
+          data-tap-id="{{ tap.id }}"
+          type="button"
+        >
           Delete
         </button>
       </div>
@@ -377,8 +387,43 @@
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
-  const TAPS = {{ taps | tojson }};
-  const KEGS = {{ kegs | tojson }};
+  const TAPS = JSON.parse(`{{ taps | tojson }}`);
+  const KEGS = JSON.parse(`{{ kegs | tojson }}`);
+
+  function wireTapCardEventListeners() {
+    document.querySelectorAll(".js-keg-level-fill").forEach((fillEl) => {
+      const rawValue = Number.parseFloat(fillEl.dataset.fillPct || "0");
+      const normalized = Number.isFinite(rawValue)
+        ? Math.max(0, Math.min(100, rawValue))
+        : 0;
+      const isLow = normalized > 0 && normalized < 12;
+      const visual = isLow ? 12 : normalized;
+      fillEl.style.height = `${visual}%`;
+      fillEl.classList.toggle("is-low", isLow);
+    });
+
+    document.querySelectorAll(".js-pour-tap-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tapId = Number.parseInt(btn.dataset.tapId || "", 10);
+        if (tapId > 0) pourTap(tapId);
+      });
+    });
+
+    document.querySelectorAll(".js-edit-tap-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tapId = Number.parseInt(btn.dataset.tapId || "", 10);
+        const tap = TAPS.find((t) => t.id === tapId);
+        if (tap) editTap(tap);
+      });
+    });
+
+    document.querySelectorAll(".js-delete-tap-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tapId = Number.parseInt(btn.dataset.tapId || "", 10);
+        if (tapId > 0) deleteTap(tapId);
+      });
+    });
+  }
 
   async function pourTap(tapId) {
     const select = document.getElementById(`tapPourPreset-${tapId}`);
@@ -646,6 +691,8 @@
     await fetch(`${INGRESS}/api/taps/${id}`, { method: "DELETE" });
     location.reload();
   }
+
+  wireTapCardEventListeners();
 
   const params = new URLSearchParams(window.location.search);
   if (params.get("add") === "1") {

@@ -440,6 +440,7 @@ DEFAULT_DATA = {
         "keg_type_choices": STANDARD_KEG_TYPE_CHOICES,
         "menu_qr_mode": "both",
         "display_title_on_tap": "On Draft",
+        "display_full_width": False,
         "display_count": 2,
         "display_tap_assignments": [],
         "pour_options": [
@@ -559,6 +560,10 @@ def load_data() -> dict:
         data["settings"]["display_title_on_tap"] = _normalize_display_title_on_tap(
             data["settings"].get("display_title_on_tap")
         )
+        data["settings"]["display_full_width"] = _coerce_bool(
+            data["settings"].get("display_full_width"),
+            False,
+        )
         data["settings"]["display_count"] = _normalize_display_count(
             data["settings"].get("display_count"),
             data["settings"].get("brewery_type"),
@@ -671,6 +676,7 @@ def load_data() -> dict:
             keg.pop("purchased_date", None)
             if "beer_brewer" not in keg:
                 keg["beer_brewer"] = keg.get("brewery", "")
+            keg.setdefault("beer_brewery", keg.get("brewery", ""))
             if "beer_abv" not in keg:
                 keg["beer_abv"] = keg.get("abv", "")
             keg.setdefault("beer_ibu", "")
@@ -1072,6 +1078,10 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
     settings["menu_qr_mode"] = _normalize_menu_qr_mode(settings.get("menu_qr_mode"))
     settings["display_title_on_tap"] = _normalize_display_title_on_tap(
         settings.get("display_title_on_tap")
+    )
+    settings["display_full_width"] = _coerce_bool(
+        settings.get("display_full_width"),
+        False,
     )
     settings["display_count"] = _normalize_display_count(
         settings.get("display_count"),
@@ -2047,7 +2057,7 @@ def _apply_beer_to_keg(keg: dict, beer: dict) -> None:
     keg["beer_ibu"] = beer.get("ibu", "")
     keg["beer_brewed_on"] = beer.get("brewed_on", "")
     # Keep legacy keys synchronized for older clients/views.
-    keg["brewery"] = keg.get("beer_brewer", "")
+    keg["brewery"] = keg.get("beer_brewery") or keg.get("beer_brewer", "")
     keg["abv"] = keg.get("beer_abv", "")
 
 
@@ -2999,6 +3009,7 @@ def api_save_settings():
         "keg_type_choices",
         "menu_qr_mode",
         "display_title_on_tap",
+        "display_full_width",
         "display_count",
         "display_tap_assignments",
         "pour_options",
@@ -4204,7 +4215,8 @@ def api_add_keg():
         "location": str(body.get("location", "")).strip(),
         "serving_psi": str(body.get("serving_psi", "")).strip(),
         "gas_type": str(body.get("gas_type", "")).strip(),
-        "beer_brewer": body.get("beer_brewer", body.get("brewery", "")),
+        "beer_brewer": body.get("beer_brewer", ""),
+        "beer_brewery": body.get("beer_brewery", body.get("brewery", "")),
         "beer_abv": body.get("beer_abv", body.get("abv", "")),
         "beer_ibu": body.get("beer_ibu", ""),
         "beer_brewed_on": body.get("beer_brewed_on", ""),
@@ -4216,7 +4228,7 @@ def api_add_keg():
             or _default_volume_unit(data.get("settings", {}).get("measurement", "us"))
         ),
         # Keep legacy keys in sync for older clients.
-        "brewery": body.get("brewery", body.get("beer_brewer", "")),
+        "brewery": body.get("brewery", body.get("beer_brewery", body.get("beer_brewer", ""))),
         "abv": body.get("abv", body.get("beer_abv", "")),
         "notes": body.get("notes", ""),
         "tapped_date": body.get("tapped_date", ""),
@@ -4322,7 +4334,8 @@ def api_add_kegs_bulk():
             "location": str(item.get("location", "")).strip(),
             "serving_psi": str(item.get("serving_psi", "")).strip(),
             "gas_type": str(item.get("gas_type", "")).strip(),
-            "beer_brewer": item.get("beer_brewer", item.get("brewery", "")),
+            "beer_brewer": item.get("beer_brewer", ""),
+            "beer_brewery": item.get("beer_brewery", item.get("brewery", "")),
             "beer_abv": item.get("beer_abv", item.get("abv", "")),
             "beer_ibu": item.get("beer_ibu", ""),
             "beer_brewed_on": item.get("beer_brewed_on", ""),
@@ -4333,7 +4346,7 @@ def api_add_kegs_bulk():
                 item.get("volume_unit")
                 or _default_volume_unit(simulated_data.get("settings", {}).get("measurement", "us"))
             ),
-            "brewery": item.get("brewery", item.get("beer_brewer", "")),
+            "brewery": item.get("brewery", item.get("beer_brewery", item.get("beer_brewer", ""))),
             "abv": item.get("abv", item.get("beer_abv", "")),
             "notes": item.get("notes", ""),
             "tapped_date": item.get("tapped_date", ""),
@@ -4410,12 +4423,12 @@ def api_update_keg(keg_id: int):
                     }), 409
 
             # Backward compatibility: map between legacy and new beer fields.
-            if "brewery" in body and "beer_brewer" not in body:
-                body["beer_brewer"] = body["brewery"]
+            if "brewery" in body and "beer_brewery" not in body:
+                body["beer_brewery"] = body["brewery"]
+            if "beer_brewery" in body and "brewery" not in body:
+                body["brewery"] = body["beer_brewery"]
             if "abv" in body and "beer_abv" not in body:
                 body["beer_abv"] = body["abv"]
-            if "beer_brewer" in body and "brewery" not in body:
-                body["brewery"] = body["beer_brewer"]
             if "beer_abv" in body and "abv" not in body:
                 body["abv"] = body["beer_abv"]
             if "line_cleaning_keg" in body:
@@ -4477,6 +4490,7 @@ def api_update_keg(keg_id: int):
                 "serving_psi",
                 "gas_type",
                 "beer_brewer",
+                "beer_brewery",
                 "beer_abv",
                 "beer_ibu",
                 "beer_brewed_on",

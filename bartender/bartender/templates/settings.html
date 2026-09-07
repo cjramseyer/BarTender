@@ -261,6 +261,18 @@ content %}
             />
             <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
           </div>
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.display_full_width %}
+              <input type="checkbox" id="displayFullWidth" checked />
+              {% else %}
+              <input type="checkbox" id="displayFullWidth" />
+              {% endif %} Full-Width Display Layout
+            </label>
+            <small class="muted"
+              >When enabled, the display view expands across 100% of the screen/browser width instead of centering within a fixed container.</small
+            >
+          </div>
           <div class="form-group" id="proDisplaySettings">
             <label for="displayCount">Number of Displays</label>
             <input
@@ -1024,41 +1036,81 @@ content %}
               Copy
             </button>
           </div>
-          <p class="muted" style="margin-top: 0.35rem">Display URL</p>
+          <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
           <div class="settings-url-row">
             <a
-              id="externalDisplayUrl"
+              id="localDisplayUrl"
               class="settings-url-link"
-              href="{{ external_display_url }}"
+              href="{{ auto_external_display_url }}"
               target="_blank"
               rel="noopener noreferrer"
-              >{{ external_display_url }}</a
+              >{{ auto_external_display_url }}</a
             >
             <button
               type="button"
               class="btn btn-sm btn-secondary"
-              onclick="copyExternalUrl('externalDisplayUrl', this)"
+              onclick="copyExternalUrl('localDisplayUrl', this)"
             >
               Copy
             </button>
           </div>
-          <p class="muted" style="margin-top: 1rem">Printable Menu URL</p>
+          <div id="externalDisplayUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
+            <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
+            <div class="settings-url-row">
+              <a
+                id="externalDisplayUrl"
+                class="settings-url-link"
+                href="{{ external_display_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ external_display_url }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('externalDisplayUrl', this)"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+          <p class="muted" style="margin-top: 0.75rem">Local Printable Menu URL</p>
           <div class="settings-url-row">
             <a
-              id="externalMenuUrl"
+              id="localMenuUrl"
               class="settings-url-link"
-              href="{{ external_menu_url }}"
+              href="{{ auto_external_menu_url }}"
               target="_blank"
               rel="noopener noreferrer"
-              >{{ external_menu_url }}</a
+              >{{ auto_external_menu_url }}</a
             >
             <button
               type="button"
               class="btn btn-sm btn-secondary"
-              onclick="copyExternalUrl('externalMenuUrl', this)"
+              onclick="copyExternalUrl('localMenuUrl', this)"
             >
               Copy
             </button>
+          </div>
+          <div id="externalMenuUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
+            <p class="muted" style="margin-top: 0.35rem">External Printable Menu URL</p>
+            <div class="settings-url-row">
+              <a
+                id="externalMenuUrl"
+                class="settings-url-link"
+                href="{{ external_menu_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ external_menu_url }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('externalMenuUrl', this)"
+              >
+                Copy
+              </button>
+            </div>
           </div>
           <p class="muted" style="margin-top: 0.35rem">
             QR Status: {% if qr_ready %}
@@ -1378,6 +1430,9 @@ content %}
       display_title_on_tap: document.getElementById("displayTitleOnTap")
         ? document.getElementById("displayTitleOnTap").value.trim() || "On Draft"
         : "On Draft",
+      display_full_width: document.getElementById("displayFullWidth")
+        ? document.getElementById("displayFullWidth").checked
+        : false,
       analytics_low_keg_threshold_percent: getClampedIntegerValue(
         "analyticsLowThreshold",
         25,
@@ -1553,6 +1608,10 @@ content %}
       typeof savedSettings.display_title_on_tap === "string"
     ) {
       displayTitleOnTapInput.value = savedSettings.display_title_on_tap;
+    }
+    const displayFullWidthInput = document.getElementById("displayFullWidth");
+    if (displayFullWidthInput && savedSettings.display_full_width !== undefined) {
+      displayFullWidthInput.checked = Boolean(savedSettings.display_full_width);
     }
     const analyticsLowThresholdInput = document.getElementById("analyticsLowThreshold");
     if (
@@ -1991,21 +2050,30 @@ content %}
   function updateExternalReadonlyLinks(externalBaseUrl = "") {
     const displayLink = document.getElementById("externalDisplayUrl");
     const menuLink = document.getElementById("externalMenuUrl");
+    const externalDisplayBlock = document.getElementById("externalDisplayUrlBlock");
+    const externalMenuBlock = document.getElementById("externalMenuUrlBlock");
+
     const overrideBase = String(externalBaseUrl || "")
       .trim()
       .replace(/\/+$/, "");
-    const autoBase = String(AUTO_EXTERNAL_DISPLAY_URL || "")
-      .trim()
-      .replace(/\/+$/, "");
-    const base = overrideBase || autoBase;
+    const hasOverride = Boolean(overrideBase);
 
-    if (displayLink && base) {
-      displayLink.href = `${base}/`;
-      displayLink.textContent = `${base}/`;
+    if (externalDisplayBlock) {
+      externalDisplayBlock.style.display = hasOverride ? "" : "none";
     }
-    if (menuLink && base) {
-      menuLink.href = `${base}/menu`;
-      menuLink.textContent = `${base}/menu`;
+    if (externalMenuBlock) {
+      externalMenuBlock.style.display = hasOverride ? "" : "none";
+    }
+
+    if (hasOverride) {
+      if (displayLink) {
+        displayLink.href = `${overrideBase}/`;
+        displayLink.textContent = `${overrideBase}/`;
+      }
+      if (menuLink) {
+        menuLink.href = `${overrideBase}/menu`;
+        menuLink.textContent = `${overrideBase}/menu`;
+      }
     }
   }
 
@@ -2760,6 +2828,7 @@ content %}
     "analyticsEnabled",
     "analyticsDaysMethod",
     "anonymousTelemetryEnabled",
+    "displayFullWidth",
   ].forEach((inputId) => {
     const input = document.getElementById(inputId);
     if (!input) {

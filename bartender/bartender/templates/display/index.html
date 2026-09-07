@@ -93,9 +93,9 @@
         opacity: 0.6;
       }
       .container {
-        max-width: 1100px;
+        max-width: {% if settings.display_full_width %}100%{% else %}1100px{% endif %};
         margin: 0 auto;
-        padding: 2rem 1.25rem;
+        padding: {% if settings.display_full_width %}1.5rem 2rem{% else %}2rem 1.25rem{% endif %};
       }
       .section-title {
         font-size: 1.3rem;
@@ -449,7 +449,8 @@
         keg.percent_full is defined else (100 if keg and keg.status == 'full'
         else 50 if keg and keg.status == 'in_use' else 0) %} {% set
         visual_fill_pct = 12 if fill_pct > 0 and fill_pct < 12 else fill_pct %}
-        {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set beer_brewer
+        {% set low_fill = fill_pct > 0 and fill_pct < 12 %} {% set beer_brewery
+        = keg.beer_brewery or keg.brewery if keg else '' %} {% set beer_brewer
         = keg.beer_brewer if keg else '' %} {% set beer_abv = keg.beer_abv if
         keg else '' %} {% set beer_ibu = keg.beer_ibu if keg else '' %} {% set
         beer_brewed_on = keg.beer_brewed_on if keg else '' %}
@@ -486,7 +487,10 @@
                 replace('_', ' ') | title) }}</span
               >
             </p>
-            <p class="muted">Brewery: {{ beer_brewer or keg.brewery or '—' }}</p>
+            <p class="muted">Brewery: {{ beer_brewery or beer_brewer or '—' }}</p>
+            {% if beer_brewer and beer_brewery and beer_brewer != beer_brewery %}
+            <p class="muted">Brewer: {{ beer_brewer }}</p>
+            {% endif %}
             <p class="muted">
               ABV: {{ (beer_abv or keg.abv) ~ '%' if (beer_abv or keg.abv) else '—' }}
               · IBU: {{ beer_ibu or '—' }}
