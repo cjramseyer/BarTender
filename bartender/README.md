@@ -54,6 +54,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
 - **Standalone Window Launch** — Open the main app in a new browser tab/window from the in-app Menu while still using Home Assistant ingress
 - **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, Team Access (owner profile, per-user PIN, reset PIN, disable/enable), pour mode in Pour Presets, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode in General
+- **Audit Trail** — Read-only Audit Log window for all signed-in users; owners manage retention and clear events with their Owner PIN, and owners/managers can export JSON
 - **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
 - **Analytics** — Dashboard summaries for recent pours, near-empty kegs, and depletion forecasting
@@ -122,6 +123,7 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 - Added in-app API Reference page (`/api-reference`) with an API request tester.
 - Added default pour preset setting applied to pour selectors across dashboard and taps pages.
 - Added Team Access enhancements: owner profile name, user PINs, reset PIN, and disable/enable controls.
+- Added role-aware audit viewing, export, and owner-PIN-protected clearing. Analytics pours and changes to bar stock, kegs, and taps are recorded in the audit trail.
 - Added tap assignment guardrails that prevent selecting kegs already connected to other taps.
 - Added bar stock category/size defaults and promotion of frequently used custom sizes.
 - Updated export download filenames to include UTC date stamps.
@@ -153,6 +155,14 @@ No configuration required. All settings are managed from within the web UI after
 - Standard size options include 12 oz bottle, 16 oz bottle, and 12 oz can.
 - Frequently used custom sizes are promoted into main size options.
 - Disable the Bar Stock feature from Settings if not needed.
+
+### Audit Trail
+
+- Open **Audit Log** from the in-app Menu; it opens in a separate read-only window.
+- All signed-in roles can view audit events.
+- Owners and managers can download the audit trail as JSON.
+- Only the owner can set audit retention or clear the audit trail. Clearing requires the configured Owner PIN.
+- Audited actions include Analytics pours and successful create, update, bulk-create, fill, clean, or delete operations for bar stock, kegs, and taps.
 
 ## Key Settings
 
