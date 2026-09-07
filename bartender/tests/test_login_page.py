@@ -174,7 +174,7 @@ def test_owner_requires_pin_when_other_users_exist(tmp_path):
         assert session["user_role"] == "owner"
 
 
-def test_owner_recovery_redirects_to_settings_when_pin_missing(tmp_path):
+def test_owner_recovery_redirects_to_team_access_when_pin_missing(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
 
@@ -193,11 +193,15 @@ def test_owner_recovery_redirects_to_settings_when_pin_missing(tmp_path):
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"] == "/settings"
+    assert response.headers["Location"] == "/team-access"
     with client.session_transaction() as session:
         assert session["user_id"] == "owner"
         assert session["user_role"] == "owner"
         assert session["owner_pin_recovery_required"] is True
+
+    team_access_response = client.get("/team-access", follow_redirects=False)
+    assert team_access_response.status_code == 200
+    assert "Save an Owner PIN here" in team_access_response.get_data(as_text=True)
 
     blocked_response = client.get("/api/team/audit", follow_redirects=False)
     assert blocked_response.status_code == 423
@@ -222,7 +226,7 @@ def test_saving_owner_pin_clears_recovery_lock(tmp_path):
         follow_redirects=False,
     )
     assert login_response.status_code == 302
-    assert login_response.headers["Location"] == "/settings"
+    assert login_response.headers["Location"] == "/team-access"
 
     save_response = client.post(
         "/api/settings",
@@ -235,6 +239,87 @@ def test_saving_owner_pin_clears_recovery_lock(tmp_path):
 
     unlocked_response = client.get("/api/team/audit", follow_redirects=False)
     assert unlocked_response.status_code == 200
+
+
+def test_settings_recovery_banner_links_to_team_access(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"},
+        {"id": "manager-1", "name": "Manager One", "role": "manager", "created_at": "2024-01-01T00:00:00Z"},
+    ]
+    data["settings"]["owner_pin"] = ""
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+        session["owner_pin_recovery_required"] = True
+
+    response = client.get("/settings", follow_redirects=False)
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Owner Recovery Mode" in body
+    assert 'href="/team-access"' in body
+    assert "Open Team Access" in body
+
+
+def test_settings_save_without_owner_pin_keeps_existing_owner_pin(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "created_at": "2024-01-01T00:00:00Z"},
+        {"id": "manager-1", "name": "Manager One", "role": "manager", "created_at": "2024-01-01T00:00:00Z"},
+    ]
+    data["settings"]["owner_pin"] = "2468"
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post(
+        "/api/settings",
+        json={"bar_name": "Updated Bar"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["bar_name"] == "Updated Bar"
+    assert app_module.load_data()["settings"]["owner_pin"] == "2468"
+
+
+def test_settings_shows_homebrewer_display_default_message(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "homebrewer"
+    data["settings"]["display_count"] = 1
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/settings", follow_redirects=False)
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Number of Displays" in body
+    assert "Homebrewer installs default to 1 display." in body
+    assert "Basic settings save automatically." in body
+    assert "Save Advanced Settings" in body
+    assert 'id="displayCount"' in body
+    assert 'disabled' in body
+    assert 'value="1"' in body
 
 
 def test_authenticated_layout_shows_logout_link(tmp_path):
