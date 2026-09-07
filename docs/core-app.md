@@ -277,7 +277,6 @@ POST /api/beers
   "serving_temperature": "38-42 F",
   "glassware": "Pint",
   "supplier": "Local Supply",
-  "purchase_cost": "125.50",
   "sku": "IPA-001",
   "recipe_url": "https://example.com/recipes/house-ipa",
   "notes": "Seasonal batch"
@@ -602,7 +601,8 @@ Owners can enable **Settings -> Privacy -> Share Anonymous Usage Statistics**. W
 {
   "installation_id": "locally-generated-uuid",
   "app_version": "version",
-  "addon_version": "version"
+  "addon_version": "version",
+  "brewery_type": "homebrewer"
 }
 ```
 
@@ -631,7 +631,6 @@ beer catalog fields:
 - glassware: string
 - supplier: string
 - distributor: string
-- purchase_cost: numeric string
 - sku: string
 - upc: string
 - recipe_url: string
@@ -652,24 +651,36 @@ keg fields:
 
 - id: integer
 - name: string
+- serial_number: string
 - beer_id: integer or null
 - beer_name: string
 - type: string
 - size: string
 - custom_size: string
 - status: string
+- coupler_type: string
+- ownership_type: string
+- location: string
+- serving_psi: string
+- gas_type: string
 - beer_brewer: string
 - beer_abv: string
 - beer_ibu: string
 - beer_brewed_on: date string (YYYY-MM-DD)
 - line_cleaning_keg: boolean
+- on_deck: boolean
 - current_volume: number or null
 - volume_unit: string (oz, gal, ml, l)
 - brewery: string (legacy compatibility mirror)
 - abv: string (legacy compatibility mirror)
 - notes: string
+- tapped_date: date string (YYYY-MM-DD)
 - filled_date: date string (YYYY-MM-DD)
+- kicked_date: date string (YYYY-MM-DD)
+- cleaned_date: date string (YYYY-MM-DD)
 - percent_full: integer (0-100)
+- created_at: ISO datetime string (UTC)
+- updated_at: ISO datetime string (UTC)
 - tapped_date: date string (YYYY-MM-DD)
 - updated_at: ISO datetime string (UTC)
 
@@ -683,7 +694,20 @@ tap fields:
 - id: integer
 - number: integer
 - label: string
+- location: string
+- status: string (`active`, `cleaning`, `maintenance`, `offline`)
+- tap_handle: string
+- faucet_type: string
+- line_length_feet: string
+- line_inner_diameter: string
+- line_material: string
+- target_pressure_psi: string
+- target_temperature: string
+- clean_interval_days: integer
+- last_cleaned_date: date string (YYYY-MM-DD)
+- last_serviced_date: date string (YYYY-MM-DD)
 - keg_id: integer or null
+- ever_assigned_keg: boolean
 - notes: string
 - updated_at: ISO datetime string (UTC)
 

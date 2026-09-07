@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from flask import Flask, render_template, send_file
+from flask import Flask, render_template, send_file, request
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
@@ -30,6 +30,70 @@ DEFAULT_DATA = {
     "kegs": [],
     "taps": [],
 }
+
+
+def _coerce_int(value, fallback=None):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _coerce_bool(value, fallback: bool = False) -> bool:
+    if value is None:
+        return fallback
+    if isinstance(value, bool):
+        return value
+    val_str = str(value).strip().lower()
+    if val_str in ("true", "1", "yes", "on"):
+        return True
+    if val_str in ("false", "0", "no", "off"):
+        return False
+    return fallback
+
+
+def _build_on_deck_kegs(data: dict) -> list[dict]:
+    return [
+        keg
+        for keg in data.get("kegs", [])
+        if isinstance(keg, dict)
+        and _coerce_bool(keg.get("on_deck"), False)
+        and not _coerce_bool(keg.get("line_cleaning_keg"), False)
+    ]
+
+
+def _normalize_brewery_type(value) -> str:
+    normalized = str(value or "homebrewer").strip().lower()
+    if normalized == "commercial":
+        return "pro"
+    if normalized in ("homebrewer", "pro"):
+        return normalized
+    return "homebrewer"
+
+
+def _normalize_display_count(value, brewery_type: str | None = None) -> int:
+    normalized_type = _normalize_brewery_type(brewery_type)
+    count = _coerce_int(value, 2)
+    if count is None:
+        return 2
+    if normalized_type != "pro":
+        return 2
+    return max(1, min(12, count))
+
+
+def _normalize_display_tap_assignments(value, display_count: int = 2) -> list[list[int]]:
+    raw = value if isinstance(value, list) else []
+    count = max(1, _coerce_int(display_count, 2) or 2)
+    normalized = []
+    for index in range(count):
+        numbers = []
+        if index < len(raw) and isinstance(raw[index], list):
+            for item in raw[index]:
+                number = _coerce_int(item, None)
+                if number is not None and number > 0:
+                    numbers.append(number)
+        normalized.append(sorted(set(numbers)))
+    return normalized
 
 
 def load_data() -> dict:
@@ -84,12 +148,50 @@ def _get_uploaded_logo_file_path() -> Path | None:
 @display_app.route("/")
 def index():
     data = load_data()
+    brewery_type = _normalize_brewery_type(data.get("settings", {}).get("brewery_type"))
+    display_count = _normalize_display_count(
+        data.get("settings", {}).get("display_count"),
+        brewery_type,
+    )
+    selected_display_index = max(1, min(display_count, _coerce_int(request.args.get("display"), 1) or 1))
+    assignments = _normalize_display_tap_assignments(
+        data.get("settings", {}).get("display_tap_assignments"),
+        display_count,
+    )
+    selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
+
+    taps = data.get("taps", [])
+    on_deck_kegs = _build_on_deck_kegs(data)
+    show_taps = True
+    show_on_deck = True
+    show_bar_stock = _coerce_bool(data.get("settings", {}).get("bar_stock_enabled"), True)
+
+    if brewery_type == "homebrewer" and display_count > 1:
+        if selected_display_index == 1:
+            show_taps = True
+            show_on_deck = True
+            show_bar_stock = False
+        elif selected_display_index == 2:
+            show_taps = False
+            show_on_deck = False
+            show_bar_stock = True
+    elif brewery_type == "pro" and display_count > 1:
+        if selected_taps:
+            taps = [tap for tap in taps if _coerce_int(tap.get("number"), None) in selected_taps]
+        else:
+            taps = []
+
     return render_template(
         "display/index.html",
         settings=data["settings"],
-        taps=data["taps"],
-        kegs=data["kegs"],
-        bar_stock=data["bar_stock"],
+        taps=taps,
+        kegs=data.get("kegs", []),
+        bar_stock=data.get("bar_stock", []),
+        on_deck_kegs=on_deck_kegs,
+        selected_display_index=selected_display_index,
+        show_taps=show_taps,
+        show_on_deck=show_on_deck,
+        show_bar_stock=show_bar_stock,
     )
 
 

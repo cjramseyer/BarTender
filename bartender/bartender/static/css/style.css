@@ -647,6 +647,40 @@ textarea.form-control {
   cursor: pointer;
 }
 
+/* Allergen Multi-Select Picker */
+.allergen-picker-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.allergen-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease-in-out;
+}
+.allergen-chip:hover {
+  border-color: var(--primary);
+}
+.allergen-chip input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0;
+}
+.allergen-chip:has(input[type="checkbox"]:checked) {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.12);
+  font-weight: 500;
+}
+
 /* Page header */
 .page-header {
   display: flex;

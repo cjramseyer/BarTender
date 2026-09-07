@@ -31,7 +31,7 @@ def test_inventory_mutations_are_recorded_in_the_audit_trail(tmp_path):
     }
 
     data = app_module.load_data()
-    data["settings"]["brewery_type"] = "commercial"
+    data["settings"]["brewery_type"] = "pro"
     data["beers"] = [{"id": 1, "name": "House IPA", "packaging": "kegged"}]
     app_module.save_data(data)
 

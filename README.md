@@ -27,7 +27,7 @@ Sample dashboard with seeded data:
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
-- **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, cost, and recipe/source details
+- **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, and recipe/source details
 - **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line, with single-tap keg assignment protection
 - **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode in Pour Presets, keg type choices/default, pour defaults, and printable menu QR mode in General
@@ -75,7 +75,7 @@ Sample dashboard with seeded data:
 - Updated pour behavior so each pour also updates `percent_full`, and first pour transitions keg status from `full` to `in_use`.
 - Updated keg edit behavior so changing `current_volume` auto-adjusts `percent_full` when percent is not explicitly set.
 - Added Beer Catalog management and linked kegs to selected beers (`beer_id`, `beer_name`) instead of direct beer-detail editing in keg forms.
-- Expanded Beer Catalog records with freshness, serving, menu/allergen, supplier, cost, identifier, and recipe/source fields, including CSV import/export support.
+- Expanded Beer Catalog records with freshness, serving, menu/allergen, supplier, identifier, and recipe/source fields, including CSV import/export support.
 - Added fill-keg flow that requires selecting a beer from the catalog when marking a keg full.
 - Added in-app API Reference page (`/api-reference`) and interactive API tester, with nav visibility controlled from Settings.
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.

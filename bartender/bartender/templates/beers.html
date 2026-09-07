@@ -207,7 +207,21 @@
       </div>
       <div class="form-group">
         <label>Allergens</label>
-        <input type="text" id="beerAllergens" class="form-control" placeholder="e.g. Lactose, Wheat, Almond" />
+        <div class="allergen-picker-group">
+          {% for allergen in allergen_choices %}
+          <label class="allergen-chip">
+            <input type="checkbox" name="beer_allergen_choice" value="{{ allergen }}" />
+            <span>{{ allergen }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <input
+          type="text"
+          id="beerAllergensCustom"
+          class="form-control"
+          placeholder="Other / custom allergens (comma-separated, e.g. Hazelnut, Pecan)"
+        />
+        <small class="muted">Select any applicable allergens above or enter custom allergens.</small>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Color (SRM)</label><input type="number" id="beerColorSrm" class="form-control" min="0" step="0.1" /></div>
@@ -215,15 +229,43 @@
         <div class="form-group"><label>Serving Temperature</label><input type="text" id="beerServingTemperature" class="form-control" placeholder="e.g. 38-42 F" /></div>
         <div class="form-group"><label>Glassware</label><input type="text" id="beerGlassware" class="form-control" placeholder="e.g. Pint" /></div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Supplier</label><input type="text" id="beerSupplier" class="form-control" /></div>
-        <div class="form-group"><label>Distributor</label><input type="text" id="beerDistributor" class="form-control" /></div>
-        <div class="form-group"><label>Purchase Cost</label><input type="number" id="beerPurchaseCost" class="form-control" min="0" step="0.01" /></div>
+      <div class="form-group">
+        <label>Supplier</label>
+        <input
+          type="text"
+          id="beerSupplier"
+          class="form-control"
+          list="beerSupplierOptions"
+          placeholder="e.g. Acme Brewing Supplies"
+        />
+        <datalist id="beerSupplierOptions">
+          {% for supplier in supplier_choices %}
+          <option value="{{ supplier }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="form-group">
+        <label>Distributor</label>
+        <input
+          type="text"
+          id="beerDistributor"
+          class="form-control"
+          list="beerDistributorOptions"
+          placeholder="e.g. Statewide Beverage Distributors"
+        />
+        <datalist id="beerDistributorOptions">
+          {% for distributor in distributor_choices %}
+          <option value="{{ distributor }}"></option>
+          {% endfor %}
+        </datalist>
       </div>
       <div class="form-row">
         <div class="form-group"><label>SKU</label><input type="text" id="beerSku" class="form-control" /></div>
         <div class="form-group"><label>UPC</label><input type="text" id="beerUpc" class="form-control" /></div>
-        <div class="form-group"><label>Recipe or Source URL</label><input type="url" id="beerRecipeUrl" class="form-control" placeholder="https://" /></div>
+      </div>
+      <div class="form-group">
+        <label>Recipe or Source URL</label>
+        <input type="url" id="beerRecipeUrl" class="form-control" placeholder="https://" />
       </div>
       <div class="form-group">
         <label>Notes</label>
@@ -246,6 +288,10 @@
     document.getElementById("beerModalTitle").textContent = "Add Beer";
     document.getElementById("beerForm").reset();
     document.getElementById("beerId").value = "";
+    document.querySelectorAll('input[name="beer_allergen_choice"]').forEach((cb) => {
+      cb.checked = false;
+    });
+    document.getElementById("beerAllergensCustom").value = "";
     openModal("beerModal");
   }
 
@@ -265,19 +311,47 @@
     document.getElementById("beerBestByDate").value = beer.best_by_date || "";
     document.getElementById("beerAvailabilityStatus").value = beer.availability_status || "available";
     document.getElementById("beerDescription").value = beer.description || "";
-    document.getElementById("beerAllergens").value = (beer.allergens || []).join(", ");
+
+    const beerAllergens = Array.isArray(beer.allergens) ? beer.allergens : [];
+    const matchedAllergens = new Set();
+    document.querySelectorAll('input[name="beer_allergen_choice"]').forEach((cb) => {
+      const isChecked = beerAllergens.some((a) => String(a).toLowerCase() === cb.value.toLowerCase());
+      cb.checked = isChecked;
+      if (isChecked) {
+        matchedAllergens.add(cb.value.toLowerCase());
+      }
+    });
+    const customAllergens = beerAllergens.filter((a) => !matchedAllergens.has(String(a).toLowerCase()));
+    document.getElementById("beerAllergensCustom").value = customAllergens.join(", ");
+
     document.getElementById("beerColorSrm").value = beer.color_srm || "";
     document.getElementById("beerColorEbc").value = beer.color_ebc || "";
     document.getElementById("beerServingTemperature").value = beer.serving_temperature || "";
     document.getElementById("beerGlassware").value = beer.glassware || "";
     document.getElementById("beerSupplier").value = beer.supplier || "";
     document.getElementById("beerDistributor").value = beer.distributor || "";
-    document.getElementById("beerPurchaseCost").value = beer.purchase_cost || "";
     document.getElementById("beerSku").value = beer.sku || "";
     document.getElementById("beerUpc").value = beer.upc || "";
     document.getElementById("beerRecipeUrl").value = beer.recipe_url || "";
     document.getElementById("beerNotes").value = beer.notes || "";
     openModal("beerModal");
+  }
+
+  function collectSelectedAllergens() {
+    const selected = [];
+    document.querySelectorAll('input[name="beer_allergen_choice"]:checked').forEach((cb) => {
+      selected.push(cb.value);
+    });
+    const customInput = document.getElementById("beerAllergensCustom").value;
+    if (customInput) {
+      customInput.split(",").forEach((item) => {
+        const trimmed = item.trim();
+        if (trimmed && !selected.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+          selected.push(trimmed);
+        }
+      });
+    }
+    return selected;
   }
 
   async function submitBeer(e) {
@@ -297,14 +371,13 @@
       best_by_date: document.getElementById("beerBestByDate").value,
       availability_status: document.getElementById("beerAvailabilityStatus").value,
       description: document.getElementById("beerDescription").value.trim(),
-      allergens: document.getElementById("beerAllergens").value.split(",").map((item) => item.trim()).filter(Boolean),
+      allergens: collectSelectedAllergens(),
       color_srm: document.getElementById("beerColorSrm").value.trim(),
       color_ebc: document.getElementById("beerColorEbc").value.trim(),
       serving_temperature: document.getElementById("beerServingTemperature").value.trim(),
       glassware: document.getElementById("beerGlassware").value.trim(),
       supplier: document.getElementById("beerSupplier").value.trim(),
       distributor: document.getElementById("beerDistributor").value.trim(),
-      purchase_cost: document.getElementById("beerPurchaseCost").value.trim(),
       sku: document.getElementById("beerSku").value.trim(),
       upc: document.getElementById("beerUpc").value.trim(),
       recipe_url: document.getElementById("beerRecipeUrl").value.trim(),
