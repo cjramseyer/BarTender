@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Activity</p>
+    <h1>Audit Log</h1>
+  </div>
+  {% if current_user_role in ['owner', 'manager'] %}
+  <div class="settings-header-actions">
+    <a
+      class="btn btn-sm btn-secondary"
+      href="{{ ingress }}/api/team/audit/export"
+      >Export</a
+    >
+    {% if current_user_role == 'owner' %}
+    <button
+      type="button"
+      class="btn btn-sm btn-danger"
+      onclick="clearAuditLog()"
+      >Clear</button
+    >
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  {% if audit_events %}
+  <div style="overflow-x: auto">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Action</th>
+          <th>Actor</th>
+          <th>Target</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in audit_events %}
+        <tr>
+          <td>{{ event.created_at }}</td>
+          <td>{{ event.action | replace('_', ' ') | title }}</td>
+          <td>{{ event.actor_name or event.actor_id or 'System' }}</td>
+          <td>{{ event.target or 'Unknown' }}</td>
+          <td>{{ event.details | tojson if event.details else '-' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No audit events yet.</p>
+  {% endif %}
+</div>
+
+{% if current_user_role == 'owner' %}
+<script>
+  async function clearAuditLog() {
+    const ownerPin = window.prompt("Enter your Owner PIN to clear all audit events.");
+    if (ownerPin === null) {
+      return;
+    }
+
+    if (!window.confirm("Clear all audit events? This cannot be undone.")) {
+      return;
+    }
+
+    const response = await fetch("{{ ingress }}/api/team/audit/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ owner_pin: ownerPin }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      window.alert(body.error || "Unable to clear audit events.");
+      return;
+    }
+    window.location.reload();
+  }
+</script>
+{% endif %}
+{% endblock %}
