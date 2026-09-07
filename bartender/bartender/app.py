@@ -810,6 +810,7 @@ def _send_anonymous_telemetry_heartbeat() -> None:
         "installation_id": installation_id,
         "app_version": APP_VERSION,
         "addon_version": APP_VERSION,
+        "brewery_type": _normalize_brewery_type(settings.get("brewery_type")),
     }).encode("utf-8")
     request_payload = Request(
         TELEMETRY_HEARTBEAT_URL,

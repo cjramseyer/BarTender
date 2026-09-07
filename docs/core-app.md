@@ -601,7 +601,8 @@ Owners can enable **Settings -> Privacy -> Share Anonymous Usage Statistics**. W
 {
   "installation_id": "locally-generated-uuid",
   "app_version": "version",
-  "addon_version": "version"
+  "addon_version": "version",
+  "brewery_type": "homebrewer"
 }
 ```
 

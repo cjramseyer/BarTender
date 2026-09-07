@@ -982,6 +982,13 @@ content %}
             Use these external links for read-only access (served from port {{
             display_port }}).
           </p>
+          <p class="muted" style="margin-top: 0.5rem">
+            QR Status: {% if qr_ready %}
+            <strong style="color: #15803d">Ready</strong>
+            {% else %}
+            <strong style="color: #b45309">Unavailable</strong>
+            {% endif %}
+          </p>
           <div class="form-group" style="margin-top: 1rem">
             <label>External Base URL (optional)</label>
             <input
@@ -1042,44 +1049,6 @@ content %}
               Copy
             </button>
           </div>
-          <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
-          <div class="settings-url-row">
-            <a
-              id="localDisplayUrl"
-              class="settings-url-link"
-              href="{{ auto_external_display_url }}"
-              target="_blank"
-              rel="noopener noreferrer"
-              >{{ auto_external_display_url }}</a
-            >
-            <button
-              type="button"
-              class="btn btn-sm btn-secondary"
-              onclick="copyExternalUrl('localDisplayUrl', this)"
-            >
-              Copy
-            </button>
-          </div>
-          <div id="externalDisplayUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
-            <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
-            <div class="settings-url-row">
-              <a
-                id="externalDisplayUrl"
-                class="settings-url-link"
-                href="{{ external_display_url }}"
-                target="_blank"
-                rel="noopener noreferrer"
-                >{{ external_display_url }}</a
-              >
-              <button
-                type="button"
-                class="btn btn-sm btn-secondary"
-                onclick="copyExternalUrl('externalDisplayUrl', this)"
-              >
-                Copy
-              </button>
-            </div>
-          </div>
           <p class="muted" style="margin-top: 0.75rem">Local Printable Menu URL</p>
           <div class="settings-url-row">
             <a
@@ -1118,13 +1087,90 @@ content %}
               </button>
             </div>
           </div>
-          <p class="muted" style="margin-top: 0.35rem">
-            QR Status: {% if qr_ready %}
-            <strong style="color: #15803d">Ready</strong>
+          <div id="displayUrlsContainer">
+            {% set active_display_count = (settings.display_count or 2) if (settings.brewery_type or 'homebrewer') == 'pro' else 2 %}
+            {% if active_display_count == 1 %}
+            <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
+            <div class="settings-url-row">
+              <a
+                id="localDisplayUrl"
+                class="settings-url-link"
+                href="{{ auto_external_display_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ auto_external_display_url }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('localDisplayUrl', this)"
+              >
+                Copy
+              </button>
+            </div>
+            <div id="externalDisplayUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
+              <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
+              <div class="settings-url-row">
+                <a
+                  id="externalDisplayUrl"
+                  class="settings-url-link"
+                  href="{{ external_display_url }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >{{ external_display_url }}</a
+                >
+                <button
+                  type="button"
+                  class="btn btn-sm btn-secondary"
+                  onclick="copyExternalUrl('externalDisplayUrl', this)"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
             {% else %}
-            <strong style="color: #b45309">Unavailable</strong>
+            {% for i in range(1, active_display_count + 1) %}
+            <p class="muted" style="margin-top: 0.75rem">Local Display {{ i }} URL</p>
+            <div class="settings-url-row">
+              <a
+                id="localDisplayUrl-{{ i }}"
+                class="settings-url-link"
+                href="{{ auto_external_display_url }}?display={{ i }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ auto_external_display_url }}?display={{ i }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('localDisplayUrl-{{ i }}', this)"
+              >
+                Copy
+              </button>
+            </div>
+            {% if settings.external_base_url %}
+            <p class="muted" style="margin-top: 0.35rem">External Display {{ i }} URL</p>
+            <div class="settings-url-row">
+              <a
+                id="externalDisplayUrl-{{ i }}"
+                class="settings-url-link"
+                href="{{ external_display_url }}?display={{ i }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ external_display_url }}?display={{ i }}</a
+              >
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="copyExternalUrl('externalDisplayUrl-{{ i }}', this)"
+              >
+                Copy
+              </button>
+            </div>
             {% endif %}
-          </p>
+            {% endfor %}
+            {% endif %}
+          </div>
         </div>
       </details>
     </div>
@@ -1400,6 +1446,8 @@ content %}
         renderDisplayTapAssignments();
       }
     }
+
+    updateExternalReadonlyLinks();
   }
 
   function buildAutoSaveSettingsPayload() {
@@ -2054,33 +2102,87 @@ content %}
   }
 
   function updateExternalReadonlyLinks(externalBaseUrl = "") {
-    const displayLink = document.getElementById("externalDisplayUrl");
-    const menuLink = document.getElementById("externalMenuUrl");
-    const externalDisplayBlock = document.getElementById("externalDisplayUrlBlock");
-    const externalMenuBlock = document.getElementById("externalMenuUrlBlock");
-
-    const overrideBase = String(externalBaseUrl || "")
+    const overrideInput = document.getElementById("externalBaseUrl");
+    const rawOverride = externalBaseUrl !== "" ? externalBaseUrl : (overrideInput ? overrideInput.value : "");
+    const overrideBase = String(rawOverride || "")
+      .trim()
+      .replace(/\/+$/, "");
+    const autoBase = String(AUTO_EXTERNAL_DISPLAY_URL || "")
+      .trim()
+      .replace(/\/+$/, "");
+    const autoMenuBase = String(AUTO_EXTERNAL_MENU_URL || "")
       .trim()
       .replace(/\/+$/, "");
     const hasOverride = Boolean(overrideBase);
 
-    if (externalDisplayBlock) {
-      externalDisplayBlock.style.display = hasOverride ? "" : "none";
+    const localMenuLink = document.getElementById("localMenuUrl");
+    if (localMenuLink && autoMenuBase) {
+      localMenuLink.href = autoMenuBase;
+      localMenuLink.textContent = autoMenuBase;
     }
+
+    const externalMenuBlock = document.getElementById("externalMenuUrlBlock");
+    const externalMenuLink = document.getElementById("externalMenuUrl");
     if (externalMenuBlock) {
       externalMenuBlock.style.display = hasOverride ? "" : "none";
     }
+    if (externalMenuLink && hasOverride) {
+      externalMenuLink.href = `${overrideBase}/menu`;
+      externalMenuLink.textContent = `${overrideBase}/menu`;
+    }
 
-    if (hasOverride) {
-      if (displayLink) {
-        displayLink.href = `${overrideBase}/`;
-        displayLink.textContent = `${overrideBase}/`;
+    const container = document.getElementById("displayUrlsContainer");
+    if (!container) return;
+
+    const isPro = currentBreweryType() === "pro";
+    const displayCountInput = document.getElementById("displayCount");
+    const displayCount = isPro
+      ? getClampedIntegerValue("displayCount", 2, 1, 12)
+      : 2;
+
+    let html = "";
+    if (displayCount === 1) {
+      html += `
+        <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
+        <div class="settings-url-row">
+          <a id="localDisplayUrl" class="settings-url-link" href="${autoBase}/" target="_blank" rel="noopener noreferrer">${autoBase}/</a>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('localDisplayUrl', this)">Copy</button>
+        </div>
+      `;
+      if (hasOverride) {
+        html += `
+          <div id="externalDisplayUrlBlock">
+            <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
+            <div class="settings-url-row">
+              <a id="externalDisplayUrl" class="settings-url-link" href="${overrideBase}/" target="_blank" rel="noopener noreferrer">${overrideBase}/</a>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('externalDisplayUrl', this)">Copy</button>
+            </div>
+          </div>
+        `;
       }
-      if (menuLink) {
-        menuLink.href = `${overrideBase}/menu`;
-        menuLink.textContent = `${overrideBase}/menu`;
+    } else {
+      for (let i = 1; i <= displayCount; i++) {
+        const localUrl = `${autoBase}/?display=${i}`;
+        html += `
+          <p class="muted" style="margin-top: 0.75rem">Local Display ${i} URL</p>
+          <div class="settings-url-row">
+            <a id="localDisplayUrl-${i}" class="settings-url-link" href="${localUrl}" target="_blank" rel="noopener noreferrer">${localUrl}</a>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('localDisplayUrl-${i}', this)">Copy</button>
+          </div>
+        `;
+        if (hasOverride) {
+          const extUrl = `${overrideBase}/?display=${i}`;
+          html += `
+            <p class="muted" style="margin-top: 0.35rem">External Display ${i} URL</p>
+            <div class="settings-url-row">
+              <a id="externalDisplayUrl-${i}" class="settings-url-link" href="${extUrl}" target="_blank" rel="noopener noreferrer">${extUrl}</a>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="copyExternalUrl('externalDisplayUrl-${i}', this)">Copy</button>
+            </div>
+          `;
+        }
       }
     }
+    container.innerHTML = html;
   }
 
   async function clearExternalBaseUrlOverride() {
@@ -2801,10 +2903,12 @@ content %}
   if (displayCountInput) {
     displayCountInput.addEventListener("input", () => {
       renderDisplayTapAssignments();
+      updateExternalReadonlyLinks();
       scheduleAutoSave(700);
     });
     displayCountInput.addEventListener("blur", () => {
       renderDisplayTapAssignments();
+      updateExternalReadonlyLinks();
       scheduleAutoSave(0);
     });
   }

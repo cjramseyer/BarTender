@@ -207,6 +207,7 @@ def test_anonymous_telemetry_is_owner_only_and_sent_once_daily(tmp_path, caplog)
         "installation_id": app_module.load_data()["settings"]["anonymous_telemetry_installation_id"],
         "app_version": app_module.APP_VERSION,
         "addon_version": app_module.APP_VERSION,
+        "brewery_type": "homebrewer",
     }
     assert app_module.load_data()["settings"]["anonymous_telemetry_last_heartbeat_date"]
 
