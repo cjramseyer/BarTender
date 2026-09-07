@@ -141,7 +141,26 @@ def test_settings_changes_are_audited(tmp_path):
     )
     assert audit_response.status_code == 200
     payload = audit_response.get_json()
-    assert any(entry["action"] == "settings_updated" for entry in payload["audit"])
+    settings_event = next(entry for entry in payload["audit"] if entry["action"] == "settings_updated")
+    assert settings_event["details"] == {
+        "changed_fields": ["bar_name", "setup_completed"],
+    }
+
+
+def test_unchanged_settings_do_not_create_an_audit_event(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+    initial_bar_name = app_module.load_data()["settings"]["bar_name"]
+
+    response = client.post(
+        "/api/settings",
+        json={"bar_name": initial_bar_name},
+        headers=owner_headers,
+    )
+
+    assert response.status_code == 200
+    assert app_module.load_data()["team_audit"] == []
 
 
 def test_manager_cannot_change_bar_name_or_api_tokens(tmp_path):
