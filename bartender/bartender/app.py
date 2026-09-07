@@ -87,6 +87,31 @@ class SupportsReadBytes(Protocol):
 
 
 def _read_addon_version() -> str:
+    for env_key in ("ADDON_VERSION", "APP_VERSION", "BARTENDER_VERSION", "HA_ADDON_VERSION"):
+        val = os.environ.get(env_key, "").strip()
+        if val:
+            return val
+
+    # If running inside Home Assistant container with Supervisor token
+    supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "").strip()
+    if supervisor_token:
+        try:
+            req = Request(
+                "http://supervisor/addons/self/info",
+                headers={
+                    "Authorization": f"Bearer {supervisor_token}",
+                    "X-Supervisor-Token": supervisor_token,
+                },
+            )
+            with urlopen(req, timeout=1.5) as resp:
+                if 200 <= resp.status < 300:
+                    info = json.loads(resp.read().decode("utf-8"))
+                    version = info.get("data", {}).get("version") or info.get("version")
+                    if version:
+                        return str(version).strip()
+        except Exception:
+            pass
+
     config_path = Path(__file__).resolve().parents[1] / "config.yaml"
     try:
         with open(config_path, "r", encoding="utf-8") as f:

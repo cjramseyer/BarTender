@@ -817,6 +817,38 @@ def test_audit_retention_days_defaults_and_clips_to_range(tmp_path):
     )
     assert response.status_code == 200
     assert response.get_json()["audit_retention_days"] == 180
-
     data = app_module.load_data()
     assert data["settings"]["audit_retention_days"] == 180
+
+
+def test_read_addon_version_from_env_and_supervisor(tmp_path, monkeypatch):
+    app_module = _load_app_module(tmp_path)
+
+    # 1. Environment variable
+    monkeypatch.setenv("ADDON_VERSION", "1.2.3")
+    assert app_module._read_addon_version() == "1.2.3"
+    monkeypatch.delenv("ADDON_VERSION", raising=False)
+
+    monkeypatch.setenv("APP_VERSION", "2.3.4")
+    assert app_module._read_addon_version() == "2.3.4"
+    monkeypatch.delenv("APP_VERSION", raising=False)
+
+    # 2. Supervisor API
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "fake-token")
+
+    class FakeSupervisorResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"result": "ok", "data": {"version": "3.4.5"}}).encode("utf-8")
+
+    with patch.object(app_module, "urlopen", return_value=FakeSupervisorResponse()) as mock_url:
+        assert app_module._read_addon_version() == "3.4.5"
+        req = mock_url.call_args[0][0]
+        assert req.get_header("X-supervisor-token") == "fake-token"

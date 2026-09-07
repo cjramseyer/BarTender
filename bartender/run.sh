@@ -3,6 +3,13 @@
 # Read ingress path provided by Home Assistant
 INGRESS_PATH=$(bashio::addon.ingress_entry)
 export INGRESS_PATH
+
+# Read addon version provided by Home Assistant
+ADDON_VERSION=$(bashio::addon.version)
+export ADDON_VERSION
+APP_VERSION="${ADDON_VERSION}"
+export APP_VERSION
+
 export DATA_DIR="/data"
 export PORT="8099"
 export DISPLAY_PORT="8100"
