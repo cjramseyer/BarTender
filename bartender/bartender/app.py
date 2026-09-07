@@ -216,7 +216,14 @@ def enforce_owner_pin_recovery():
     normalized_path = _normalized_request_path()
     if normalized_path.startswith("/static/"):
         return None
-    if normalized_path in ("/logout", "/settings", "/api/settings", "/api/settings/reset", "/api/reset"):
+    if normalized_path in (
+        "/logout",
+        "/settings",
+        "/team-access",
+        "/api/settings",
+        "/api/settings/reset",
+        "/api/reset",
+    ):
         return None
     if normalized_path.startswith("/api/"):
         return jsonify({
@@ -225,8 +232,8 @@ def enforce_owner_pin_recovery():
 
     ingress = _effective_ingress_path()
     if ingress:
-        return redirect(f"{ingress}/settings")
-    return redirect(url_for("settings"))
+        return redirect(f"{ingress}/team-access")
+    return redirect(url_for("team_access"))
 
 
 @app.before_request
@@ -2252,7 +2259,7 @@ def login_view():
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
-                return _redirect_to_endpoint("settings")
+                return _redirect_to_endpoint("team_access")
             return _redirect_to_endpoint("index")
 
     return render_template(
@@ -2407,6 +2414,7 @@ def team_access():
         "team_access.html",
         settings=data["settings"],
         team_users=data.get("team_users", []),
+        owner_pin_recovery_required=bool(session.get("owner_pin_recovery_required")),
         ingress=ingress_path,
     )
 
