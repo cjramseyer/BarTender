@@ -33,7 +33,7 @@ def _seed_taps_and_kegs(app_module):
             "status": "full",
             "size": "5 gal",
             "percent_full": 100,
-            "current_volume": None,
+            "current_volume": 5,
             "volume_unit": "gal",
         },
         {
@@ -42,7 +42,7 @@ def _seed_taps_and_kegs(app_module):
             "status": "full",
             "size": "5 gal",
             "percent_full": 100,
-            "current_volume": None,
+            "current_volume": 5,
             "volume_unit": "gal",
         },
     ]
@@ -130,3 +130,38 @@ def test_api_update_tap_allows_keeping_same_connected_keg(tmp_path):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["keg_id"] == 1
+
+
+def test_pours_are_recorded_in_analytics_and_audit_trails(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    _seed_taps_and_kegs(app_module)
+    client = app_module.app.test_client()
+    staff_headers = {
+        "X-BarTender-User-Id": "staff-1",
+        "X-BarTender-Role": "staff",
+        "X-BarTender-Name": "Staff One",
+    }
+
+    keg_pour = client.post(
+        "/api/kegs/1/pour",
+        json={"amount": 64, "unit": "oz", "preset_name": "Growler"},
+        headers=staff_headers,
+    )
+    assert keg_pour.status_code == 200
+
+    tap_pour = client.post(
+        "/api/taps/1/pour",
+        json={"amount": 32, "unit": "oz", "preset_name": "Growler"},
+        headers=staff_headers,
+    )
+    assert tap_pour.status_code == 200
+
+    data = app_module.load_data()
+    assert len(data["pour_events"]) == 2
+    assert [entry["action"] for entry in data["team_audit"]] == [
+        "pour_recorded",
+        "pour_recorded",
+    ]
+    assert data["team_audit"][0]["actor_name"] == "Staff One"
+    assert data["team_audit"][0]["details"]["source"] == "tap"
+    assert data["team_audit"][1]["details"]["source"] == "keg"
