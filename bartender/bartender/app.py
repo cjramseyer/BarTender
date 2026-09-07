@@ -1825,12 +1825,28 @@ def _normalize_beers(raw_beers) -> list[dict]:
             "id": candidate_id,
             "name": str(entry.get("name", "")).strip(),
             "type": str(entry.get("type", entry.get("style", ""))).strip(),
+            "style_guideline": str(entry.get("style_guideline", "")).strip(),
             "packaging": _normalize_beer_packaging(entry.get("packaging", "kegged")),
             "brewer": str(entry.get("brewer", "")).strip(),
             "brewery": str(entry.get("brewery", "")).strip(),
             "abv": str(entry.get("abv", "")).strip(),
             "ibu": str(entry.get("ibu", "")).strip(),
             "brewed_on": str(entry.get("brewed_on", "")).strip(),
+            "packaged_on": str(entry.get("packaged_on", "")).strip(),
+            "best_by_date": str(entry.get("best_by_date", "")).strip(),
+            "availability_status": str(entry.get("availability_status", "available")).strip() or "available",
+            "description": str(entry.get("description", "")).strip(),
+            "allergens": _normalize_beer_allergens(entry.get("allergens", [])),
+            "color_srm": str(entry.get("color_srm", "")).strip(),
+            "color_ebc": str(entry.get("color_ebc", "")).strip(),
+            "serving_temperature": str(entry.get("serving_temperature", "")).strip(),
+            "glassware": str(entry.get("glassware", "")).strip(),
+            "supplier": str(entry.get("supplier", "")).strip(),
+            "distributor": str(entry.get("distributor", "")).strip(),
+            "purchase_cost": str(entry.get("purchase_cost", "")).strip(),
+            "sku": str(entry.get("sku", "")).strip(),
+            "upc": str(entry.get("upc", "")).strip(),
+            "recipe_url": str(entry.get("recipe_url", "")).strip(),
             "notes": str(entry.get("notes", "")).strip(),
             "updated_at": entry.get("updated_at") or datetime.now(timezone.utc).isoformat(),
         })
@@ -1843,6 +1859,15 @@ def _normalize_beer_packaging(value) -> str:
     if packaging in ("bottled", "bottle", "can", "canned", "bottled_can"):
         return "bottled_can"
     return "kegged"
+
+
+def _normalize_beer_allergens(value) -> list[str]:
+    values = value.split(",") if isinstance(value, str) else value
+    if not isinstance(values, list):
+        return []
+    return list(dict.fromkeys(
+        str(item).strip() for item in values if str(item).strip()
+    ))
 
 
 def _is_beer_kegged(beer: dict) -> bool:
@@ -3511,6 +3536,13 @@ def api_search_beers():
                 str(beer.get("brewery", "")),
                 str(beer.get("brewer", "")),
                 str(beer.get("type", "")),
+                str(beer.get("style_guideline", "")),
+                str(beer.get("description", "")),
+                " ".join(beer.get("allergens", [])),
+                str(beer.get("supplier", "")),
+                str(beer.get("distributor", "")),
+                str(beer.get("sku", "")),
+                str(beer.get("upc", "")),
                 str(beer.get("notes", "")),
             ]
         ).lower()
@@ -3526,15 +3558,8 @@ def export_beers_csv():
     rows = [BEER_CSV_HEADER]
     for beer in sorted(data.get("beers", []), key=lambda item: str(item.get("name", "")).lower()):
         rows.append([
-            beer.get("name", ""),
-            beer.get("type", ""),
-            beer.get("packaging", "kegged"),
-            beer.get("brewer", ""),
-            beer.get("brewery", ""),
-            beer.get("abv", ""),
-            beer.get("ibu", ""),
-            beer.get("brewed_on", ""),
-            beer.get("notes", ""),
+            ", ".join(beer.get(field, [])) if field == "allergens" else beer.get(field, "")
+            for field in BEER_CSV_HEADER
         ])
     csv_bytes = _rows_to_csv_bytes(rows)
     date_stamp = _export_date_stamp()
@@ -3549,12 +3574,28 @@ def export_beers_csv():
 BEER_CSV_HEADER = [
     "name",
     "type",
+    "style_guideline",
     "packaging",
     "brewer",
     "brewery",
     "abv",
     "ibu",
     "brewed_on",
+    "packaged_on",
+    "best_by_date",
+    "availability_status",
+    "description",
+    "allergens",
+    "color_srm",
+    "color_ebc",
+    "serving_temperature",
+    "glassware",
+    "supplier",
+    "distributor",
+    "purchase_cost",
+    "sku",
+    "upc",
+    "recipe_url",
     "notes",
 ]
 
@@ -3587,7 +3628,7 @@ def _validate_beer_csv_row(row: dict, row_number: int):
     if packaging not in {"kegged", "bottled_can"}:
         return f"Row {row_number}: packaging must be 'kegged' or 'bottled_can'."
 
-    for field in ("abv", "ibu"):
+    for field in ("abv", "ibu", "color_srm", "color_ebc", "purchase_cost"):
         raw = str(row.get(field, "") or "").strip()
         if raw and not re.fullmatch(r"\d+(?:\.\d+)?", raw):
             return f"Row {row_number}: '{field}' must be numeric or blank."
@@ -3636,12 +3677,28 @@ def _parse_beer_csv_rows(file_bytes: bytes):
         rows.append({
             "name": normalized.get("name", "").strip(),
             "type": normalized.get("type", "").strip(),
+            "style_guideline": normalized.get("style_guideline", "").strip(),
             "packaging": _coerce_beer_packaging(normalized.get("packaging", "kegged")),
             "brewer": normalized.get("brewer", "").strip(),
             "brewery": normalized.get("brewery", "").strip(),
             "abv": normalized.get("abv", "").strip(),
             "ibu": normalized.get("ibu", "").strip(),
             "brewed_on": normalized.get("brewed_on", "").strip(),
+            "packaged_on": normalized.get("packaged_on", "").strip(),
+            "best_by_date": normalized.get("best_by_date", "").strip(),
+            "availability_status": normalized.get("availability_status", "available").strip() or "available",
+            "description": normalized.get("description", "").strip(),
+            "allergens": _normalize_beer_allergens(normalized.get("allergens", "")),
+            "color_srm": normalized.get("color_srm", "").strip(),
+            "color_ebc": normalized.get("color_ebc", "").strip(),
+            "serving_temperature": normalized.get("serving_temperature", "").strip(),
+            "glassware": normalized.get("glassware", "").strip(),
+            "supplier": normalized.get("supplier", "").strip(),
+            "distributor": normalized.get("distributor", "").strip(),
+            "purchase_cost": normalized.get("purchase_cost", "").strip(),
+            "sku": normalized.get("sku", "").strip(),
+            "upc": normalized.get("upc", "").strip(),
+            "recipe_url": normalized.get("recipe_url", "").strip(),
             "notes": normalized.get("notes", "").strip(),
         })
 
@@ -3679,15 +3736,7 @@ def import_beer_csv():
     for row in rows:
         beer = {
             "id": next_id,
-            "name": row["name"],
-            "type": row["type"],
-            "packaging": row["packaging"],
-            "brewer": row["brewer"],
-            "brewery": row["brewery"],
-            "abv": row["abv"],
-            "ibu": row["ibu"],
-            "brewed_on": row["brewed_on"],
-            "notes": row["notes"],
+            **row,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         existing_beers.append(beer)
@@ -3709,12 +3758,28 @@ def api_add_beer():
         "id": _next_id(data.get("beers", [])),
         "name": name,
         "type": str(body.get("type", "")).strip(),
+        "style_guideline": str(body.get("style_guideline", "")).strip(),
         "packaging": _normalize_beer_packaging(body.get("packaging", "kegged")),
         "brewer": str(body.get("brewer", "")).strip(),
         "brewery": str(body.get("brewery", "")).strip(),
         "abv": str(body.get("abv", "")).strip(),
         "ibu": str(body.get("ibu", "")).strip(),
         "brewed_on": str(body.get("brewed_on", "")).strip(),
+        "packaged_on": str(body.get("packaged_on", "")).strip(),
+        "best_by_date": str(body.get("best_by_date", "")).strip(),
+        "availability_status": str(body.get("availability_status", "available")).strip() or "available",
+        "description": str(body.get("description", "")).strip(),
+        "allergens": _normalize_beer_allergens(body.get("allergens", [])),
+        "color_srm": str(body.get("color_srm", "")).strip(),
+        "color_ebc": str(body.get("color_ebc", "")).strip(),
+        "serving_temperature": str(body.get("serving_temperature", "")).strip(),
+        "glassware": str(body.get("glassware", "")).strip(),
+        "supplier": str(body.get("supplier", "")).strip(),
+        "distributor": str(body.get("distributor", "")).strip(),
+        "purchase_cost": str(body.get("purchase_cost", "")).strip(),
+        "sku": str(body.get("sku", "")).strip(),
+        "upc": str(body.get("upc", "")).strip(),
+        "recipe_url": str(body.get("recipe_url", "")).strip(),
         "notes": str(body.get("notes", "")).strip(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -3733,9 +3798,16 @@ def api_update_beer(beer_id: int):
         if beer.get("id") != beer_id:
             continue
 
-        for field in ("name", "type", "brewer", "brewery", "abv", "ibu", "brewed_on", "notes"):
+        for field in (
+            "name", "type", "style_guideline", "brewer", "brewery", "abv", "ibu",
+            "brewed_on", "packaged_on", "best_by_date", "availability_status", "description",
+            "color_srm", "color_ebc", "serving_temperature", "glassware", "supplier",
+            "distributor", "purchase_cost", "sku", "upc", "recipe_url", "notes",
+        ):
             if field in body:
                 beer[field] = str(body.get(field, "")).strip()
+        if "allergens" in body:
+            beer["allergens"] = _normalize_beer_allergens(body.get("allergens", []))
         if "packaging" in body:
             beer["packaging"] = _normalize_beer_packaging(body.get("packaging"))
 
