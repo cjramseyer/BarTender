@@ -12,11 +12,13 @@ import secrets
 import math
 import time
 import threading
+import uuid
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 
 from bartender.pos_sync.service import (
     POS_SYNC_PROVIDERS,
@@ -62,6 +64,7 @@ EXTERNAL_API_MODE = str(os.environ.get("EXTERNAL_API_MODE", "")).strip().lower()
     "yes",
     "on",
 )
+TELEMETRY_HEARTBEAT_URL = "https://bartender-telemetry.cj-a3.workers.dev/v1/heartbeat"
 EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
 DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE = 120
 _EXTERNAL_API_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
@@ -372,6 +375,9 @@ DEFAULT_DATA = {
         "analytics_low_keg_threshold_percent": 25,
         "analytics_days_left_method": "trailing_window",
         "analytics_days_left_window_days": 14,
+        "anonymous_telemetry_enabled": False,
+        "anonymous_telemetry_installation_id": "",
+        "anonymous_telemetry_last_heartbeat_date": "",
     },
     "bar_stock": [],
     "beers": [],
@@ -537,6 +543,12 @@ def load_data() -> dict:
         data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
             data["settings"].get("external_api_rate_limit_per_minute")
         )
+        data["settings"]["anonymous_telemetry_enabled"] = _coerce_bool(
+            data["settings"].get("anonymous_telemetry_enabled"),
+            False,
+        )
+        data["settings"].setdefault("anonymous_telemetry_installation_id", "")
+        data["settings"].setdefault("anonymous_telemetry_last_heartbeat_date", "")
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
             data["settings"].get("keg_type_choices", []),
@@ -666,6 +678,47 @@ def _bar_stock_enabled(data: dict) -> bool:
 
 def _analytics_enabled(data: dict) -> bool:
     return _coerce_bool(data.get("settings", {}).get("analytics_enabled"), True)
+
+
+def _send_anonymous_telemetry_heartbeat() -> None:
+    data = load_data()
+    settings = data.get("settings", {})
+    if not _coerce_bool(settings.get("anonymous_telemetry_enabled"), False):
+        return
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    if settings.get("anonymous_telemetry_last_heartbeat_date") == today:
+        return
+
+    installation_id = str(settings.get("anonymous_telemetry_installation_id", "")).strip()
+    if not installation_id:
+        installation_id = str(uuid.uuid4())
+        settings["anonymous_telemetry_installation_id"] = installation_id
+
+    payload = json.dumps({
+        "installation_id": installation_id,
+        "app_version": APP_VERSION,
+        "addon_version": APP_VERSION,
+    }).encode("utf-8")
+    request_payload = Request(
+        TELEMETRY_HEARTBEAT_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request_payload, timeout=5) as response:
+            if response.status < 200 or response.status >= 300:
+                return
+    except OSError:
+        return
+
+    settings["anonymous_telemetry_last_heartbeat_date"] = today
+    save_data(data)
+
+
+def _schedule_anonymous_telemetry_heartbeat() -> None:
+    threading.Thread(target=_send_anonymous_telemetry_heartbeat, daemon=True).start()
 
 
 def _normalize_menu_qr_mode(value) -> str:
@@ -2676,6 +2729,7 @@ def api_save_settings():
         "pos_sync_credentials",
         "pos_sync_provider_config_json",
         "audit_retention_days",
+        "anonymous_telemetry_enabled",
     }
     if current_user.get("role") != "owner":
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -2726,6 +2780,7 @@ def api_save_settings():
         "analytics_low_keg_threshold_percent",
         "analytics_days_left_method",
         "analytics_days_left_window_days",
+        "anonymous_telemetry_enabled",
     }
     for key in allowed:
         if key in body:
@@ -2761,6 +2816,11 @@ def api_save_settings():
             {"changed_fields": changed_fields},
         )
     save_data(data)
+    if (
+        "anonymous_telemetry_enabled" in changed_fields
+        and data["settings"]["anonymous_telemetry_enabled"]
+    ):
+        _schedule_anonymous_telemetry_heartbeat()
     return jsonify(data["settings"])
 
 
@@ -5037,4 +5097,6 @@ def import_json_preview():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8099))
+    if not EXTERNAL_API_MODE:
+        _schedule_anonymous_telemetry_heartbeat()
     app.run(host="0.0.0.0", port=port, debug=False)

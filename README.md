@@ -36,6 +36,7 @@ Sample dashboard with seeded data:
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, low-volume alerts, and a reset option for clearing historical pour data from settings
+- **Anonymous Usage Statistics** — Owner-only, disabled-by-default opt-in that sends a daily anonymous installation ID and app/add-on versions to estimate active installations
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive with date-stamped filenames, with import preview and replace/merge modes
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
@@ -79,6 +80,7 @@ Sample dashboard with seeded data:
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
 - Added Team Access enhancements: a dedicated Team Access page, owner profile name management, per-user PIN, PIN reset, and disable/enable controls, with staff blocked from the management screen.
 - Added a role-aware Audit Log window with owner-only retention/clear controls, owner/manager export, and events for Analytics pours and inventory changes to bar stock, kegs, and taps.
+- Added an owner-only anonymous usage-statistics opt-in for daily active-installation estimates without collecting bar, inventory, user, device, or network data in its telemetry payload.
 - Added an analytics reset action in Settings for clearing historical pour data used in dashboard and forecasting calculations.
 - Added duplicate keg assignment protection for taps (already-connected kegs are shown as in-use and blocked for other taps).
 - Added bar stock category/size quality-of-life updates (expanded defaults and promoted popular custom sizes).
