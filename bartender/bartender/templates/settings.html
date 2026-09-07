@@ -887,6 +887,26 @@ content %}
         </div>
       </details>
 
+      {% if current_user_role == 'owner' %}
+      <details class="settings-collapsible">
+        <summary>Privacy</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              {% if settings.anonymous_telemetry_enabled %}
+              <input type="checkbox" id="anonymousTelemetryEnabled" checked />
+              {% else %}
+              <input type="checkbox" id="anonymousTelemetryEnabled" />
+              {% endif %} Share Anonymous Usage Statistics
+            </label>
+            <small class="muted">
+              Sends a daily anonymous installation ID and app/add-on versions to help measure active installs. No bar, inventory, user, device, or network data is sent.
+            </small>
+          </div>
+        </div>
+      </details>
+      {% endif %}
+
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Advanced Settings</button>
         <button
@@ -1384,6 +1404,10 @@ content %}
     const menuQrModeInput = document.getElementById("menuQrMode");
     if (menuQrModeInput) {
       payload.menu_qr_mode = menuQrModeInput.value;
+    }
+    const anonymousTelemetryEnabledInput = document.getElementById("anonymousTelemetryEnabled");
+    if (anonymousTelemetryEnabledInput) {
+      payload.anonymous_telemetry_enabled = anonymousTelemetryEnabledInput.checked;
     }
 
     if (payload.brewery_type !== "commercial") {
@@ -2735,6 +2759,7 @@ content %}
     "apiReferenceEnabled",
     "analyticsEnabled",
     "analyticsDaysMethod",
+    "anonymousTelemetryEnabled",
   ].forEach((inputId) => {
     const input = document.getElementById(inputId);
     if (!input) {

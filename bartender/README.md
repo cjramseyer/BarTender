@@ -58,6 +58,7 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
 - **Analytics** — Dashboard summaries for recent pours, near-empty kegs, and depletion forecasting
+- **Anonymous Usage Statistics** — Owner-only, disabled-by-default daily anonymous installation heartbeat for active-installation estimates
 - **API Reference + Tester** — Built-in endpoint docs and in-app request tester UI
 
 ## Beer Catalog CSV Schema
@@ -172,6 +173,7 @@ No configuration required. All settings are managed from within the web UI after
 - **Pour Presets**: named preset volumes and default preset
 - **Analytics**: low-keg threshold and days-left forecasting window
 - **Menu QR**: where QR appears on display/print output (Settings -> General)
+- **Anonymous Usage Statistics**: owner-only opt-in in Settings -> Privacy. Sends only a locally generated anonymous installation ID and app/add-on versions, at most once per UTC day; the telemetry payload excludes bar, inventory, user, device, and network data.
 
 ## Troubleshooting
 

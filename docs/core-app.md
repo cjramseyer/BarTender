@@ -31,6 +31,7 @@ Primary runtime components:
 - Pour workflow and current keg volume tracking.
 - Export/import backups as versioned JSON and ZIP archives with preview.
 - Analytics reset support for clearing historical pour data used in dashboard and forecasting calculations.
+- Owner-only, disabled-by-default anonymous usage-statistics opt-in for active-installation estimates.
 - Read-only display page.
 - In-app API reference and API tester page.
 - Runtime QR generation endpoint for printable menu.
@@ -589,6 +590,23 @@ settings fields:
 - menu_qr_mode: string (off, display, print, both)
 - pour_options: array of preset objects (name, amount, unit)
 - default_pour_preset: string encoded as amount|unit|name
+- anonymous_telemetry_enabled: boolean (owner-only; default false)
+- anonymous_telemetry_installation_id: locally generated UUID, created only after opt-in
+- anonymous_telemetry_last_heartbeat_date: UTC date of the last successful heartbeat
+
+### Anonymous Usage Statistics
+
+Owners can enable **Settings -> Privacy -> Share Anonymous Usage Statistics**. When enabled, the management server sends at most one HTTPS heartbeat per UTC day. The payload contains only:
+
+```json
+{
+  "installation_id": "locally-generated-uuid",
+  "app_version": "version",
+  "addon_version": "version"
+}
+```
+
+The feature is disabled by default. Its payload does not include a bar name, Home Assistant or device identifier, user data, inventory, audit events, credentials, or logs. As with any HTTPS request, the receiving service can process the request's source IP address at the network layer; BarTender does not include it in the telemetry payload or store it locally.
 
 beer catalog fields:
 
