@@ -9,6 +9,21 @@
   </div>
 </div>
 
+{% if owner_pin_recovery_required %}
+<div class="card settings-card settings-warning-block" style="margin-bottom: 1rem">
+  <div class="settings-collapsible-body">
+    <label>Owner Recovery Mode</label>
+    <p class="muted" style="margin-top: 0.35rem">
+      This installation has multiple team members but no owner PIN yet.
+      Save an Owner PIN here to unlock the rest of the app.
+    </p>
+    <p class="muted" style="margin-top: 0.25rem">
+      Team management actions stay locked until the Owner PIN is saved.
+    </p>
+  </div>
+</div>
+{% endif %}
+
 <div class="card settings-card settings-team-card">
   <div class="settings-collapsible-body">
     <div class="form-group">
@@ -46,9 +61,24 @@
         Require this PIN for the owner login when there is more than one team member.
         Leave blank if you want only the single-owner setup.
       </small>
+      <div class="form-row" style="gap: 0.5rem; align-items: center; margin-top: 0.75rem">
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          onclick="saveOwnerPin()"
+        >
+          Save Owner PIN
+        </button>
+        <span id="ownerPinSaveMsg" class="save-msg"></span>
+      </div>
     </div>
     <div class="form-group">
       <label>Additional Team Members</label>
+      {% if owner_pin_recovery_required %}
+      <small class="muted">
+        Save the Owner PIN above before adding or changing team members.
+      </small>
+      {% endif %}
       <div id="teamUsersList" class="stack-gap-sm" style="margin-top: 8px"></div>
     </div>
     <div class="form-group">
@@ -98,6 +128,7 @@
 <script>
   const INGRESS = "{{ ingress }}";
   const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
+  const OWNER_PIN_RECOVERY_REQUIRED = {% if owner_pin_recovery_required %}true{% else %}false{% endif %};
 
   function renderTeamUsers(users = []) {
     const list = document.getElementById("teamUsersList");
@@ -158,6 +189,10 @@
   }
 
   async function addTeamUser() {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const name = document.getElementById("teamUserName").value.trim();
     const pin = document.getElementById("teamUserPin").value.trim();
     const role = document.getElementById("teamUserRole").value;
@@ -187,7 +222,45 @@
     renderTeamUsers(users.users || []);
   }
 
+  async function saveOwnerPin() {
+    const ownerPinInput = document.getElementById("ownerPin");
+    const saveMsg = document.getElementById("ownerPinSaveMsg");
+    const ownerPin = ownerPinInput ? ownerPinInput.value.trim() : "";
+
+    if (!ownerPin) {
+      if (saveMsg) saveMsg.textContent = "Owner PIN is required.";
+      return;
+    }
+
+    if (saveMsg) saveMsg.textContent = "Saving...";
+
+    try {
+      const res = await fetch(`${INGRESS}/api/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner_pin: ownerPin }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "Unable to save owner PIN");
+      }
+
+      if (saveMsg) saveMsg.textContent = "Owner PIN saved.";
+      if (OWNER_PIN_RECOVERY_REQUIRED) {
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error(err);
+      if (saveMsg) saveMsg.textContent = "";
+      alert(err.message || "Unable to save owner PIN");
+    }
+  }
+
   async function saveOwnerProfile() {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const ownerName = document.getElementById("ownerName").value.trim();
     if (!ownerName) {
       alert("Owner name is required.");
@@ -212,6 +285,10 @@
   }
 
   async function updateTeamMemberRole(button) {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const userId = button.dataset.userId;
     const select = document.querySelector(
       `.team-role-select[data-user-id="${CSS.escape(userId)}"]`,
@@ -237,6 +314,10 @@
   }
 
   async function setTeamUserPin(button) {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const userId = button.dataset.userId;
     if (!userId) return;
     const nextPin = window.prompt("Set PIN for this user:");
@@ -260,6 +341,10 @@
   }
 
   async function resetTeamUserPin(button) {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const userId = button.dataset.userId;
     if (!userId) return;
     if (!window.confirm("Reset this user's PIN?")) return;
@@ -282,6 +367,10 @@
   }
 
   async function toggleTeamUserDisabled(button) {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const userId = button.dataset.userId;
     if (!userId) return;
     const currentlyDisabled = button.dataset.disabled === "1";
@@ -309,6 +398,10 @@
   }
 
   async function deleteTeamUser(button) {
+    if (OWNER_PIN_RECOVERY_REQUIRED) {
+      alert("Save the Owner PIN first to unlock team management.");
+      return;
+    }
     const userId = button.dataset.userId;
     if (!userId) return;
 

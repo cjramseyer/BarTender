@@ -28,12 +28,17 @@ content %}
       >
         <label>Owner Recovery Mode</label>
         <p class="muted" style="margin-top: 0.35rem">
-          This installation has multiple team members but no owner PIN yet. Save
-          an Owner PIN below to restore normal access.
+          This installation has multiple team members but no owner PIN yet.
+          Finish recovery from Team Access to restore normal access.
         </p>
         <p class="muted" style="margin-top: 0.25rem">
           Until a PIN is saved, other pages and non-settings actions stay
           locked.
+        </p>
+        <p style="margin-top: 0.75rem">
+          <a class="btn btn-sm btn-secondary" href="{{ ingress }}/team-access"
+            >Open Team Access</a
+          >
         </p>
       </div>
       {% endif %}
@@ -2284,9 +2289,6 @@ content %}
         .value,
       external_api_write_token: document.getElementById("externalApiWriteToken")
         .value,
-      owner_pin: document.getElementById("ownerPin")
-        ? document.getElementById("ownerPin").value
-        : "",
       external_api_allowlist_enabled: document.getElementById(
         "externalApiAllowlistEnabled",
       ).checked,
