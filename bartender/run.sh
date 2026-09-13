@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 
 # Read ingress path provided by Home Assistant
-INGRESS_PATH="$(bashio::addon.ingress_entry)"
+INGRESS_PATH="$(bashio::app.ingress_entry)"
 export INGRESS_PATH
 
 # Read addon version provided by Home Assistant
