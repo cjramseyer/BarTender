@@ -87,6 +87,22 @@ def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
     assert 'id="updateNoticeModal"' in page
 
 
+def test_team_access_renders_scan_credential_modal(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/team-access")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="scanCredentialModal"' in page
+    assert "function issueScanCredential" in page
+
+
 def test_whats_new_dismissal_is_stored_per_user(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
