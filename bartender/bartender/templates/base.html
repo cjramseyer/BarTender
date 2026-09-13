@@ -87,14 +87,17 @@
           </button>
           <div class="nav-menu-panel" role="menu">
             {% if settings.setup_completed %}
-            <button
-              class="nav-menu-item nav-menu-button-item"
-              type="button"
-              onclick="openWhatsNewFromMenu()"
-              role="menuitem"
-            >
-              What's New
-            </button>
+            <div class="nav-menu-section nav-menu-updates-section">
+              <div class="nav-menu-section-title">Updates</div>
+              <button
+                class="nav-menu-item nav-menu-button-item"
+                type="button"
+                onclick="openWhatsNewFromMenu()"
+                role="menuitem"
+              >
+                What's New
+              </button>
+            </div>
             {% endif %}
             <details class="nav-menu-submenu">
               <summary>Options</summary>
@@ -272,10 +275,11 @@
                         type="radio"
                         name="setup_theme"
                         value="light"
+                        onchange="previewSetupTheme(this.value)"
                         checked
                       />
                       {% else %}
-                      <input type="radio" name="setup_theme" value="light" />
+                      <input type="radio" name="setup_theme" value="light" onchange="previewSetupTheme(this.value)" />
                       {% endif %} ☀ Light
                     </label>
                     <label class="radio-label">
@@ -284,10 +288,11 @@
                         type="radio"
                         name="setup_theme"
                         value="dark"
+                        onchange="previewSetupTheme(this.value)"
                         checked
                       />
                       {% else %}
-                      <input type="radio" name="setup_theme" value="dark" />
+                      <input type="radio" name="setup_theme" value="dark" onchange="previewSetupTheme(this.value)" />
                       {% endif %} 🌙 Dark
                     </label>
                   </div>

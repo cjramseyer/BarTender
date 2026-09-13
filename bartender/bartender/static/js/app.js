@@ -10,6 +10,11 @@ function initTheme(serverTheme, ingress) {
   localStorage.setItem("bartender_theme", theme);
 }
 
+function previewSetupTheme(theme) {
+  const normalizedTheme = ["light", "dark"].includes(theme) ? theme : "light";
+  document.documentElement.dataset.theme = normalizedTheme;
+}
+
 function openModal(id) {
   const modal = document.getElementById(id);
   if (modal) modal.classList.add("is-open");
@@ -221,6 +226,14 @@ async function submitSetupWizard(event) {
 async function dismissUpdateNotice() {
   const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
   const ingress = window.BARTENDER_INGRESS || "";
+  const titlebarWhatsNewButton = document.getElementById(
+    "titlebarWhatsNewButton",
+  );
+  if (titlebarWhatsNewButton) {
+    titlebarWhatsNewButton.hidden = true;
+  }
+  closeModal("updateNoticeModal");
+
   if (appVersion) {
     const response = await fetch(`${ingress}/api/user/release-seen`, {
       method: "POST",
@@ -233,11 +246,4 @@ async function dismissUpdateNotice() {
     }
     window.BARTENDER_SEEN_VERSION = appVersion;
   }
-  const titlebarWhatsNewButton = document.getElementById(
-    "titlebarWhatsNewButton",
-  );
-  if (titlebarWhatsNewButton) {
-    titlebarWhatsNewButton.hidden = true;
-  }
-  closeModal("updateNoticeModal");
 }
