@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -137,6 +138,26 @@ def test_valid_user_can_login_from_team_users(tmp_path):
     with client.session_transaction() as session:
         assert session["user_id"] == "manager-1"
         assert session["user_role"] == "manager"
+        assert session.permanent is True
+        assert "last_activity_at" in session
+
+
+def test_authenticated_session_expires_after_idle_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+        session.permanent = True
+        session["last_activity_at"] = time.time() - (app_module.SESSION_TIMEOUT_MINUTES * 60 + 1)
+
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/login")
+    with client.session_transaction() as session:
+        assert "user_id" not in session
 
 
 def test_user_scan_credential_logs_in_and_can_be_revoked(tmp_path):

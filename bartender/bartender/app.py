@@ -82,6 +82,17 @@ EXTERNAL_API_MODE = str(os.environ.get("EXTERNAL_API_MODE", "")).strip().lower()
 )
 TELEMETRY_HEARTBEAT_URL = "https://bartender-telemetry.td2.info/v1/heartbeat"
 EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
+
+
+def _session_timeout_minutes() -> int:
+    try:
+        configured = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480") or "480")
+    except (TypeError, ValueError):
+        configured = 480
+    return max(5, min(configured, 43200))
+
+
+SESSION_TIMEOUT_MINUTES = _session_timeout_minutes()
 DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE = 120
 _EXTERNAL_API_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
 _EXTERNAL_API_RATE_LIMIT_LOCK = threading.Lock()
@@ -94,6 +105,19 @@ ALLOWED_LOGO_MIME_TYPES = {
     "image/svg+xml": ".svg",
 }
 LOGO_FILENAME_PREFIX = "bar-logo"
+
+
+def _load_or_create_secret_key() -> str:
+    secret_path = DATA_DIR / ".secret_key"
+    try:
+        secret = secret_path.read_text(encoding="utf-8").strip()
+        if secret:
+            return secret
+        secret = secrets.token_urlsafe(48)
+        secret_path.write_text(secret, encoding="utf-8")
+        return secret
+    except OSError:
+        return "bartender-dev-secret-change-me"
 
 
 @runtime_checkable
@@ -254,7 +278,11 @@ STANDARD_BEER_ALLERGENS = [
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bartender-dev-secret-change-me")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or _load_or_create_secret_key()
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 DATA_STATE_LOCK = threading.RLock()
 
 
@@ -269,6 +297,35 @@ def acquire_mutation_lock():
 def release_mutation_lock(exception=None):
     if getattr(g, "data_state_lock_acquired", False):
         DATA_STATE_LOCK.release()
+
+
+@app.before_request
+def enforce_session_timeout():
+    if EXTERNAL_API_MODE:
+        return None
+
+    session_user_id = str(session.get("user_id", "") or "").strip()
+    if not session_user_id:
+        return None
+
+    now = time.time()
+    try:
+        last_activity = float(session.get("last_activity_at", now))
+    except (TypeError, ValueError):
+        last_activity = now
+
+    if now - last_activity > SESSION_TIMEOUT_MINUTES * 60:
+        session.clear()
+        if _normalized_request_path().startswith("/api/"):
+            return jsonify({"error": "Session expired. Please log in again."}), 401
+        ingress = _effective_ingress_path()
+        if ingress:
+            return redirect(f"{ingress}/login")
+        return redirect(url_for("login_view"))
+
+    session.permanent = True
+    session["last_activity_at"] = now
+    return None
 
 
 def _effective_ingress_path() -> str:
@@ -2675,9 +2732,11 @@ def login_view():
                     )
 
             session.clear()
+            session.permanent = True
             session["user_id"] = str(matched_user.get("id", "")).strip() or user_id
             session["user_role"] = selected_role
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
+            session["last_activity_at"] = time.time()
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
             if scan_token:
@@ -2722,9 +2781,11 @@ def scan_login(token: str):
         return redirect(url_for("login_view", scan_token=token))
 
     session.clear()
+    session.permanent = True
     session["user_id"] = str(user.get("id", "")).strip()
     session["user_role"] = _normalize_team_role(user.get("role", "staff"))
     session["user_name"] = str(user.get("name", session["user_id"]))
+    session["last_activity_at"] = time.time()
     if str(user.get("role", "")).lower() == "owner" and len(active_users) > 1 and not _normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")):
         session["owner_pin_recovery_required"] = True
         _record_team_audit(data, user, "scan_login", session["user_id"], {"transport": "qr_or_nfc", "owner_recovery": True})
