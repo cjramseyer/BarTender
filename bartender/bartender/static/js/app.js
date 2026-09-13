@@ -120,9 +120,6 @@ document.addEventListener("keydown", (e) => {
 function initAppPrompts(appVersion, seenVersion) {
   const setupModal = document.getElementById("setupWizardModal");
   const updateModal = document.getElementById("updateNoticeModal");
-  const titlebarWhatsNewButton = document.getElementById(
-    "titlebarWhatsNewButton",
-  );
   const currentVersion = String(appVersion || "").trim();
 
   if (setupModal) {
@@ -135,9 +132,6 @@ function initAppPrompts(appVersion, seenVersion) {
   }
 
   const hasUnseenUpdate = String(seenVersion || "").trim() !== currentVersion;
-  if (titlebarWhatsNewButton) {
-    titlebarWhatsNewButton.hidden = !hasUnseenUpdate;
-  }
   if (hasUnseenUpdate) {
     openModal("updateNoticeModal");
   }
@@ -226,12 +220,6 @@ async function submitSetupWizard(event) {
 async function dismissUpdateNotice() {
   const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
   const ingress = window.BARTENDER_INGRESS || "";
-  const titlebarWhatsNewButton = document.getElementById(
-    "titlebarWhatsNewButton",
-  );
-  if (titlebarWhatsNewButton) {
-    titlebarWhatsNewButton.hidden = true;
-  }
   closeModal("updateNoticeModal");
 
   if (appVersion) {
