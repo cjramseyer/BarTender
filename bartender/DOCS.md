@@ -89,7 +89,17 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 
 ## Configuration
 
-No configuration required. All settings are managed from within the web UI after the add-on starts.
+Most BarTender settings are managed from within the web UI after the add-on starts.
+The add-on configuration also provides:
+
+- `session_timeout_minutes`: idle timeout for signed-in browser sessions. The default is
+  `480` minutes (8 hours); valid values range from 5 minutes to 30 days. Change this
+  under the add-on's **Configuration** tab and restart the add-on for the new value to
+  take effect.
+
+Sessions are signed with a secret persisted in `/data/.secret_key`, so normal add-on
+restarts do not invalidate active sessions. Removing the add-on's stored data or
+changing an explicitly supplied `SECRET_KEY` invalidates existing sessions.
 
 ## Core Usage Flows
 

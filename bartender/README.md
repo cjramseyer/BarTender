@@ -132,7 +132,10 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 
 ## Configuration
 
-No configuration required. All settings are managed from within the web UI after the add-on starts.
+Most BarTender settings are managed from within the web UI after the add-on starts.
+The add-on configuration includes `session_timeout_minutes`, which controls the idle
+timeout for signed-in browser sessions. It defaults to 480 minutes (8 hours), accepts
+values from 5 minutes to 30 days, and takes effect after restarting the add-on.
 
 ## Core Usage Flows
 
