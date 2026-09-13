@@ -87,6 +87,7 @@ def test_brewfather_sync_is_idempotent_and_persists_ids(tmp_path, monkeypatch):
                 "brewfather_batch_id": "batch-1",
                 "name": "House IPA Batch 1",
                 "packaged_on": "2026-09-01",
+                "status": "completed",
             }]
 
     monkeypatch.setattr(app_module, "BrewfatherClient", FakeClient)
@@ -147,6 +148,7 @@ def test_brewfather_keg_import_requires_confirmation(tmp_path):
         "id": 1,
         "name": "Batch IPA",
         "packaging": "kegged",
+        "brewfather_batch_status": "completed",
         "brewfather_batch_id": "batch-1",
         "brewfather_recipe_id": "recipe-1",
     }]
@@ -166,6 +168,31 @@ def test_brewfather_keg_import_requires_confirmation(tmp_path):
     assert rejected.status_code == 400
     assert accepted.status_code == 201
     assert app_module.load_data()["kegs"][0]["beer_id"] == 1
+
+
+def test_brewfather_sync_imports_only_completed_or_conditioning_batches(tmp_path, monkeypatch):
+    app_module = _load_app_module(tmp_path)
+    client = _configure(app_module)
+
+    class FakeClient:
+        def __init__(self, *args):
+            pass
+
+        def fetch_recipes(self):
+            return []
+
+        def fetch_batches(self):
+            return [
+                {"brewfather_batch_id": "done", "name": "Done", "status": "completed"},
+                {"brewfather_batch_id": "fermenting", "name": "Fermenting", "status": "fermenting"},
+                {"brewfather_batch_id": "conditioning", "name": "Conditioning", "status": "conditioning"},
+            ]
+
+    monkeypatch.setattr(app_module, "BrewfatherClient", FakeClient)
+    response = client.post("/api/brewfather/sync", headers=OWNER_HEADERS)
+
+    assert response.status_code == 200
+    assert {beer["brewfather_batch_id"] for beer in app_module.load_data()["beers"]} == {"done", "conditioning"}
 
 
 def test_brewfather_rate_limit_uses_retry_after():

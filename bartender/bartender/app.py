@@ -41,6 +41,7 @@ from bartender.pos_sync.brewfather import (
     normalize_credentials,
     reconcile_beer,
     redact_credentials,
+    is_importable_batch,
     utc_now as brewfather_now,
 )
 
@@ -2111,6 +2112,14 @@ def _normalize_beers(raw_beers) -> list[dict]:
             "brewfather_last_synced_at": str(entry.get("brewfather_last_synced_at", "")).strip(),
             "brewfather_source_snapshot": entry.get("brewfather_source_snapshot", {}) if isinstance(entry.get("brewfather_source_snapshot", {}), dict) else {},
             "brewfather_conflict": str(entry.get("brewfather_conflict", "")).strip() or None,
+            "brewfather_batch_status": str(entry.get("brewfather_batch_status", "")).strip(),
+            "brewfather_measured_og": str(entry.get("brewfather_measured_og", "")).strip(),
+            "brewfather_measured_fg": str(entry.get("brewfather_measured_fg", "")).strip(),
+            "brewfather_carbonation": str(entry.get("brewfather_carbonation", "")).strip(),
+            "brewfather_latest_gravity": str(entry.get("brewfather_latest_gravity", "")).strip(),
+            "brewfather_latest_temperature": str(entry.get("brewfather_latest_temperature", "")).strip(),
+            "brewfather_packaging_volume": str(entry.get("brewfather_packaging_volume", "")).strip(),
+            "brewfather_packaging_unit": str(entry.get("brewfather_packaging_unit", "")).strip(),
             "updated_at": entry.get("updated_at") or datetime.now(timezone.utc).isoformat(),
         })
 
@@ -3351,7 +3360,8 @@ def api_brewfather_sync():
     try:
         client = BrewfatherClient(credentials["user_id"], credentials["api_key"])
         recipes = client.fetch_recipes()
-        batches = client.fetch_batches()
+        fetched_batches = client.fetch_batches()
+        batches = [batch for batch in fetched_batches if is_importable_batch(batch)]
         records = list(recipes)
         recipe_records = {
             str(item.get("brewfather_recipe_id", "")): index
@@ -3447,6 +3457,25 @@ def api_brewfather_resolve_conflict(conflict_id: str):
     return jsonify({"ok": True, "beer": beer})
 
 
+@app.route("/api/brewfather/batches/<batch_id>", methods=["GET"])
+def api_brewfather_batch_details(batch_id: str):
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    beer = next((item for item in data.get("beers", []) if item.get("brewfather_batch_id") == batch_id), None)
+    if not beer:
+        return jsonify({"error": "Brewfather batch is not linked to a beer."}), 404
+    return jsonify({
+        "batch_id": batch_id,
+        "recipe_id": beer.get("brewfather_recipe_id", ""),
+        "beer": beer,
+        "eligible_for_keg_import": str(beer.get("brewfather_batch_status", "")).lower() in {
+            "completed", "complete", "conditioning", "conditioned",
+        },
+    })
+
+
 @app.route("/api/brewfather/batches/<batch_id>/import-keg", methods=["POST"])
 def api_brewfather_import_keg(batch_id: str):
     data = load_data()
@@ -3459,6 +3488,8 @@ def api_brewfather_import_keg(batch_id: str):
     beer = next((item for item in data.get("beers", []) if item.get("brewfather_batch_id") == batch_id), None)
     if not beer:
         return jsonify({"error": "Brewfather batch is not linked to a beer. Run sync first."}), 404
+    if not is_importable_batch(beer):
+        return jsonify({"error": "Only completed or conditioning Brewfather batches can be imported as kegs."}), 409
     keg_id = _coerce_int(body.get("keg_id"), None)
     now = datetime.now(timezone.utc).isoformat()
     if keg_id is not None:
@@ -4484,6 +4515,7 @@ API_REFERENCE_ENDPOINTS = [
     ("POST", "/api/brewfather/sync", "Run Brewfather recipe and batch sync"),
     ("GET", "/api/brewfather/conflicts", "List Brewfather catalog conflicts"),
     ("POST", "/api/brewfather/conflicts/<id>/resolve", "Resolve a Brewfather catalog conflict"),
+    ("GET", "/api/brewfather/batches/<id>", "Review a linked Brewfather batch"),
     ("POST", "/api/brewfather/batches/<id>/import-keg", "Import a confirmed Brewfather batch as a keg"),
     ("GET", "/api/export/json", "Export portable versioned JSON backup"),
     ("GET", "/api/export/archive", "Export ZIP archive backup"),

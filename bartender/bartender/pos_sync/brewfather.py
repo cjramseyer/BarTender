@@ -23,6 +23,14 @@ BREWFATHER_MANAGED_FIELDS = (
     "description",
     "notes",
     "recipe_url",
+    "brewfather_batch_status",
+    "brewfather_measured_og",
+    "brewfather_measured_fg",
+    "brewfather_carbonation",
+    "brewfather_latest_gravity",
+    "brewfather_latest_temperature",
+    "brewfather_packaging_volume",
+    "brewfather_packaging_unit",
 )
 
 
@@ -148,9 +156,22 @@ def normalize_batch(batch: dict) -> dict:
             "packaging_volume": _first(batch, "packagingVolume", "volume", default=""),
             "packaging_unit": _string(_first(batch, "packagingVolumeUnit", "volumeUnit", default="")),
             "status": _string(_first(batch, "status", "batchStatus")),
+            "brewfather_batch_status": _string(_first(batch, "status", "batchStatus")),
+            "brewfather_measured_og": _number(_first(batch, "measuredOg", "og", "originalGravity")),
+            "brewfather_measured_fg": _number(_first(batch, "measuredFg", "fg", "finalGravity")),
+            "brewfather_carbonation": _string(_first(batch, "carbonation", "carbonationLevel")),
+            "brewfather_latest_gravity": _number(_first(batch, "latestGravity", "gravity", "currentGravity")),
+            "brewfather_latest_temperature": _number(_first(batch, "latestTemperature", "temperature", "currentTemperature")),
+            "brewfather_packaging_volume": _first(batch, "packagingVolume", "volume", default=""),
+            "brewfather_packaging_unit": _string(_first(batch, "packagingVolumeUnit", "volumeUnit", default="")),
         }
     )
     return result
+
+
+def is_importable_batch(batch: dict) -> bool:
+    status = _string(_first(batch, "brewfather_batch_status", "status", "batchStatus")).lower().replace("_", " ")
+    return status in {"completed", "complete", "conditioning", "conditioned"}
 
 
 class BrewfatherClient:

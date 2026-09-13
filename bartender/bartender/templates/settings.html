@@ -697,6 +697,7 @@ content %}
             · Last sync: <span id="brewfatherLastSync">{{ settings.brewfather_last_synced_at or 'Never' }}</span>
           </p>
           <p class="muted">Conflicts: <span id="brewfatherConflictCount">0</span></p>
+          <div id="brewfatherConflictList" class="stack-gap-sm" style="margin-top: 0.5rem"></div>
         </div>
       </details>
 
@@ -2559,12 +2560,62 @@ content %}
       document.getElementById("brewfatherLastStatus").textContent = status.last_status || "success";
       document.getElementById("brewfatherLastSync").textContent = status.last_synced_at || "Never";
       document.getElementById("brewfatherConflictCount").textContent = status.conflicts || 0;
+      await loadBrewfatherConflicts();
       if (msg) msg.textContent = `Imported ${body.counts?.beers_created || 0}, updated ${body.counts?.beers_updated || 0}.`;
     } catch (err) {
       if (msg) msg.textContent = "Unable to run Brewfather sync.";
       console.error(err);
     }
   }
+
+  function escapeBrewfatherText(value) {
+    return String(value || "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
+  }
+
+  async function loadBrewfatherConflicts() {
+    const list = document.getElementById("brewfatherConflictList");
+    if (!list) return;
+    const response = await fetch(`${INGRESS}/api/brewfather/conflicts`);
+    const body = await response.json().catch(() => ({}));
+    const conflicts = Array.isArray(body.conflicts) ? body.conflicts : [];
+    const count = document.getElementById("brewfatherConflictCount");
+    if (count) count.textContent = conflicts.length;
+    list.innerHTML = conflicts.length
+      ? conflicts.map((conflict) => `
+          <div class="settings-warning-block">
+            <strong>${escapeBrewfatherText(conflict.brewfather_batch_id || conflict.brewfather_recipe_id || "Catalog conflict")}</strong>
+            <span class="muted">${Object.keys(conflict.fields || {}).length} field(s) changed locally and remotely.</span>
+            <div class="form-actions" style="margin-top: 0.35rem">
+              <button type="button" class="btn btn-sm btn-secondary" onclick="resolveBrewfatherConflict('${escapeBrewfatherText(conflict.id)}', 'brewfather')">Use Brewfather</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="resolveBrewfatherConflict('${escapeBrewfatherText(conflict.id)}', 'local')">Keep Local</button>
+            </div>
+          </div>`).join("")
+      : "";
+  }
+
+  async function resolveBrewfatherConflict(conflictId, resolution) {
+    const response = await fetch(`${INGRESS}/api/brewfather/conflicts/${encodeURIComponent(conflictId)}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolution }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body.error || "Unable to resolve Brewfather conflict.");
+      return;
+    }
+    await loadBrewfatherConflicts();
+    const status = await fetch(`${INGRESS}/api/brewfather/status`).then((item) => item.json());
+    document.getElementById("brewfatherConflictCount").textContent = status.conflicts || 0;
+  }
+
+  loadBrewfatherConflicts();
 
   function createPourOptionRow(option = {}) {
     const row = document.createElement("div");
