@@ -56,6 +56,50 @@ def test_valid_user_can_login_from_team_users(tmp_path):
         assert session["user_role"] == "manager"
 
 
+def test_user_scan_credential_logs_in_and_can_be_revoked(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False},
+        {"id": "staff-1", "name": "Staff One", "role": "staff", "pin": "", "disabled": False},
+    ]
+    data["settings"]["owner_pin"] = "1234"
+    app_module.save_data(data)
+    headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+
+    issued = client.post(
+        "/api/team/users",
+        json={"action": "issue_scan", "user_id": "staff-1"},
+        headers=headers,
+    )
+    assert issued.status_code == 200
+    payload = issued.get_json()
+    assert payload["login_url"].startswith("/auth/scan/")
+    assert "scan_token_hash" not in payload["user"]
+
+    token = payload["login_url"].rsplit("/", 1)[-1]
+    response = client.get(f"/auth/scan/{token}", follow_redirects=False)
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["user_id"] == "staff-1"
+
+    client.get("/logout")
+    revoked = client.post(
+        "/api/team/users",
+        json={"action": "revoke_scan", "user_id": "staff-1"},
+        headers=headers,
+    )
+    assert revoked.status_code == 200
+    rejected = client.get(f"/auth/scan/{token}", follow_redirects=False)
+    assert rejected.status_code == 302
+    assert "/login" in rejected.headers["Location"]
+    failed_login = client.get(rejected.headers["Location"])
+    assert "invalid or revoked" in failed_login.get_data(as_text=True)
+    audit = client.get("/api/team/audit", headers=headers).get_json()["audit"]
+    assert any(entry["action"] == "scan_login_failed" for entry in audit)
+
+
 def test_user_pin_required_when_configured(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -160,10 +204,11 @@ def test_owner_requires_pin_when_other_users_exist(tmp_path):
 
     assert response.status_code == 200
     assert "PIN" in response.get_data(as_text=True)
+    assert 'name="owner_pin"' not in response.get_data(as_text=True)
 
     response = client.post(
         "/login",
-        data={"user_id": "owner", "owner_pin": "1234"},
+        data={"user_id": "owner", "user_pin": "1234"},
         follow_redirects=False,
     )
 
@@ -172,6 +217,36 @@ def test_owner_requires_pin_when_other_users_exist(tmp_path):
     with client.session_transaction() as session:
         assert session["user_id"] == "owner"
         assert session["user_role"] == "owner"
+
+
+def test_owner_scan_uses_the_same_pin_field(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "pin": "", "disabled": False},
+        {"id": "staff-1", "name": "Staff One", "role": "staff", "pin": "", "disabled": False},
+    ]
+    data["settings"]["owner_pin"] = "1234"
+    app_module.save_data(data)
+    owner_headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+    issued = client.post(
+        "/api/team/users",
+        json={"action": "issue_scan", "user_id": "owner"},
+        headers=owner_headers,
+    ).get_json()
+    token = issued["login_url"].rsplit("/", 1)[-1]
+
+    challenge = client.get(f"/auth/scan/{token}", follow_redirects=False)
+    assert challenge.status_code == 302
+    response = client.post(
+        "/login",
+        data={"scan_token": token, "user_pin": "1234"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as session:
+        assert session["user_id"] == "owner"
 
 
 def test_owner_recovery_redirects_to_team_access_when_pin_missing(tmp_path):
