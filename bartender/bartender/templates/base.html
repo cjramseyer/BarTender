@@ -62,17 +62,6 @@
         {% endif %}
       </ul>
       <div class="nav-actions">
-        {% if settings.setup_completed %}
-        <button
-          id="titlebarWhatsNewButton"
-          type="button"
-          class="btn btn-sm btn-secondary nav-secondary-btn"
-          onclick="openModal('updateNoticeModal')"
-          hidden
-        >
-          What's New
-        </button>
-        {% endif %}
         <div class="nav-menu-shell" data-nav-dropdown>
           <button
             type="button"
@@ -86,7 +75,7 @@
             <span class="nav-menu-label">Menu</span>
           </button>
           <div class="nav-menu-panel" role="menu">
-            {% if settings.setup_completed %}
+            {% if settings.setup_completed and current_user_name %}
             <div class="nav-menu-section nav-menu-updates-section">
               <div class="nav-menu-section-title">Updates</div>
               <button
@@ -308,7 +297,7 @@
         </form>
       </div>
     </div>
-    {% endif %} {% if settings.setup_completed %}
+    {% endif %} {% if settings.setup_completed and current_user_name %}
     <div class="modal" id="updateNoticeModal" data-overlay-close="true">
       <div class="modal-dialog modal-dialog-lg">
         <div class="modal-header">

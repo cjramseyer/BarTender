@@ -32,6 +32,21 @@ def test_login_page_redirects_when_not_authenticated(tmp_path):
     assert response.headers["Location"].startswith("/login")
 
 
+def test_login_page_does_not_render_whats_new_notice(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["setup_completed"] = True
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+
+    response = client.get("/login")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="updateNoticeModal"' not in page
+    assert 'id="titlebarWhatsNewButton"' not in page
+
+
 def test_dashboard_includes_inline_tap_and_keg_edit_controls(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -50,6 +65,25 @@ def test_dashboard_includes_inline_tap_and_keg_edit_controls(tmp_path):
     assert "openDashboardKegEdit" in page
     assert "saveDashboardTap" in page
     assert "saveDashboardKeg" in page
+
+
+def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["setup_completed"] = True
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="titlebarWhatsNewButton"' not in page
+    assert 'id="updateNoticeModal"' in page
 
 
 def test_whats_new_dismissal_is_stored_per_user(tmp_path):
