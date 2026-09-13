@@ -323,6 +323,15 @@ body {
   color: var(--text);
 }
 
+.nav-menu-button-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
 .nav-user-menu {
   position: relative;
   display: inline-flex;
@@ -779,6 +788,35 @@ textarea.form-control {
 .dashboard-card-title-link:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+.dashboard-edit-trigger {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.dashboard-edit-trigger:hover {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.15rem;
+}
+
+.dashboard-edit-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+.keg-summary-title {
+  display: block;
+  font-weight: 700;
 }
 
 .dashboard-manage-row {
@@ -1496,6 +1534,11 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   padding-top: 1rem;
   border-top: 1px solid var(--border);
   margin-top: 0.5rem;
+}
+
+.update-notice-footer {
+  margin-top: 0;
+  padding: 1rem 1.25rem 1.25rem;
 }
 
 .wizard-intro,

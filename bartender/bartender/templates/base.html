@@ -64,9 +64,11 @@
       <div class="nav-actions">
         {% if settings.setup_completed %}
         <button
+          id="titlebarWhatsNewButton"
           type="button"
           class="btn btn-sm btn-secondary nav-secondary-btn"
           onclick="openModal('updateNoticeModal')"
+          hidden
         >
           What's New
         </button>
@@ -84,6 +86,16 @@
             <span class="nav-menu-label">Menu</span>
           </button>
           <div class="nav-menu-panel" role="menu">
+            {% if settings.setup_completed %}
+            <button
+              class="nav-menu-item nav-menu-button-item"
+              type="button"
+              onclick="openWhatsNewFromMenu()"
+              role="menuitem"
+            >
+              What's New
+            </button>
+            {% endif %}
             <details class="nav-menu-submenu">
               <summary>Options</summary>
               <div class="nav-menu-submenu-body">
@@ -318,7 +330,7 @@
             Dismiss this message once you’ve reviewed the updates.
           </p>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer update-notice-footer">
           <button
             type="button"
             class="btn btn-primary"
@@ -335,11 +347,12 @@
     <script>
       window.BARTENDER_INGRESS = {{ ingress | tojson }};
       window.BARTENDER_APP_VERSION = {{ app_version | tojson }};
+      window.BARTENDER_SEEN_VERSION = {{ current_user_release_seen_version | tojson }};
       window.BARTENDER_ENVIRONMENT_MODE = {{ (settings.environment_mode or 'production') | tojson }};
       initTheme("{{ settings.theme }}", "{{ ingress }}");
       document.body.dataset.managePos =
         document.documentElement.dataset.managePos || "top-right";
-      initAppPrompts(window.BARTENDER_APP_VERSION);
+      initAppPrompts(window.BARTENDER_APP_VERSION, window.BARTENDER_SEEN_VERSION);
     </script>
     {% block scripts %}{% endblock %}
   </body>

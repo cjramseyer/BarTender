@@ -112,9 +112,10 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-function initAppPrompts(appVersion) {
+function initAppPrompts(appVersion, seenVersion) {
   const setupModal = document.getElementById("setupWizardModal");
   const updateModal = document.getElementById("updateNoticeModal");
+  const titlebarWhatsNewButton = document.getElementById("titlebarWhatsNewButton");
   const currentVersion = String(appVersion || "").trim();
 
   if (setupModal) {
@@ -126,10 +127,18 @@ function initAppPrompts(appVersion) {
     return;
   }
 
-  const seenVersion = localStorage.getItem("bartender_seen_version");
-  if (seenVersion === currentVersion) {
-    return;
+  const hasUnseenUpdate = String(seenVersion || "").trim() !== currentVersion;
+  if (titlebarWhatsNewButton) {
+    titlebarWhatsNewButton.hidden = !hasUnseenUpdate;
   }
+  if (hasUnseenUpdate) {
+    openModal("updateNoticeModal");
+  }
+}
+
+function openWhatsNewFromMenu() {
+  openModal("updateNoticeModal");
+  closeNavDropdowns();
 }
 
 async function submitSetupWizard(event) {
@@ -197,9 +206,6 @@ async function submitSetupWizard(event) {
       }
     }
 
-    if (appVersion) {
-      localStorage.setItem("bartender_seen_version", appVersion);
-    }
     closeModal("setupWizardModal");
     location.reload();
   } catch (err) {
@@ -210,10 +216,24 @@ async function submitSetupWizard(event) {
   }
 }
 
-function dismissUpdateNotice() {
+async function dismissUpdateNotice() {
   const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
+  const ingress = window.BARTENDER_INGRESS || "";
   if (appVersion) {
-    localStorage.setItem("bartender_seen_version", appVersion);
+    const response = await fetch(`${ingress}/api/user/release-seen`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: appVersion }),
+    });
+    if (!response.ok) {
+      console.error("Unable to save What's New dismissal", response.status);
+      return;
+    }
+    window.BARTENDER_SEEN_VERSION = appVersion;
+  }
+  const titlebarWhatsNewButton = document.getElementById("titlebarWhatsNewButton");
+  if (titlebarWhatsNewButton) {
+    titlebarWhatsNewButton.hidden = true;
   }
   closeModal("updateNoticeModal");
 }

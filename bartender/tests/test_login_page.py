@@ -32,6 +32,55 @@ def test_login_page_redirects_when_not_authenticated(tmp_path):
     assert response.headers["Location"].startswith("/login")
 
 
+def test_dashboard_includes_inline_tap_and_keg_edit_controls(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="dashboardTapEditModal"' in page
+    assert 'id="dashboardKegEditModal"' in page
+    assert "openDashboardTapEdit" in page
+    assert "openDashboardKegEdit" in page
+    assert "saveDashboardTap" in page
+    assert "saveDashboardKeg" in page
+
+
+def test_whats_new_dismissal_is_stored_per_user(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["team_users"] = [
+        {"id": "owner", "name": "Owner", "role": "owner", "release_seen_version": ""},
+        {"id": "staff-1", "name": "Staff One", "role": "staff", "release_seen_version": ""},
+    ]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post("/api/user/release-seen", json={"version": "dev"})
+    assert response.status_code == 200
+    saved_users = {user["id"]: user for user in app_module.load_data()["team_users"]}
+    assert saved_users["owner"]["release_seen_version"] == "dev"
+    assert saved_users["staff-1"]["release_seen_version"] == ""
+
+    with client.session_transaction() as session:
+        session["user_id"] = "staff-1"
+        session["user_role"] = "staff"
+        session["user_name"] = "Staff One"
+    staff_page = client.get("/")
+    assert 'window.BARTENDER_SEEN_VERSION = ""' in staff_page.get_data(as_text=True)
+
+
 def test_valid_user_can_login_from_team_users(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

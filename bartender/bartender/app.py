@@ -567,6 +567,7 @@ def load_data() -> dict:
             user["scan_token_hash"] = str(user.get("scan_token_hash", "") or "").strip()
             user["scan_issued_at"] = str(user.get("scan_issued_at", "") or "").strip()
             user["scan_require_pin"] = _coerce_bool(user.get("scan_require_pin"), False)
+            user["release_seen_version"] = str(user.get("release_seen_version", "") or "").strip()[:64]
             normalized_team_users.append(user)
         data["team_users"] = normalized_team_users
 
@@ -1020,6 +1021,17 @@ def _public_team_user(user: dict) -> dict:
     public = {key: value for key, value in user.items() if key not in ("scan_token_hash",)}
     public["scan_enabled"] = bool(str(user.get("scan_token_hash", "")).strip())
     return public
+
+
+def _current_user_release_seen_version() -> str:
+    user_id = str(session.get("user_id", "") or "").strip().lower()
+    if not user_id:
+        return ""
+    data = load_data()
+    for user in data.get("team_users", []):
+        if str(user.get("id", "")).strip().lower() == user_id:
+            return str(user.get("release_seen_version", "") or "").strip()
+    return ""
 
 
 def _qr_png_data_url(value: str) -> str:
@@ -2557,6 +2569,7 @@ def inject_runtime_metadata():
         "ingress": _effective_ingress_path(),
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),
+        "current_user_release_seen_version": _current_user_release_seen_version(),
     }
 
 
@@ -3183,6 +3196,30 @@ def api_get_settings():
     if not _team_can(current_user.get("role", "owner"), "settings"):
         return jsonify({"error": "Insufficient permissions"}), 403
     return jsonify(_brewfather_settings_response(data["settings"]))
+
+
+@app.route("/api/user/release-seen", methods=["POST"])
+def api_mark_release_seen():
+    current_user = _get_current_team_user()
+    user_id = str(current_user.get("id", "") or "").strip()
+    version = str((request.get_json(silent=True) or {}).get("version", "") or "").strip()[:64]
+    if not user_id or not version:
+        return jsonify({"error": "User and release version are required."}), 400
+
+    data = load_data()
+    user = next(
+        (
+            item for item in data.get("team_users", [])
+            if str(item.get("id", "")).strip().lower() == user_id.lower()
+        ),
+        None,
+    )
+    if user is None:
+        return jsonify({"error": "User not found."}), 404
+
+    user["release_seen_version"] = version
+    save_data(data)
+    return jsonify({"ok": True, "version": version})
 
 
 @app.route("/api/storage/status", methods=["GET"])
