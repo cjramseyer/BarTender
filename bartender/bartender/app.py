@@ -3185,6 +3185,33 @@ def api_get_settings():
     return jsonify(_brewfather_settings_response(data["settings"]))
 
 
+@app.route("/api/storage/status", methods=["GET"])
+def api_storage_status():
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    backend = str(os.environ.get("STORAGE_BACKEND", "internal") or "internal").strip().lower()
+    if backend in ("internal", "sqlite"):
+        return jsonify({
+            "backend": "internal",
+            "engine": "SQLite",
+            "location": str(DATA_FILE.with_name("bartender.db")),
+            "configured": True,
+        })
+
+    database_url = str(os.environ.get("DATABASE_URL", "") or "").strip()
+    parsed = urlsplit(database_url)
+    return jsonify({
+        "backend": backend,
+        "engine": "PostgreSQL" if backend in ("postgres", "postgresql") else "MariaDB",
+        "host": parsed.hostname or "",
+        "port": parsed.port or (5432 if backend in ("postgres", "postgresql") else 3306),
+        "database": parsed.path.lstrip("/") if parsed.path else "",
+        "configured": bool(database_url),
+    })
+
+
 @app.route("/api/settings", methods=["POST"])
 def api_save_settings():
     data = load_data()
@@ -4645,6 +4672,7 @@ KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
 API_REFERENCE_ENDPOINTS = [
     ("GET", "/api/settings", "Get current settings"),
     ("POST", "/api/settings", "Update settings"),
+    ("GET", "/api/storage/status", "Get credential-safe storage status"),
     ("GET", "/api/stock", "List all bar stock items"),
     ("POST", "/api/stock", "Add a stock item"),
     ("PUT", "/api/stock/<id>", "Update a stock item"),

@@ -14,6 +14,17 @@ export DATA_DIR="/data"
 export PORT="8099"
 export DISPLAY_PORT="8100"
 export EXTERNAL_API_PORT="8110"
+export STORAGE_BACKEND="$(bashio::config 'storage_backend')"
+export DATABASE_URL="$(bashio::config 'database_url')"
+
+if [ -z "${STORAGE_BACKEND}" ]; then
+	export STORAGE_BACKEND="internal"
+fi
+
+if [ "${STORAGE_BACKEND}" != "internal" ] && [ -z "${DATABASE_URL}" ]; then
+	bashio::log.error "DATABASE_URL is required when STORAGE_BACKEND=${STORAGE_BACKEND}"
+	exit 1
+fi
 
 bashio::log.info "Starting BarTender management server on port ${PORT} (ingress: ${INGRESS_PATH})"
 bashio::log.info "Starting BarTender display server on port ${DISPLAY_PORT}"
