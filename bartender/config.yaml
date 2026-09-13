@@ -19,3 +19,9 @@ ports_description:
 ingress: true
 panel_icon: "mdi:beer"
 panel_title: "BarTender"
+options:
+  storage_backend: internal
+  database_url: ""
+schema:
+  storage_backend: list(internal|postgresql|mariadb)
+  database_url: str

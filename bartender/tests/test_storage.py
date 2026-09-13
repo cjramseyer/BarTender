@@ -46,3 +46,27 @@ def test_external_storage_requires_deployment_configuration(tmp_path):
 
     with pytest.raises(StorageConfigurationError, match="STORAGE_BACKEND"):
         create_state_store(tmp_path / "bartender.db", "oracle")
+
+
+def test_storage_status_does_not_expose_database_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("STORAGE_BACKEND", "postgresql")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://db-user:secret@example.test:5432/bar")
+    import importlib
+    import bartender.app as app_module
+
+    importlib.reload(app_module)
+    app_module.DATA_DIR = tmp_path
+    app_module.DATA_FILE = tmp_path / "bartender.json"
+    app_module.app.config["TESTING"] = True
+    response = app_module.app.test_client().get(
+        "/api/storage/status",
+        headers={"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["engine"] == "PostgreSQL"
+    assert payload["host"] == "example.test"
+    assert payload["database"] == "bar"
+    assert "secret" not in response.get_data(as_text=True)

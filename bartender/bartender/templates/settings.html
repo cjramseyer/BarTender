@@ -864,6 +864,14 @@ content %}
       </details>
 
       <details class="settings-collapsible">
+        <summary>Storage Status</summary>
+        <div class="settings-collapsible-body">
+          <p class="muted">Database selection is managed by the Home Assistant add-on configuration. Credentials are never shown here.</p>
+          <div id="storageStatus" class="stack-gap-sm">Loading storage status...</div>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
         <summary>Analytics</summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
@@ -2599,6 +2607,24 @@ content %}
       : "";
   }
 
+  async function loadStorageStatus() {
+    const container = document.getElementById("storageStatus");
+    if (!container) return;
+    try {
+      const response = await fetch(`${INGRESS}/api/storage/status`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Unable to load storage status.");
+      const location = body.location || [body.host, body.port, body.database].filter(Boolean).join(":");
+      container.innerHTML = `
+        <p><strong>Backend:</strong> ${escapeBrewfatherText(body.engine || body.backend || "Unknown")}</p>
+        <p><strong>Status:</strong> ${body.configured ? "Configured" : "Not configured"}</p>
+        <p><strong>Location:</strong> ${escapeBrewfatherText(location || "Not available")}</p>
+      `;
+    } catch (error) {
+      container.textContent = error.message || "Unable to load storage status.";
+    }
+  }
+
   async function resolveBrewfatherConflict(conflictId, resolution) {
     const response = await fetch(`${INGRESS}/api/brewfather/conflicts/${encodeURIComponent(conflictId)}/resolve`, {
       method: "POST",
@@ -2616,6 +2642,7 @@ content %}
   }
 
   loadBrewfatherConflicts();
+  loadStorageStatus();
 
   function createPourOptionRow(option = {}) {
     const row = document.createElement("div");

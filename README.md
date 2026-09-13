@@ -101,9 +101,24 @@ Sample dashboard with seeded data:
 
 No required configuration. Optional options can be set in the add-on configuration tab.
 
-| Option   | Default | Description                                     |
-| -------- | ------- | ----------------------------------------------- |
-| _(none)_ | —       | All settings are managed from within the web UI |
+| Option            | Default    | Description                                                                 |
+| ----------------- | ---------- | --------------------------------------------------------------------------- |
+| `storage_backend` | `internal` | `internal` for SQLite, or `postgresql` / `mariadb` for an external database |
+| `database_url`    | _(empty)_  | Deployment-only connection URL required for external database backends      |
+
+Database selection belongs in the Home Assistant add-on configuration because it is infrastructure configuration. BarTender Settings shows only a credential-safe storage status; it never displays the database password or full connection URL.
+
+Examples:
+
+```yaml
+storage_backend: internal
+database_url: ""
+```
+
+```yaml
+storage_backend: postgresql
+database_url: postgresql://user:password@database-host:5432/bartender
+```
 
 ### Network Ports
 
