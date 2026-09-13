@@ -670,6 +670,37 @@ content %}
       </details>
 
       <details class="settings-collapsible">
+        <summary>Brewfather Integration</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              <input type="checkbox" id="brewfatherEnabled" {% if settings.brewfather_enabled %}checked{% endif %} />
+              Enable read-only Brewfather sync
+            </label>
+            <small class="muted">Only recipes and batches are imported. BarTender remains responsible for keg and pour operations.</small>
+          </div>
+          <div class="form-group">
+            <label for="brewfatherUserId">Brewfather User ID</label>
+            <input type="text" id="brewfatherUserId" class="form-control" value="{{ settings.brewfather_user_id or '' }}" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="brewfatherApiKey">Read-only API key</label>
+            <input type="password" id="brewfatherApiKey" class="form-control" value="" autocomplete="new-password" placeholder="Leave blank to keep the saved key" />
+            <small class="muted">The key is never returned in settings responses, exports, audit events, or logs.</small>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="runBrewfatherSync()">Sync Brewfather</button>
+            <span id="brewfatherMsg" class="save-msg"></span>
+          </div>
+          <p class="muted" style="margin-top: 0.5rem">
+            Status: <strong id="brewfatherLastStatus">{{ settings.brewfather_last_status or 'never' }}</strong>
+            · Last sync: <span id="brewfatherLastSync">{{ settings.brewfather_last_synced_at or 'Never' }}</span>
+          </p>
+          <p class="muted">Conflicts: <span id="brewfatherConflictCount">0</span></p>
+        </div>
+      </details>
+
+      <details class="settings-collapsible">
         <summary>Audit Trail</summary>
         <div class="settings-collapsible-body">
           {% if current_user_role == 'owner' %}
@@ -1572,6 +1603,16 @@ content %}
     )
       ? document.getElementById("posSyncProviderConfigJson").value
       : "";
+    payload.brewfather_enabled = document.getElementById("brewfatherEnabled")
+      ? document.getElementById("brewfatherEnabled").checked
+      : false;
+    payload.brewfather_user_id = document.getElementById("brewfatherUserId")
+      ? document.getElementById("brewfatherUserId").value
+      : "";
+    const brewfatherApiKey = document.getElementById("brewfatherApiKey");
+    if (brewfatherApiKey && brewfatherApiKey.value) {
+      payload.brewfather_api_key = brewfatherApiKey.value;
+    }
     payload.external_api_token_auth_enabled = document.getElementById(
       "externalApiTokenAuthEnabled",
     )
@@ -2501,6 +2542,27 @@ content %}
       if (msg) {
         msg.textContent = "Unable to run POS sync.";
       }
+    }
+  }
+
+  async function runBrewfatherSync() {
+    const msg = document.getElementById("brewfatherMsg");
+    if (msg) msg.textContent = "Syncing...";
+    try {
+      const response = await fetch(`${INGRESS}/api/brewfather/sync`, { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) {
+        if (msg) msg.textContent = body.error || `Sync failed: ${response.status}`;
+        return;
+      }
+      const status = await fetch(`${INGRESS}/api/brewfather/status`).then((item) => item.json());
+      document.getElementById("brewfatherLastStatus").textContent = status.last_status || "success";
+      document.getElementById("brewfatherLastSync").textContent = status.last_synced_at || "Never";
+      document.getElementById("brewfatherConflictCount").textContent = status.conflicts || 0;
+      if (msg) msg.textContent = `Imported ${body.counts?.beers_created || 0}, updated ${body.counts?.beers_updated || 0}.`;
+    } catch (err) {
+      if (msg) msg.textContent = "Unable to run Brewfather sync.";
+      console.error(err);
     }
   }
 

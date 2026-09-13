@@ -413,6 +413,41 @@
   </div>
 </div>
 
+<div class="modal" id="newBeerFromKegModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Add New Beer</h3>
+      <button class="btn btn-icon" type="button" onclick="cancelNewBeerFromKeg()">
+        ✕
+      </button>
+    </div>
+    <form id="newBeerFromKegForm" onsubmit="submitNewBeerFromKeg(event)">
+      <div class="form-group">
+        <label for="newBeerFromKegName">Beer Name *</label>
+        <input id="newBeerFromKegName" class="form-control" type="text" required />
+      </div>
+      <div class="form-group">
+        <label for="newBeerFromKegType">Beer Type</label>
+        <input id="newBeerFromKegType" class="form-control" type="text" placeholder="e.g. IPA" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="newBeerFromKegBrewer">Brewer</label>
+          <input id="newBeerFromKegBrewer" class="form-control" type="text" />
+        </div>
+        <div class="form-group">
+          <label for="newBeerFromKegBrewery">Brewery</label>
+          <input id="newBeerFromKegBrewery" class="form-control" type="text" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="cancelNewBeerFromKeg()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Beer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal" id="bulkKegModal">
   <div class="modal-dialog">
     <div class="modal-header">
@@ -455,6 +490,7 @@
   const KEGS = {{ kegs | tojson }};
   const BEERS = {{ beers | tojson }};
   const ADD_NEW_BEER_VALUE = "__add_new_beer__";
+  let pendingNewBeerSelectId = "";
 
   function getPreferredDefaultKegSize() {
     const choices = Array.isArray(DEFAULT_KEG_TYPE_CHOICES)
@@ -564,40 +600,32 @@
     }
   }
 
-  async function createBeerFromKegManagement(selectId) {
+  function openNewBeerFromKeg(selectId) {
     const select = document.getElementById(selectId);
-    const restoreValue = select?.dataset.previousValue || "";
+    pendingNewBeerSelectId = selectId;
+    document.getElementById("newBeerFromKegName").value = "";
+    document.getElementById("newBeerFromKegType").value = "";
+    document.getElementById("newBeerFromKegBrewer").value = "";
+    document.getElementById("newBeerFromKegBrewery").value = "";
+    openModal("newBeerFromKegModal");
+    document.getElementById("newBeerFromKegName").focus();
+  }
 
-    const nameInput = prompt("New beer name:");
-    if (nameInput === null) {
-      if (select) select.value = restoreValue;
-      return;
-    }
+  function cancelNewBeerFromKeg() {
+    const select = document.getElementById(pendingNewBeerSelectId);
+    if (select) select.value = select.dataset.previousValue || "";
+    pendingNewBeerSelectId = "";
+    closeModal("newBeerFromKegModal");
+  }
 
-    const name = String(nameInput).trim();
-    if (!name) {
-      alert("Beer name is required.");
-      if (select) select.value = restoreValue;
-      return;
-    }
-
-    const typeInput = prompt("Beer type (optional):", "");
-    if (typeInput === null) {
-      if (select) select.value = restoreValue;
-      return;
-    }
-
-    const brewerInput = prompt("Brewer (optional):", "");
-    if (brewerInput === null) {
-      if (select) select.value = restoreValue;
-      return;
-    }
-
-    const breweryInput = prompt("Brewery (optional):", "");
-    if (breweryInput === null) {
-      if (select) select.value = restoreValue;
-      return;
-    }
+  async function submitNewBeerFromKeg(event) {
+    event.preventDefault();
+    const select = document.getElementById(pendingNewBeerSelectId);
+    const name = document.getElementById("newBeerFromKegName").value.trim();
+    const type = document.getElementById("newBeerFromKegType").value.trim();
+    const brewer = document.getElementById("newBeerFromKegBrewer").value.trim();
+    const brewery = document.getElementById("newBeerFromKegBrewery").value.trim();
+    if (!name) return;
 
     const response = await fetch(`${INGRESS}/api/beers`, {
       method: "POST",
@@ -605,9 +633,9 @@
       body: JSON.stringify({
         name,
         packaging: "kegged",
-        type: String(typeInput || "").trim(),
-        brewer: String(brewerInput || "").trim(),
-        brewery: String(breweryInput || "").trim(),
+        type,
+        brewer,
+        brewery,
       }),
     });
 
@@ -620,7 +648,7 @@
         // Keep fallback message.
       }
       alert(message);
-      if (select) select.value = restoreValue;
+      if (select) select.value = select.dataset.previousValue || "";
       return;
     }
 
@@ -633,6 +661,8 @@
     const fillKegBeerSelect = document.getElementById("fillKegBeer");
     if (kegBeerSelect) kegBeerSelect.value = createdId;
     if (fillKegBeerSelect) fillKegBeerSelect.value = createdId;
+    pendingNewBeerSelectId = "";
+    closeModal("newBeerFromKegModal");
   }
 
   function wireBeerSelectForAddNew(selectId) {
@@ -645,7 +675,7 @@
 
     select.addEventListener("change", async () => {
       if (select.value !== ADD_NEW_BEER_VALUE) return;
-      await createBeerFromKegManagement(selectId);
+      openNewBeerFromKeg(selectId);
     });
   }
 
