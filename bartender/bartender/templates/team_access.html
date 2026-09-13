@@ -122,8 +122,6 @@
     </div>
   </div>
 </div>
-{% endblock %}
-
 <div class="modal" id="scanCredentialModal">
   <div class="modal-dialog modal-dialog-lg">
     <div class="modal-header">
@@ -137,6 +135,7 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
 {% block scripts %}
 <script>
@@ -242,30 +241,34 @@
   let activeScanCredential = null;
 
   async function issueScanCredential(button) {
-    const userId = button.dataset.userId;
-    const user = (TEAM_USERS || []).find((item) => String(item.id) === String(userId));
-    const requirePin = user ? Boolean(user.scan_require_pin) : false;
-    const response = await fetch(`${INGRESS}/api/team/users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: user?.scan_enabled ? "rotate_scan" : "issue_scan", user_id: userId, require_pin: requirePin }),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      alert(body.error || "Unable to issue scan credential.");
-      return;
+    try {
+      const userId = button.dataset.userId;
+      const user = (TEAM_USERS || []).find((item) => String(item.id) === String(userId));
+      const requirePin = user ? Boolean(user.scan_require_pin) : false;
+      const response = await fetch(`${INGRESS}/api/team/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: user?.scan_enabled ? "rotate_scan" : "issue_scan", user_id: userId, require_pin: requirePin }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to issue scan credential.");
+      }
+      activeScanCredential = body;
+      document.getElementById("scanCredentialTitle").textContent = `${body.user?.name || "User"} QR / NFC Credential`;
+      document.getElementById("scanCredentialBody").innerHTML = `
+        <p class="muted">The QR code and NFC payload use the same login URL. Rotating or revoking the credential invalidates the previous URL.</p>
+        ${body.qr_data_url ? `<img src="${body.qr_data_url}" alt="QR sign-in code" style="width:260px; max-width:100%;" />` : "<p class=\"muted\">QR generation is unavailable.</p>"}
+        <label>NFC payload / login URL</label>
+        <input class="form-control" readonly value="${body.login_url || ""}" />
+        <label class="nav-menu-checkbox"><input type="checkbox" ${requirePin ? "checked" : ""} onchange="updateScanPolicy('${userId}', this.checked)" /> Require PIN after scan</label>
+      `;
+      openModal("scanCredentialModal");
+      await refreshTeamUsers();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to issue scan credential.");
     }
-    activeScanCredential = body;
-    document.getElementById("scanCredentialTitle").textContent = `${body.user?.name || "User"} QR / NFC Credential`;
-    document.getElementById("scanCredentialBody").innerHTML = `
-      <p class="muted">The QR code and NFC payload use the same login URL. Rotating or revoking the credential invalidates the previous URL.</p>
-      ${body.qr_data_url ? `<img src="${body.qr_data_url}" alt="QR sign-in code" style="width:260px; max-width:100%;" />` : "<p class=\"muted\">QR generation is unavailable.</p>"}
-      <label>NFC payload / login URL</label>
-      <input class="form-control" readonly value="${body.login_url || ""}" />
-      <label class="nav-menu-checkbox"><input type="checkbox" ${requirePin ? "checked" : ""} onchange="updateScanPolicy('${userId}', this.checked)" /> Require PIN after scan</label>
-    `;
-    openModal("scanCredentialModal");
-    await refreshTeamUsers();
   }
 
   async function revokeScanCredential(button) {
