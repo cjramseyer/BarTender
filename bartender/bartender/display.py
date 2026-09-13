@@ -245,8 +245,3 @@ def media_bar_logo():
     if logo_path is None or not logo_path.exists():
         return "", 404
     return send_file(logo_path)
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("DISPLAY_PORT", 8100))
-    display_app.run(host="0.0.0.0", port=port, debug=False)

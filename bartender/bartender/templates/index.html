@@ -18,7 +18,13 @@ content %}
       keg and keg.percent_full is defined else (100 if keg and keg.status ==
       'full' else 50 if keg and keg.status == 'in_use' else 0) %}
       <li class="tap-item">
-        <span class="tap-number">Tap {{ tap.number }}</span>
+        <button
+          class="dashboard-edit-trigger tap-number"
+          type="button"
+          onclick='openDashboardTapEdit({{ tap | tojson | forceescape }})'
+        >
+          Tap {{ tap.number }}
+        </button>
         {% if keg %}
         <div
           class="tap-keg-compact"
@@ -35,9 +41,13 @@ content %}
           </div>
           <span class="tap-keg-percent">{{ fill_pct }}%</span>
         </div>
-        <span class="tap-label"
-          >{{ keg.name if keg else (tap.label or ('Tap ' ~ tap.number)) }}</span
+        <button
+          class="dashboard-edit-trigger tap-label"
+          type="button"
+          onclick='openDashboardKegEdit({{ keg | tojson | forceescape }})'
         >
+          {{ keg.name if keg else (tap.label or ('Tap ' ~ tap.number)) }}
+        </button>
         {% if keg.current_volume is not none and keg.current_volume > 0 and
         keg.status not in ('cleaning', 'retired') %} {% if (settings.pour_mode
         or 'manual') == 'manual' %} {% set pour_options = settings.pour_options
@@ -154,7 +164,13 @@ content %}
         {% set volume_token = '%g' | format(keg.current_volume)
         if keg.current_volume is not none else '—' %}
         <div class="keg-summary-line keg-summary-line-primary">
-          <strong>{{ keg.beer_name or 'Unknown Beer' }}</strong>
+          <button
+            class="dashboard-edit-trigger keg-summary-title"
+            type="button"
+            onclick='openDashboardKegEdit({{ keg | tojson | forceescape }})'
+          >
+            {{ keg.beer_name or 'Unknown Beer' }}
+          </button>
           <span class="muted"
             >Volume Remaining: {{ volume_token }} {{ keg.volume_unit or '' }}</span
           >
@@ -199,9 +215,6 @@ content %}
         rel="noopener noreferrer"
         title="Opens Analytics in a new tab"
         >Open Analytics</a
-      >
-      <span class="muted" style="margin-left: 0.5rem; align-self: center"
-        >Opens in a new tab</span
       >
     </div>
     <details class="analytics-panel" open>
@@ -306,9 +319,172 @@ content %}
   </div>
   {% endif %}
 </div>
+
+<div class="modal" id="dashboardTapEditModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Edit Tap</h3>
+      <button class="btn btn-icon" type="button" onclick="closeModal('dashboardTapEditModal')">✕</button>
+    </div>
+    <form onsubmit="saveDashboardTap(event)">
+      <input type="hidden" id="dashboardTapId" />
+      <div class="form-group">
+        <label for="dashboardTapLabel">Label</label>
+        <input id="dashboardTapLabel" class="form-control" type="text" />
+      </div>
+      <div class="form-group">
+        <label for="dashboardTapKeg">Assigned Keg</label>
+        <select id="dashboardTapKeg" class="form-control">
+          <option value="">No keg</option>
+          {% for keg in kegs %}
+          <option value="{{ keg.id }}">{{ keg.name or 'Unnamed Keg' }}{% if keg.beer_name %} — {{ keg.beer_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="dashboardTapStatus">Status</label>
+        <select id="dashboardTapStatus" class="form-control">
+          <option value="active">Active</option>
+          <option value="cleaning">Cleaning</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="offline">Offline</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="dashboardTapNotes">Notes</label>
+        <textarea id="dashboardTapNotes" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('dashboardTapEditModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Tap</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="dashboardKegEditModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Edit Keg</h3>
+      <button class="btn btn-icon" type="button" onclick="closeModal('dashboardKegEditModal')">✕</button>
+    </div>
+    <form onsubmit="saveDashboardKeg(event)">
+      <input type="hidden" id="dashboardKegId" />
+      <div class="form-group">
+        <label for="dashboardKegName">Keg Name</label>
+        <input id="dashboardKegName" class="form-control" type="text" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dashboardKegStatus">Status</label>
+          <select id="dashboardKegStatus" class="form-control">
+            <option value="full">Full</option>
+            <option value="in_use">On-Tap</option>
+            <option value="empty">Empty</option>
+            <option value="cleaning">Cleaning</option>
+            <option value="retired">Retired</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="dashboardKegPercent">Percent Full</label>
+          <input id="dashboardKegPercent" class="form-control" type="number" min="0" max="100" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dashboardKegVolume">Current Volume</label>
+          <input id="dashboardKegVolume" class="form-control" type="number" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label for="dashboardKegUnit">Volume Unit</label>
+          <select id="dashboardKegUnit" class="form-control">
+            <option value="oz">oz</option>
+            <option value="gal">gal</option>
+            <option value="ml">ml</option>
+            <option value="l">L</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="dashboardKegNotes">Notes</label>
+        <textarea id="dashboardKegNotes" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('dashboardKegEditModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Keg</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  const DEFAULT_VOLUME_UNIT = {{ ('oz' if (settings.measurement or 'us') == 'us' else 'ml') | tojson }};
+
+  function openDashboardTapEdit(tap) {
+    document.getElementById("dashboardTapId").value = tap.id;
+    document.getElementById("dashboardTapLabel").value = tap.label || "";
+    document.getElementById("dashboardTapKeg").value = tap.keg_id || "";
+    document.getElementById("dashboardTapStatus").value = tap.status || "active";
+    document.getElementById("dashboardTapNotes").value = tap.notes || "";
+    openModal("dashboardTapEditModal");
+  }
+
+  function openDashboardKegEdit(keg) {
+    document.getElementById("dashboardKegId").value = keg.id;
+    document.getElementById("dashboardKegName").value = keg.name || "";
+    document.getElementById("dashboardKegStatus").value = keg.status || "empty";
+    document.getElementById("dashboardKegPercent").value = keg.percent_full ?? "";
+    document.getElementById("dashboardKegVolume").value = keg.current_volume ?? "";
+    document.getElementById("dashboardKegUnit").value = keg.volume_unit || DEFAULT_VOLUME_UNIT;
+    document.getElementById("dashboardKegNotes").value = keg.notes || "";
+    openModal("dashboardKegEditModal");
+  }
+
+  async function saveDashboardTap(event) {
+    event.preventDefault();
+    const tapId = document.getElementById("dashboardTapId").value;
+    const kegId = document.getElementById("dashboardTapKeg").value;
+    const response = await fetch(`${INGRESS}/api/taps/${tapId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        label: document.getElementById("dashboardTapLabel").value.trim(),
+        keg_id: kegId ? Number(kegId) : null,
+        status: document.getElementById("dashboardTapStatus").value,
+        notes: document.getElementById("dashboardTapNotes").value.trim(),
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body.error || "Unable to save tap.");
+      return;
+    }
+    location.reload();
+  }
+
+  async function saveDashboardKeg(event) {
+    event.preventDefault();
+    const kegId = document.getElementById("dashboardKegId").value;
+    const response = await fetch(`${INGRESS}/api/kegs/${kegId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: document.getElementById("dashboardKegName").value.trim(),
+        status: document.getElementById("dashboardKegStatus").value,
+        percent_full: Number(document.getElementById("dashboardKegPercent").value),
+        current_volume: Number(document.getElementById("dashboardKegVolume").value),
+        volume_unit: document.getElementById("dashboardKegUnit").value,
+        notes: document.getElementById("dashboardKegNotes").value.trim(),
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body.error || "Unable to save keg.");
+      return;
+    }
+    location.reload();
+  }
 
   function wireDashboardTapControls() {
     document.querySelectorAll(".js-keg-level-fill").forEach((fillEl) => {

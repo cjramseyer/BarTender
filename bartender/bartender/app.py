@@ -61,6 +61,7 @@ from flask import (
     render_template,
     request,
     jsonify,
+    g,
     send_file,
     redirect,
     session,
@@ -254,6 +255,20 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bartender-dev-secret-change-me")
+DATA_STATE_LOCK = threading.RLock()
+
+
+@app.before_request
+def acquire_mutation_lock():
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        DATA_STATE_LOCK.acquire()
+        g.data_state_lock_acquired = True
+
+
+@app.teardown_request
+def release_mutation_lock(exception=None):
+    if getattr(g, "data_state_lock_acquired", False):
+        DATA_STATE_LOCK.release()
 
 
 def _effective_ingress_path() -> str:
@@ -528,7 +543,7 @@ DEFAULT_DATA = {
 }
 
 
-def load_data() -> dict:
+def _load_data_unlocked() -> dict:
     database = create_state_store(
         DATA_FILE.with_name("bartender.db"),
         os.environ.get("STORAGE_BACKEND", "internal"),
@@ -567,6 +582,7 @@ def load_data() -> dict:
             user["scan_token_hash"] = str(user.get("scan_token_hash", "") or "").strip()
             user["scan_issued_at"] = str(user.get("scan_issued_at", "") or "").strip()
             user["scan_require_pin"] = _coerce_bool(user.get("scan_require_pin"), False)
+            user["release_seen_version"] = str(user.get("release_seen_version", "") or "").strip()[:64]
             normalized_team_users.append(user)
         data["team_users"] = normalized_team_users
 
@@ -799,15 +815,25 @@ def load_data() -> dict:
     return json.loads(json.dumps(data))
 
 
+def load_data() -> dict:
+    with DATA_STATE_LOCK:
+        return _load_data_unlocked()
+
+
 def save_data(data: dict) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    create_state_store(
-        DATA_FILE.with_name("bartender.db"),
-        os.environ.get("STORAGE_BACKEND", "internal"),
-        os.environ.get("DATABASE_URL", ""),
-    ).save(data)
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    with DATA_STATE_LOCK:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        create_state_store(
+            DATA_FILE.with_name("bartender.db"),
+            os.environ.get("STORAGE_BACKEND", "internal"),
+            os.environ.get("DATABASE_URL", ""),
+        ).save(data)
+        temporary_file = DATA_FILE.with_name(f"{DATA_FILE.name}.tmp")
+        with open(temporary_file, "w", encoding="utf-8") as file_handle:
+            json.dump(data, file_handle, indent=2)
+            file_handle.flush()
+            os.fsync(file_handle.fileno())
+        os.replace(temporary_file, DATA_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -1020,6 +1046,17 @@ def _public_team_user(user: dict) -> dict:
     public = {key: value for key, value in user.items() if key not in ("scan_token_hash",)}
     public["scan_enabled"] = bool(str(user.get("scan_token_hash", "")).strip())
     return public
+
+
+def _current_user_release_seen_version() -> str:
+    user_id = str(session.get("user_id", "") or "").strip().lower()
+    if not user_id:
+        return ""
+    data = load_data()
+    for user in data.get("team_users", []):
+        if str(user.get("id", "")).strip().lower() == user_id:
+            return str(user.get("release_seen_version", "") or "").strip()
+    return ""
 
 
 def _qr_png_data_url(value: str) -> str:
@@ -2557,6 +2594,7 @@ def inject_runtime_metadata():
         "ingress": _effective_ingress_path(),
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),
+        "current_user_release_seen_version": _current_user_release_seen_version(),
     }
 
 
@@ -3183,6 +3221,30 @@ def api_get_settings():
     if not _team_can(current_user.get("role", "owner"), "settings"):
         return jsonify({"error": "Insufficient permissions"}), 403
     return jsonify(_brewfather_settings_response(data["settings"]))
+
+
+@app.route("/api/user/release-seen", methods=["POST"])
+def api_mark_release_seen():
+    current_user = _get_current_team_user()
+    user_id = str(current_user.get("id", "") or "").strip()
+    version = str((request.get_json(silent=True) or {}).get("version", "") or "").strip()[:64]
+    if not user_id or not version:
+        return jsonify({"error": "User and release version are required."}), 400
+
+    data = load_data()
+    user = next(
+        (
+            item for item in data.get("team_users", [])
+            if str(item.get("id", "")).strip().lower() == user_id.lower()
+        ),
+        None,
+    )
+    if user is None:
+        return jsonify({"error": "User not found."}), 404
+
+    user["release_seen_version"] = version
+    save_data(data)
+    return jsonify({"ok": True, "version": version})
 
 
 @app.route("/api/storage/status", methods=["GET"])
@@ -6034,14 +6096,3 @@ def import_json_preview():
     existing = load_data()
     preview_payload = _apply_import_payload(existing, extracted, mode)
     return jsonify({"ok": True, "summary": _import_summary(preview_payload), "mode": mode})
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8099))
-    if not EXTERNAL_API_MODE:
-        _schedule_anonymous_telemetry_heartbeat()
-    app.run(host="0.0.0.0", port=port, debug=False)
