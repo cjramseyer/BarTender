@@ -38,6 +38,8 @@ Sample dashboard with seeded data:
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, low-volume alerts, and a reset option for clearing historical pour data from settings
 - **Anonymous Usage Statistics** — Owner-only, disabled-by-default opt-in that sends a daily anonymous installation ID and app/add-on versions to estimate active installations
 - **Data Backup & Restore** — Export portable versioned JSON or ZIP archive with date-stamped filenames, with import preview and replace/merge modes
+- **Internal Storage** — Uses a transactional SQLite state store at `bartender.db`, with automatic migration from and compatibility mirroring to `bartender.json`
+- **External Storage Options** — Set `STORAGE_BACKEND=postgresql` or `STORAGE_BACKEND=mariadb` with a deployment-only `DATABASE_URL`; SQLite remains the default
 - **Display View** — Minimal read-only tap board suitable for a wall display
 - **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
 - **Standalone Window Launch** — Open the main app in a new browser tab/window from the in-app Menu while still using Home Assistant ingress

@@ -44,6 +44,7 @@ from bartender.pos_sync.brewfather import (
     is_importable_batch,
     utc_now as brewfather_now,
 )
+from bartender.storage import create_state_store
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -526,9 +527,18 @@ DEFAULT_DATA = {
 
 
 def load_data() -> dict:
-    if DATA_FILE.exists():
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    database = create_state_store(
+        DATA_FILE.with_name("bartender.db"),
+        os.environ.get("STORAGE_BACKEND", "internal"),
+        os.environ.get("DATABASE_URL", ""),
+    )
+    if database.path.exists() or DATA_FILE.exists():
+        if database.path.exists():
+            data = database.load(DEFAULT_DATA)
+        else:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            database.initialize(data)
         # Ensure all top-level keys exist
         for key, value in DEFAULT_DATA.items():
             if key not in data:
@@ -780,11 +790,17 @@ def load_data() -> dict:
             if tap.get("keg_id") is not None:
                 tap["ever_assigned_keg"] = True
         return data
-    return json.loads(json.dumps(DEFAULT_DATA))
+    data = database.load(DEFAULT_DATA)
+    return json.loads(json.dumps(data))
 
 
 def save_data(data: dict) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    create_state_store(
+        DATA_FILE.with_name("bartender.db"),
+        os.environ.get("STORAGE_BACKEND", "internal"),
+        os.environ.get("DATABASE_URL", ""),
+    ).save(data)
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
