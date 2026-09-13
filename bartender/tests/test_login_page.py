@@ -345,8 +345,12 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert "View Display" in body
     assert "Open in New Window" in body
     assert "Printable Menu" in body
+    assert "<summary>Options</summary>" in body
+    assert 'class="nav-menu-section-title">Team</div>' in body
+    assert 'class="nav-menu-divider"' in body
     assert 'href="/audit"' in body
-    assert 'href="/audit"\n              target="_blank"' in body
+    assert 'href="/audit"' in body and 'target="_blank"' in body
+    assert 'href="/settings"' in body
     assert "nav-avatar-button" in body
     assert "Owner" in body
     assert "Log out" in body

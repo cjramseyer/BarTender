@@ -242,6 +242,51 @@ body {
   margin-bottom: 0.35rem;
 }
 
+.nav-menu-submenu {
+  padding: 0.15rem 0.35rem;
+}
+
+.nav-menu-submenu summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  list-style: none;
+  padding: 0.5rem 0.35rem;
+}
+
+.nav-menu-submenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-menu-submenu summary::after {
+  content: "▸";
+  float: right;
+  color: var(--text-muted);
+}
+
+.nav-menu-submenu[open] summary::after {
+  content: "▾";
+}
+
+.nav-menu-submenu summary:hover,
+.nav-menu-submenu summary:focus-visible {
+  background: var(--surface2);
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.nav-menu-submenu-body {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.15rem 0 0.25rem 0.35rem;
+}
+
+.nav-menu-divider {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  background: var(--border);
+}
+
 .nav-menu-checkbox {
   display: inline-flex;
   align-items: center;
@@ -705,6 +750,15 @@ textarea.form-control {
 
 .dashboard-grid > .card > h2 {
   order: -2;
+}
+
+.dashboard-panel-title {
+  margin: -0.15rem -0.15rem 1rem;
+  padding: 0 0.15rem 0.7rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
 }
 
 .dashboard-card-title-link {

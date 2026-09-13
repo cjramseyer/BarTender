@@ -6,7 +6,7 @@ content %}
   serving_keg_ids = serving_kegs | map(attribute='id') | list %}
 
   <div class="card">
-    <h2>
+    <h2 class="dashboard-panel-title">
       <a class="dashboard-card-title-link" href="{{ ingress }}/taps"
         >🍺 Taps ({{ taps | length }})</a
       >
@@ -113,7 +113,7 @@ content %}
     {% set connected_keg_ids = namespace(values=[]) %} {% for tap in taps %} {%
     if tap.keg_id in serving_keg_ids %} {% set connected_keg_ids.values =
     connected_keg_ids.values + [tap.keg_id] %} {% endif %} {% endfor %}
-    <h2>
+    <h2 class="dashboard-panel-title">
       <a class="dashboard-card-title-link" href="{{ ingress }}/kegs"
         >🛢 Kegs ({{ connected_keg_ids.values | length }})</a
       >
@@ -186,7 +186,7 @@ content %}
   {% if settings.analytics_enabled is not defined or settings.analytics_enabled
   %}
   <div class="card">
-    <h2>
+    <h2 class="dashboard-panel-title">
       <a class="dashboard-card-title-link" href="{{ ingress }}/analytics"
         >📈 Pour Analytics</a
       >
@@ -258,7 +258,7 @@ content %}
   </div>
   {% endif %} {% if on_deck_kegs %}
   <div class="card">
-    <h2>
+    <h2 class="dashboard-panel-title">
       <a class="dashboard-card-title-link" href="{{ ingress }}/kegs"
         >🔜 On Deck ({{ on_deck_kegs | length }})</a
       >
@@ -280,7 +280,7 @@ content %}
   </div>
   {% endif %} {% if settings.bar_stock_enabled %}
   <div class="card">
-    <h2>
+    <h2 class="dashboard-panel-title">
       <a class="dashboard-card-title-link" href="{{ ingress }}/stock"
         >📦 Bar Stock ({{ bar_stock | length }} items)</a
       >

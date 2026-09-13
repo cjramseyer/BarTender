@@ -2,7 +2,10 @@
 
 function initTheme(serverTheme, ingress) {
   const stored = localStorage.getItem("bartender_theme");
-  const theme = stored || serverTheme || "light";
+  const normalizedServerTheme = ["light", "dark"].includes(serverTheme)
+    ? serverTheme
+    : "";
+  const theme = normalizedServerTheme || stored || "light";
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("bartender_theme", theme);
 }
@@ -165,6 +168,9 @@ async function submitSetupWizard(event) {
     if (!response.ok) {
       throw new Error(`Setup save failed: ${response.status}`);
     }
+
+    document.documentElement.dataset.theme = payload.theme;
+    localStorage.setItem("bartender_theme", payload.theme);
 
     const usersResponse = await fetch(`${ingress}/api/team/users`);
     const usersBody = await usersResponse.json();

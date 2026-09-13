@@ -84,79 +84,80 @@
             <span class="nav-menu-label">Menu</span>
           </button>
           <div class="nav-menu-panel" role="menu">
+            <details class="nav-menu-submenu">
+              <summary>Options</summary>
+              <div class="nav-menu-submenu-body">
+                <div class="nav-menu-section">
+                  <div class="nav-menu-section-title">View</div>
+                  <label class="nav-menu-checkbox">
+                    <input
+                      type="checkbox"
+                      {% if settings.bar_stock_enabled %}checked{% endif %}
+                      onchange="toggleNavSetting('bar_stock_enabled', this)"
+                    />
+                    <span>Bar Stock</span>
+                  </label>
+                  <label class="nav-menu-checkbox">
+                    <input
+                      type="checkbox"
+                      {% if settings.api_reference_enabled %}checked{% endif %}
+                      onchange="toggleNavSetting('api_reference_enabled', this)"
+                    />
+                    <span>API Reference</span>
+                  </label>
+                </div>
+                <a
+                  class="nav-menu-item"
+                  href="{{ ingress }}/display"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  >View Display</a
+                >
+                <a
+                  class="nav-menu-item"
+                  href="{{ ingress }}/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  >Open in New Window</a
+                >
+                <a
+                  class="nav-menu-item"
+                  href="{{ ingress }}/menu"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  >Printable Menu</a
+                >
+              </div>
+            </details>
             <div class="nav-menu-section">
-              <div class="nav-menu-section-title">View</div>
-              <label class="nav-menu-checkbox">
-                <input
-                  type="checkbox"
-                  {%
-                  if
-                  settings.bar_stock_enabled
-                  %}checked{%
-                  endif
-                  %}
-                  onchange="toggleNavSetting('bar_stock_enabled', this)"
-                />
-                <span>Bar Stock</span>
-              </label>
-              <label class="nav-menu-checkbox">
-                <input
-                  type="checkbox"
-                  {%
-                  if
-                  settings.api_reference_enabled
-                  %}checked{%
-                  endif
-                  %}
-                  onchange="toggleNavSetting('api_reference_enabled', this)"
-                />
-                <span>API Reference</span>
-              </label>
+              <div class="nav-menu-section-title">Team</div>
+              <a
+                class="nav-menu-item"
+                href="{{ ingress }}/audit"
+                target="_blank"
+                rel="noopener noreferrer"
+                role="menuitem"
+                >Audit Log</a
+              >
+              {% if current_user_role in ['owner', 'manager'] %}
+              <a
+                class="nav-menu-item"
+                href="{{ ingress }}/team-access"
+                role="menuitem"
+                >Team Access</a
+              >
+              {% endif %}
             </div>
-            <a
-              class="nav-menu-item"
-              href="{{ ingress }}/display"
-              target="_blank"
-              rel="noopener noreferrer"
-              role="menuitem"
-              >View Display</a
-            >
-            <a
-              class="nav-menu-item"
-              href="{{ ingress }}/"
-              target="_blank"
-              rel="noopener noreferrer"
-              role="menuitem"
-              >Open in New Window</a
-            >
-            <a
-              class="nav-menu-item"
-              href="{{ ingress }}/menu"
-              target="_blank"
-              rel="noopener noreferrer"
-              role="menuitem"
-              >Printable Menu</a
-            >
-            <a
-              class="nav-menu-item"
-              href="{{ ingress }}/audit"
-              target="_blank"
-              rel="noopener noreferrer"
-              role="menuitem"
-              >Audit Log</a
-            >
             {% if current_user_role in ['owner', 'manager'] %}
+            <div class="nav-menu-divider" aria-hidden="true"></div>
             <a
               class="nav-menu-item"
               href="{{ ingress }}/settings"
               role="menuitem"
               >Settings</a
-            >
-            <a
-              class="nav-menu-item"
-              href="{{ ingress }}/team-access"
-              role="menuitem"
-              >Team Access</a
             >
             {% endif %}
           </div>

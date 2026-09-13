@@ -74,6 +74,18 @@
         >
           Delete
         </button>
+        {% if beer.brewfather_batch_id or beer.brewfather_recipe_id %}
+        {% if beer.recipe_url %}
+        <a class="btn btn-sm btn-secondary" href="{{ beer.recipe_url }}" target="_blank" rel="noopener noreferrer">Source</a>
+        {% endif %}
+        {% if beer.brewfather_conflict %}<span class="badge badge-cleaning">Conflict</span>{% endif %}
+        {% if beer.brewfather_batch_id %}
+        <button class="btn btn-sm btn-secondary" onclick='viewBrewfatherBatch({{ beer | tojson | forceescape }})'>Batch Details</button>
+        {% if (beer.brewfather_batch_status or '') | lower in ['completed', 'complete', 'conditioning', 'conditioned'] %}
+        <button class="btn btn-sm btn-secondary" onclick='importBrewfatherKeg({{ beer | tojson | forceescape }})'>Import as Keg</button>
+        {% endif %}
+        {% endif %}
+        {% endif %}
       </td>
     </tr>
     {% else %}
@@ -280,9 +292,24 @@
     </form>
   </div>
 </div>
+
+<div class="modal" id="brewfatherBatchModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Brewfather Batch</h3>
+      <button class="btn btn-icon" onclick="closeModal('brewfatherBatchModal')">✕</button>
+    </div>
+    <div id="brewfatherBatchDetails" class="stack-gap-sm"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeModal('brewfatherBatchModal')">Close</button>
+      <button type="button" class="btn btn-primary" onclick="importBrewfatherKeg(brewfatherBatchReview)">Import as Keg</button>
+    </div>
+  </div>
+</div>
 {% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
+  let brewfatherBatchReview = null;
 
   function openAddBeer() {
     document.getElementById("beerModalTitle").textContent = "Add Beer";
@@ -442,6 +469,9 @@
               <button class="btn btn-sm btn-danger" onclick="deleteBeer(${beer.id})">
                 Delete
               </button>
+              ${beer.recipe_url ? `<a class="btn btn-sm btn-secondary" href="${beer.recipe_url}" target="_blank" rel="noopener noreferrer">Source</a>` : ""}
+              ${beer.brewfather_conflict ? `<span class="badge badge-cleaning">Conflict</span>` : ""}
+              ${beer.brewfather_batch_id ? `<button class="btn btn-sm btn-secondary" onclick='viewBrewfatherBatch(${JSON.stringify(beer)})'>Batch Details</button>` : ""}
             </td>
           </tr>
         `,
@@ -539,6 +569,59 @@
     }
 
     location.reload();
+  }
+
+  async function importBrewfatherKeg(beer) {
+    if (!beer || !beer.brewfather_batch_id) return;
+    if (!confirm(`Import ${beer.name || "this batch"} as a full keg?`)) return;
+    const volume = Number(beer.brewfather_packaging_volume);
+    const response = await fetch(`${INGRESS}/api/brewfather/batches/${encodeURIComponent(beer.brewfather_batch_id)}/import-keg`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        confirm: true,
+        name: `${beer.name || "Brewfather batch"} Keg`,
+        size: "Corny (5 gal)",
+        volume: Number.isFinite(volume) ? volume : undefined,
+        volume_unit: beer.brewfather_packaging_unit || "gal",
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(body.error || "Unable to import Brewfather batch as a keg.");
+      return;
+    }
+    alert(`Keg ${body.keg?.name || "created"} imported successfully.`);
+    location.reload();
+  }
+
+  function escapeBrewfatherText(value) {
+    return String(value || "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[character]);
+  }
+
+  function viewBrewfatherBatch(beer) {
+    brewfatherBatchReview = beer;
+    const details = document.getElementById("brewfatherBatchDetails");
+    if (!details) return;
+    const rows = [
+      ["Batch ID", beer.brewfather_batch_id],
+      ["Recipe ID", beer.brewfather_recipe_id],
+      ["Status", beer.brewfather_batch_status],
+      ["Brewed", beer.brewed_on],
+      ["Packaged", beer.packaged_on],
+      ["Measured OG", beer.brewfather_measured_og],
+      ["Measured FG", beer.brewfather_measured_fg],
+      ["Latest Gravity", beer.brewfather_latest_gravity],
+      ["Latest Temperature", beer.brewfather_latest_temperature],
+      ["Carbonation", beer.brewfather_carbonation],
+      ["Packaging Volume", `${beer.brewfather_packaging_volume || ""} ${beer.brewfather_packaging_unit || ""}`.trim()],
+    ];
+    details.innerHTML = rows.map(([label, value]) => `<p><strong>${escapeBrewfatherText(label)}:</strong> ${escapeBrewfatherText(value) || "—"}</p>`).join("");
+    const importButton = document.querySelector("#brewfatherBatchModal .btn-primary");
+    if (importButton) importButton.hidden = !["completed", "complete", "conditioning", "conditioned"].includes(String(beer.brewfather_batch_status || "").toLowerCase());
+    openModal("brewfatherBatchModal");
   }
 
   const beerSearchInput = document.getElementById("beerSearchInput");
