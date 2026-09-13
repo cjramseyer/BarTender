@@ -1,11 +1,12 @@
 #!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
 
 # Read ingress path provided by Home Assistant
-INGRESS_PATH=$(bashio::addon.ingress_entry)
+INGRESS_PATH="$(bashio::addon.ingress_entry)"
 export INGRESS_PATH
 
 # Read addon version provided by Home Assistant
-ADDON_VERSION=$(bashio::addon.version)
+ADDON_VERSION="$(bashio::addon.version)"
 export ADDON_VERSION
 APP_VERSION="${ADDON_VERSION}"
 export APP_VERSION
@@ -14,8 +15,9 @@ export DATA_DIR="/data"
 export PORT="8099"
 export DISPLAY_PORT="8100"
 export EXTERNAL_API_PORT="8110"
-export STORAGE_BACKEND="$(bashio::config 'storage_backend')"
-export DATABASE_URL="$(bashio::config 'database_url')"
+STORAGE_BACKEND="$(bashio::config 'storage_backend')"
+DATABASE_URL="$(bashio::config 'database_url')"
+export STORAGE_BACKEND DATABASE_URL
 
 if [ -z "${STORAGE_BACKEND}" ]; then
 	export STORAGE_BACKEND="internal"
