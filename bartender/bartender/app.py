@@ -4,6 +4,8 @@ import json
 import os
 import io
 import csv
+import base64
+import hashlib
 import zipfile
 import re
 import mimetypes
@@ -303,7 +305,7 @@ def require_login_for_web_views():
     normalized_path = _normalized_request_path()
     if normalized_path.startswith("/static/"):
         return None
-    if normalized_path in ("/login", "/logout"):
+    if normalized_path in ("/login", "/logout") or normalized_path.startswith("/auth/scan/"):
         return None
     if normalized_path.startswith("/api/"):
         return None
@@ -562,6 +564,9 @@ def load_data() -> dict:
             user["role"] = _normalize_team_role(user.get("role", "staff"))
             user["pin"] = _normalize_team_user_pin(user.get("pin", ""))
             user["disabled"] = _coerce_bool(user.get("disabled"), False)
+            user["scan_token_hash"] = str(user.get("scan_token_hash", "") or "").strip()
+            user["scan_issued_at"] = str(user.get("scan_issued_at", "") or "").strip()
+            user["scan_require_pin"] = _coerce_bool(user.get("scan_require_pin"), False)
             normalized_team_users.append(user)
         data["team_users"] = normalized_team_users
 
@@ -986,6 +991,43 @@ def _find_team_user_by_identifier(users: list[dict], value: str) -> dict | None:
         if user_id.lower() == lowered or user_name.lower() == lowered:
             return user
     return None
+
+
+def _scan_token_hash(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _find_scan_user(data: dict, token: str) -> dict | None:
+    token_hash = _scan_token_hash(token)
+    for user in data.get("team_users", []):
+        if not isinstance(user, dict):
+            continue
+        if secrets.compare_digest(str(user.get("scan_token_hash", "")), token_hash):
+            return user
+    return None
+
+
+def _scan_requires_pin(user: dict) -> bool:
+    return _coerce_bool(user.get("scan_require_pin"), False)
+
+
+def _scan_login_url(token: str) -> str:
+    ingress = _effective_ingress_path()
+    return f"{ingress}/auth/scan/{token}"
+
+
+def _public_team_user(user: dict) -> dict:
+    public = {key: value for key, value in user.items() if key not in ("scan_token_hash",)}
+    public["scan_enabled"] = bool(str(user.get("scan_token_hash", "")).strip())
+    return public
+
+
+def _qr_png_data_url(value: str) -> str:
+    if not _qr_is_available():
+        return ""
+    buffer = io.BytesIO()
+    qrcode.make(value).save(buffer, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
 def _ensure_owner_team_user(data: dict) -> None:
@@ -2528,13 +2570,20 @@ def login_view():
         user for user in all_team_users
         if not _coerce_bool(user.get("disabled"), False)
     ]
-    error = None
+    scan_error = str(request.args.get("scan_error", "") or "").strip().lower()
+    error = {
+        "invalid": "That QR/NFC credential is invalid or revoked. Use manual sign-in or ask an owner/manager for a new badge.",
+        "disabled": "This user account is disabled. Use manual sign-in with an active account.",
+    }.get(scan_error)
+    scan_token = str(request.values.get("scan_token", "") or "").strip()
 
     if request.method == "POST":
         user_id = str(request.form.get("user_id", "") or "").strip()
-        matched_user = _find_team_user_by_identifier(all_team_users, user_id)
+        matched_user = _find_scan_user(data, scan_token) if scan_token else _find_team_user_by_identifier(all_team_users, user_id)
+        if matched_user is not None:
+            user_id = str(matched_user.get("id", "") or user_id).strip()
         if matched_user is None:
-            error = "User not found. Choose a valid team member."
+            error = "This scan credential is invalid or revoked." if scan_token else "User not found. Choose a valid team member."
         else:
             selected_role = _normalize_team_role(matched_user.get("role", "staff"))
             if _coerce_bool(matched_user.get("disabled"), False):
@@ -2555,9 +2604,9 @@ def login_view():
                 expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
                 if expected_pin:
                     owner_pin_required = True
-                    supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
+                    supplied_pin = str(request.form.get("user_pin", "") or "").strip()
                     if not secrets.compare_digest(expected_pin, supplied_pin):
-                        error = "Owner PIN required when additional team members are configured."
+                        error = "PIN required for the owner account when additional team members are configured."
                         return render_template(
                             "login.html",
                             settings=data["settings"],
@@ -2565,6 +2614,7 @@ def login_view():
                             error=error,
                             selected_user_id=user_id,
                             require_owner_pin=True,
+                            scan_token=scan_token,
                             ingress=_effective_ingress_path(),
                         )
                 else:
@@ -2582,6 +2632,7 @@ def login_view():
                         error=error,
                         selected_user_id=user_id,
                         require_owner_pin=owner_pin_required,
+                        scan_token=scan_token,
                         ingress=_effective_ingress_path(),
                     )
 
@@ -2591,6 +2642,10 @@ def login_view():
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
+            if scan_token:
+                _record_team_audit(data, matched_user, "scan_login", str(matched_user.get("id", "")), {"transport": "qr_or_nfc"})
+                save_data(data)
+            if owner_pin_recovery_required:
                 return _redirect_to_endpoint("team_access")
             return _redirect_to_endpoint("index")
 
@@ -2601,8 +2656,45 @@ def login_view():
         error=error,
         selected_user_id=str(request.form.get("user_id", "") or "").strip() if request.method == "POST" else "",
         require_owner_pin=False,
+        scan_token=scan_token,
         ingress=_effective_ingress_path(),
     )
+
+
+@app.route("/auth/scan/<token>", methods=["GET"])
+def scan_login(token: str):
+    data = load_data()
+    user = _find_scan_user(data, token)
+    if user is None:
+        _record_team_audit(data, {"id": "anonymous", "name": "Anonymous", "role": "staff"}, "scan_login_failed", "scan", {"reason": "invalid_or_revoked_credential"})
+        save_data(data)
+        return redirect(url_for("login_view", scan_error="invalid"))
+    if _coerce_bool(user.get("disabled"), False):
+        _record_team_audit(data, {"id": user.get("id", ""), "name": user.get("name", ""), "role": user.get("role", "staff")}, "scan_login_failed", str(user.get("id", "")), {"reason": "disabled_user"})
+        save_data(data)
+        return redirect(url_for("login_view", scan_error="disabled"))
+
+    active_users = [item for item in data.get("team_users", []) if not _coerce_bool(item.get("disabled"), False)]
+    owner_pin_required = (
+        str(user.get("role", "")).lower() == "owner"
+        and len(active_users) > 1
+        and bool(_normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")))
+    )
+    if _scan_requires_pin(user) or owner_pin_required:
+        return redirect(url_for("login_view", scan_token=token))
+
+    session.clear()
+    session["user_id"] = str(user.get("id", "")).strip()
+    session["user_role"] = _normalize_team_role(user.get("role", "staff"))
+    session["user_name"] = str(user.get("name", session["user_id"]))
+    if str(user.get("role", "")).lower() == "owner" and len(active_users) > 1 and not _normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")):
+        session["owner_pin_recovery_required"] = True
+        _record_team_audit(data, user, "scan_login", session["user_id"], {"transport": "qr_or_nfc", "owner_recovery": True})
+        save_data(data)
+        return _redirect_to_endpoint("team_access")
+    _record_team_audit(data, user, "scan_login", session["user_id"], {"transport": "qr_or_nfc"})
+    save_data(data)
+    return _redirect_to_endpoint("index")
 
 
 @app.route("/logout")
@@ -2834,7 +2926,7 @@ def settings():
         settings=template_settings,
         pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
         pos_sync_provider_catalog=get_pos_provider_catalog(data["settings"]),
-        team_users=data.get("team_users", []),
+        team_users=[_public_team_user(user) for user in data.get("team_users", [])],
         owner_pin_recovery_required=bool(session.get("owner_pin_recovery_required")),
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
@@ -3652,7 +3744,7 @@ def api_get_team_users():
     users = data.get("team_users", [])
     if current_user.get("role") == "staff":
         users = [user for user in users if user.get("id") == current_user.get("id")]
-    return jsonify({"users": users})
+    return jsonify({"users": [_public_team_user(user) for user in users]})
 
 
 @app.route("/api/team/users", methods=["POST"])
@@ -3666,6 +3758,8 @@ def api_create_team_user():
     action = str(payload.get("action", "")).strip().lower()
     if action == "delete":
         return api_delete_team_user()
+    if action in ("issue_scan", "rotate_scan", "revoke_scan", "set_scan_policy"):
+        return api_manage_scan_credential()
     if action in (
         "update",
         "update_profile",
@@ -3717,7 +3811,7 @@ def api_create_team_user():
             users.insert(0, user)
         _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
         save_data(data)
-        return jsonify({"user": user})
+        return jsonify({"user": _public_team_user(user)})
 
     user_id = str(payload.get("id") or payload.get("user_id") or f"user-{abs(hash(name)) % 1000000}").strip()
     if any(str(existing.get("id", "")).lower() == user_id.lower() for existing in users):
@@ -3730,11 +3824,57 @@ def api_create_team_user():
         "pin": user_pin,
         "disabled": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "scan_token_hash": "",
+        "scan_issued_at": "",
+        "scan_require_pin": False,
     }
     users.append(user)
     _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
     save_data(data)
-    return jsonify({"user": user})
+    return jsonify({"user": _public_team_user(user)})
+
+
+def api_manage_scan_credential():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "")).strip().lower()
+    user_id = str(payload.get("user_id") or payload.get("id") or "").strip()
+    user = next(
+        (item for item in data.get("team_users", []) if str(item.get("id", "")).strip().lower() == user_id.lower()),
+        None,
+    )
+    if user is None:
+        return jsonify({"error": "User not found."}), 404
+    if action == "set_scan_policy":
+        user["scan_require_pin"] = _coerce_bool(payload.get("require_pin"), False)
+        _record_team_audit(data, current_user, "user_scan_policy_updated", user_id, {"require_pin": user["scan_require_pin"]})
+        save_data(data)
+        return jsonify({"user": _public_team_user(user)})
+    if action == "revoke_scan":
+        user["scan_token_hash"] = ""
+        user["scan_issued_at"] = ""
+        _record_team_audit(data, current_user, "user_scan_credential_revoked", user_id, {})
+        save_data(data)
+        return jsonify({"user": _public_team_user(user), "revoked": True})
+    if action not in ("issue_scan", "rotate_scan"):
+        return jsonify({"error": "Unsupported scan credential action."}), 400
+
+    token = secrets.token_urlsafe(32)
+    user["scan_token_hash"] = _scan_token_hash(token)
+    user["scan_issued_at"] = datetime.now(timezone.utc).isoformat()
+    user["scan_require_pin"] = _coerce_bool(payload.get("require_pin"), user.get("scan_require_pin", False))
+    _record_team_audit(data, current_user, "user_scan_credential_issued", user_id, {"rotated": action == "rotate_scan"})
+    save_data(data)
+    login_url = _scan_login_url(token)
+    return jsonify({
+        "user": _public_team_user(user),
+        "login_url": login_url,
+        "qr_data_url": _qr_png_data_url(login_url),
+        "nfc_payload": login_url,
+    })
 
 
 @app.route("/api/team/users/update", methods=["POST"])
@@ -3792,7 +3932,7 @@ def api_update_team_user():
             {"from_name": previous_name, "to_name": new_name},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if action in ("set_pin", "update_pin"):
         if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
@@ -3806,7 +3946,7 @@ def api_update_team_user():
             {"pin_set": bool(matching_user.get("pin"))},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if action == "reset_pin":
         if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
@@ -3820,7 +3960,7 @@ def api_update_team_user():
             {},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if action in ("disable", "set_disabled"):
         disable_value = _coerce_bool(payload.get("disabled"), True)
@@ -3837,7 +3977,7 @@ def api_update_team_user():
             {"disabled": disable_value},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if requested_role == "owner" and current_user.get("role") != "owner":
         return jsonify({"error": "Only the owner can promote someone to owner."}), 403
@@ -3852,7 +3992,7 @@ def api_update_team_user():
         {"from_role": previous_role, "to_role": requested_role},
     )
     save_data(data)
-    return jsonify({"user": matching_user})
+    return jsonify({"user": _public_team_user(matching_user)})
 
 
 @app.route("/api/team/users", methods=["DELETE"])
@@ -4527,6 +4667,8 @@ API_REFERENCE_ENDPOINTS = [
     ("PUT", "/api/taps/<id>", "Update a tap"),
     ("POST", "/api/taps/<id>/pour", "Record a pour for the assigned keg"),
     ("DELETE", "/api/taps/<id>", "Delete a tap"),
+    ("POST", "/api/team/users", "Issue, rotate, revoke, or configure a user scan credential"),
+    ("GET", "/auth/scan/<token>", "Sign in with a user QR/NFC scan credential"),
     ("GET", "/api/brewfather/status", "Get Brewfather sync status"),
     ("POST", "/api/brewfather/sync", "Run Brewfather recipe and batch sync"),
     ("GET", "/api/brewfather/conflicts", "List Brewfather catalog conflicts"),

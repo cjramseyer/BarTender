@@ -31,7 +31,7 @@ Sample dashboard with seeded data:
 - **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line, with single-tap keg assignment protection
 - **Settings** — Configurable bar name/logo, measurement system (US / metric), UI theme (light / dark), bar stock visibility, API Reference nav visibility, external URL override, external API scoped token/allowlist/rate-limit controls, pour mode in Pour Presets, keg type choices/default, pour defaults, and printable menu QR mode in General
-- **Team Access** — Dedicated owner/manager-only Team Access screen for owner profile management, per-user PINs, PIN resets, disable/enable controls, and staff access restrictions
+- **Team Access** — Dedicated owner/manager-only Team Access screen for owner profile management, per-user PINs, QR/NFC scan credentials, PIN resets, disable/enable controls, and staff access restrictions
 - **Audit Trail** — Read-only audit log available to all signed-in users from the Menu; owners can configure retention and clear the log with their Owner PIN, while owners and managers can export it
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
@@ -82,6 +82,7 @@ Sample dashboard with seeded data:
 - Added in-app API Reference page (`/api-reference`) and interactive API tester, with nav visibility controlled from Settings.
 - Added default pour preset selection in Settings and automatic preselection anywhere pour presets are shown.
 - Added Team Access enhancements: a dedicated Team Access page, owner profile name management, per-user PIN, PIN reset, and disable/enable controls, with staff blocked from the management screen.
+- Added per-user QR sign-in credentials with rotation/revocation, printable badges, optional PIN-after-scan, and the same login URL documented for NFC NDEF URI tags.
 - Added a role-aware Audit Log window with owner-only retention/clear controls, owner/manager export, and events for Analytics pours and inventory changes to bar stock, kegs, and taps.
 - Added an owner-only anonymous usage-statistics opt-in for daily active-installation estimates without collecting bar, inventory, user, device, or network data in its telemetry payload.
 - Added an analytics reset action in Settings for clearing historical pour data used in dashboard and forecasting calculations.

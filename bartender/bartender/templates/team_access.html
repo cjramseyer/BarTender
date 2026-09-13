@@ -124,10 +124,24 @@
 </div>
 {% endblock %}
 
+<div class="modal" id="scanCredentialModal">
+  <div class="modal-dialog modal-dialog-lg">
+    <div class="modal-header">
+      <h3 id="scanCredentialTitle">QR / NFC Credential</h3>
+      <button class="btn btn-icon" onclick="closeModal('scanCredentialModal')">✕</button>
+    </div>
+    <div id="scanCredentialBody" class="stack-gap-sm"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeModal('scanCredentialModal')">Close</button>
+      <button type="button" class="btn btn-secondary" onclick="printScanCredential()">Print Badge</button>
+    </div>
+  </div>
+</div>
+
 {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
-  const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
+  let TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
   const OWNER_PIN_RECOVERY_REQUIRED = {% if owner_pin_recovery_required %}true{% else %}false{% endif %};
 
   function renderTeamUsers(users = []) {
@@ -179,6 +193,8 @@
               <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="updateTeamMemberRole(this)">Update Role</button>
               <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="setTeamUserPin(this)">Set PIN</button>
               <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" ${pinSet ? "" : "disabled"} onclick="resetTeamUserPin(this)">Reset PIN</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="issueScanCredential(this)">${user.scan_enabled ? "Rotate QR/NFC" : "Issue QR/NFC"}</button>
+              ${user.scan_enabled ? `<button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" onclick="revokeScanCredential(this)">Revoke Scan</button>` : ""}
               <button type="button" class="btn btn-secondary btn-sm" data-user-id="${user.id}" data-disabled="${isDisabled ? "1" : "0"}" onclick="toggleTeamUserDisabled(this)">${isDisabled ? "Enable" : "Disable"}</button>
               <button type="button" class="btn btn-danger btn-sm" data-user-id="${user.id}" onclick="deleteTeamUser(this)">Delete</button>
             </div>
@@ -219,7 +235,67 @@
 
   async function refreshTeamUsers() {
     const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
-    renderTeamUsers(users.users || []);
+    TEAM_USERS = users.users || [];
+    renderTeamUsers(TEAM_USERS);
+  }
+
+  let activeScanCredential = null;
+
+  async function issueScanCredential(button) {
+    const userId = button.dataset.userId;
+    const user = (TEAM_USERS || []).find((item) => String(item.id) === String(userId));
+    const requirePin = user ? Boolean(user.scan_require_pin) : false;
+    const response = await fetch(`${INGRESS}/api/team/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: user?.scan_enabled ? "rotate_scan" : "issue_scan", user_id: userId, require_pin: requirePin }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(body.error || "Unable to issue scan credential.");
+      return;
+    }
+    activeScanCredential = body;
+    document.getElementById("scanCredentialTitle").textContent = `${body.user?.name || "User"} QR / NFC Credential`;
+    document.getElementById("scanCredentialBody").innerHTML = `
+      <p class="muted">The QR code and NFC payload use the same login URL. Rotating or revoking the credential invalidates the previous URL.</p>
+      ${body.qr_data_url ? `<img src="${body.qr_data_url}" alt="QR sign-in code" style="width:260px; max-width:100%;" />` : "<p class=\"muted\">QR generation is unavailable.</p>"}
+      <label>NFC payload / login URL</label>
+      <input class="form-control" readonly value="${body.login_url || ""}" />
+      <label class="nav-menu-checkbox"><input type="checkbox" ${requirePin ? "checked" : ""} onchange="updateScanPolicy('${userId}', this.checked)" /> Require PIN after scan</label>
+    `;
+    openModal("scanCredentialModal");
+    await refreshTeamUsers();
+  }
+
+  async function revokeScanCredential(button) {
+    const response = await fetch(`${INGRESS}/api/team/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "revoke_scan", user_id: button.dataset.userId }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body.error || "Unable to revoke scan credential.");
+      return;
+    }
+    await refreshTeamUsers();
+  }
+
+  async function updateScanPolicy(userId, requirePin) {
+    await fetch(`${INGRESS}/api/team/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "set_scan_policy", user_id: userId, require_pin: requirePin }),
+    });
+  }
+
+  function printScanCredential() {
+    if (!activeScanCredential) return;
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) return;
+    printWindow.document.write(`<html><head><title>BarTender QR Badge</title></head><body style="font-family:sans-serif;text-align:center;padding:2rem"><h1>${activeScanCredential.user?.name || "User"}</h1>${activeScanCredential.qr_data_url ? `<img src="${activeScanCredential.qr_data_url}" style="width:320px" />` : ""}<p>${activeScanCredential.login_url || ""}</p><script>window.onload=()=>window.print()<\/script></body></html>`);
+    printWindow.document.close();
   }
 
   async function saveOwnerPin() {
