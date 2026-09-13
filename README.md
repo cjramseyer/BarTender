@@ -101,10 +101,10 @@ Sample dashboard with seeded data:
 
 No required configuration. Optional options can be set in the add-on configuration tab.
 
-| Option | Default | Description |
-| --- | --- | --- |
+| Option            | Default    | Description                                                                 |
+| ----------------- | ---------- | --------------------------------------------------------------------------- |
 | `storage_backend` | `internal` | `internal` for SQLite, or `postgresql` / `mariadb` for an external database |
-| `database_url` | _(empty)_ | Deployment-only connection URL required for external database backends |
+| `database_url`    | _(empty)_  | Deployment-only connection URL required for external database backends      |
 
 Database selection belongs in the Home Assistant add-on configuration because it is infrastructure configuration. BarTender Settings shows only a credential-safe storage status; it never displays the database password or full connection URL.
 
