@@ -752,6 +752,15 @@ textarea.form-control {
   order: -2;
 }
 
+.dashboard-panel-title {
+  margin: -0.15rem -0.15rem 1rem;
+  padding: 0 0.15rem 0.7rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
 .dashboard-card-title-link {
   display: block;
   color: inherit;
