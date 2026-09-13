@@ -4,6 +4,8 @@ import json
 import os
 import io
 import csv
+import base64
+import hashlib
 import zipfile
 import re
 import mimetypes
@@ -33,6 +35,18 @@ from bartender.pos_sync.service import (
     perform_pos_sync,
     validate_pos_sync_runtime_configuration,
 )
+from bartender.pos_sync.brewfather import (
+    BREWFATHER_MANAGED_FIELDS,
+    BrewfatherClient,
+    BrewfatherError,
+    credentials_configured,
+    normalize_credentials,
+    reconcile_beer,
+    redact_credentials,
+    is_importable_batch,
+    utc_now as brewfather_now,
+)
+from bartender.storage import create_state_store
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -291,7 +305,7 @@ def require_login_for_web_views():
     normalized_path = _normalized_request_path()
     if normalized_path.startswith("/static/"):
         return None
-    if normalized_path in ("/login", "/logout"):
+    if normalized_path in ("/login", "/logout") or normalized_path.startswith("/auth/scan/"):
         return None
     if normalized_path.startswith("/api/"):
         return None
@@ -443,6 +457,19 @@ DEFAULT_DATA = {
             "taps_created": 0,
         },
         "pos_sync_custom_providers": [],
+        "brewfather_enabled": False,
+        "brewfather_user_id": "",
+        "brewfather_api_key": "",
+        "brewfather_last_synced_at": "",
+        "brewfather_last_status": "never",
+        "brewfather_last_error": "",
+        "brewfather_last_counts": {
+            "recipes_received": 0,
+            "batches_received": 0,
+            "beers_created": 0,
+            "beers_updated": 0,
+            "conflicts": 0,
+        },
         "bar_logo_url": "",
         "external_base_url": "",
         "external_api_token_auth_enabled": True,
@@ -497,17 +524,29 @@ DEFAULT_DATA = {
         }
     ],
     "team_audit": [],
+    "brewfather_conflicts": [],
 }
 
 
 def load_data() -> dict:
-    if DATA_FILE.exists():
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    database = create_state_store(
+        DATA_FILE.with_name("bartender.db"),
+        os.environ.get("STORAGE_BACKEND", "internal"),
+        os.environ.get("DATABASE_URL", ""),
+    )
+    if database.path.exists() or DATA_FILE.exists():
+        if database.path.exists():
+            data = database.load(DEFAULT_DATA)
+        else:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            database.initialize(data)
         # Ensure all top-level keys exist
         for key, value in DEFAULT_DATA.items():
             if key not in data:
                 data[key] = value
+        if not isinstance(data.get("brewfather_conflicts"), list):
+            data["brewfather_conflicts"] = []
         # Ensure nested settings keys exist for backward compatibility.
         if not isinstance(data.get("settings"), dict):
             data["settings"] = json.loads(json.dumps(DEFAULT_DATA["settings"]))
@@ -525,6 +564,9 @@ def load_data() -> dict:
             user["role"] = _normalize_team_role(user.get("role", "staff"))
             user["pin"] = _normalize_team_user_pin(user.get("pin", ""))
             user["disabled"] = _coerce_bool(user.get("disabled"), False)
+            user["scan_token_hash"] = str(user.get("scan_token_hash", "") or "").strip()
+            user["scan_issued_at"] = str(user.get("scan_issued_at", "") or "").strip()
+            user["scan_require_pin"] = _coerce_bool(user.get("scan_require_pin"), False)
             normalized_team_users.append(user)
         data["team_users"] = normalized_team_users
 
@@ -542,6 +584,7 @@ def load_data() -> dict:
             data["settings"].get("pour_mode"),
         )
         normalize_pos_sync_settings(data["settings"])
+        _normalize_brewfather_settings(data["settings"])
         data["settings"]["pour_mode"] = _normalize_pour_mode(
             data["settings"].get("pour_mode"),
             data["settings"].get("brewery_type"),
@@ -752,11 +795,17 @@ def load_data() -> dict:
             if tap.get("keg_id") is not None:
                 tap["ever_assigned_keg"] = True
         return data
-    return json.loads(json.dumps(DEFAULT_DATA))
+    data = database.load(DEFAULT_DATA)
+    return json.loads(json.dumps(data))
 
 
 def save_data(data: dict) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    create_state_store(
+        DATA_FILE.with_name("bartender.db"),
+        os.environ.get("STORAGE_BACKEND", "internal"),
+        os.environ.get("DATABASE_URL", ""),
+    ).save(data)
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
@@ -944,6 +993,43 @@ def _find_team_user_by_identifier(users: list[dict], value: str) -> dict | None:
     return None
 
 
+def _scan_token_hash(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _find_scan_user(data: dict, token: str) -> dict | None:
+    token_hash = _scan_token_hash(token)
+    for user in data.get("team_users", []):
+        if not isinstance(user, dict):
+            continue
+        if secrets.compare_digest(str(user.get("scan_token_hash", "")), token_hash):
+            return user
+    return None
+
+
+def _scan_requires_pin(user: dict) -> bool:
+    return _coerce_bool(user.get("scan_require_pin"), False)
+
+
+def _scan_login_url(token: str) -> str:
+    ingress = _effective_ingress_path()
+    return f"{ingress}/auth/scan/{token}"
+
+
+def _public_team_user(user: dict) -> dict:
+    public = {key: value for key, value in user.items() if key not in ("scan_token_hash",)}
+    public["scan_enabled"] = bool(str(user.get("scan_token_hash", "")).strip())
+    return public
+
+
+def _qr_png_data_url(value: str) -> str:
+    if not _qr_is_available():
+        return ""
+    buffer = io.BytesIO()
+    qrcode.make(value).save(buffer, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
 def _ensure_owner_team_user(data: dict) -> None:
     users = data.get("team_users", [])
     if not isinstance(users, list):
@@ -981,6 +1067,46 @@ def _team_can(role: str, action: str) -> bool:
         "audit_view": {"owner", "manager", "staff"},
     }
     return action in allowed and normalized in allowed[action]
+
+
+def _normalize_brewfather_settings(settings: dict) -> None:
+    settings["brewfather_enabled"] = _coerce_bool(settings.get("brewfather_enabled"), False)
+    settings["brewfather_user_id"] = str(settings.get("brewfather_user_id", "") or "").strip()[:256]
+    settings["brewfather_api_key"] = str(settings.get("brewfather_api_key", "") or "").strip()[:256]
+    settings["brewfather_last_synced_at"] = str(settings.get("brewfather_last_synced_at", "") or "").strip()
+    status = str(settings.get("brewfather_last_status", "never") or "never").strip().lower()
+    settings["brewfather_last_status"] = status if status in ("never", "success", "failed") else "never"
+    settings["brewfather_last_error"] = str(settings.get("brewfather_last_error", "") or "").strip()[:500]
+    raw_counts = settings.get("brewfather_last_counts", {})
+    raw_counts = raw_counts if isinstance(raw_counts, dict) else {}
+    settings["brewfather_last_counts"] = {
+        key: max(0, _coerce_int(raw_counts.get(key), 0) or 0)
+        for key in (
+            "recipes_received",
+            "batches_received",
+            "beers_created",
+            "beers_updated",
+            "conflicts",
+        )
+    }
+
+
+def _brewfather_credentials(settings: dict) -> dict[str, str]:
+    return normalize_credentials(settings.get("brewfather_user_id"), settings.get("brewfather_api_key"))
+
+
+def _brewfather_settings_response(settings: dict) -> dict:
+    _normalize_brewfather_settings(settings)
+    response = {key: value for key, value in settings.items() if not key.startswith("brewfather_")}
+    response.update({
+        "brewfather_enabled": settings["brewfather_enabled"],
+        "brewfather_last_synced_at": settings["brewfather_last_synced_at"],
+        "brewfather_last_status": settings["brewfather_last_status"],
+        "brewfather_last_error": settings["brewfather_last_error"],
+        "brewfather_last_counts": settings["brewfather_last_counts"],
+        "brewfather_credentials": redact_credentials(_brewfather_credentials(settings)),
+    })
+    return response
 
 
 def _prune_team_audit_by_retention(data: dict) -> None:
@@ -1084,6 +1210,7 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
         settings.get("pour_mode"),
     )
     normalize_pos_sync_settings(settings)
+    _normalize_brewfather_settings(settings)
     settings["pour_mode"] = _normalize_pour_mode(
         settings.get("pour_mode"),
         settings.get("brewery_type"),
@@ -2038,6 +2165,19 @@ def _normalize_beers(raw_beers) -> list[dict]:
             "upc": str(entry.get("upc", "")).strip(),
             "recipe_url": str(entry.get("recipe_url", "")).strip(),
             "notes": str(entry.get("notes", "")).strip(),
+            "brewfather_recipe_id": str(entry.get("brewfather_recipe_id", "")).strip(),
+            "brewfather_batch_id": str(entry.get("brewfather_batch_id", "")).strip(),
+            "brewfather_last_synced_at": str(entry.get("brewfather_last_synced_at", "")).strip(),
+            "brewfather_source_snapshot": entry.get("brewfather_source_snapshot", {}) if isinstance(entry.get("brewfather_source_snapshot", {}), dict) else {},
+            "brewfather_conflict": str(entry.get("brewfather_conflict", "")).strip() or None,
+            "brewfather_batch_status": str(entry.get("brewfather_batch_status", "")).strip(),
+            "brewfather_measured_og": str(entry.get("brewfather_measured_og", "")).strip(),
+            "brewfather_measured_fg": str(entry.get("brewfather_measured_fg", "")).strip(),
+            "brewfather_carbonation": str(entry.get("brewfather_carbonation", "")).strip(),
+            "brewfather_latest_gravity": str(entry.get("brewfather_latest_gravity", "")).strip(),
+            "brewfather_latest_temperature": str(entry.get("brewfather_latest_temperature", "")).strip(),
+            "brewfather_packaging_volume": str(entry.get("brewfather_packaging_volume", "")).strip(),
+            "brewfather_packaging_unit": str(entry.get("brewfather_packaging_unit", "")).strip(),
             "updated_at": entry.get("updated_at") or datetime.now(timezone.utc).isoformat(),
         })
 
@@ -2430,13 +2570,20 @@ def login_view():
         user for user in all_team_users
         if not _coerce_bool(user.get("disabled"), False)
     ]
-    error = None
+    scan_error = str(request.args.get("scan_error", "") or "").strip().lower()
+    error = {
+        "invalid": "That QR/NFC credential is invalid or revoked. Use manual sign-in or ask an owner/manager for a new badge.",
+        "disabled": "This user account is disabled. Use manual sign-in with an active account.",
+    }.get(scan_error)
+    scan_token = str(request.values.get("scan_token", "") or "").strip()
 
     if request.method == "POST":
         user_id = str(request.form.get("user_id", "") or "").strip()
-        matched_user = _find_team_user_by_identifier(all_team_users, user_id)
+        matched_user = _find_scan_user(data, scan_token) if scan_token else _find_team_user_by_identifier(all_team_users, user_id)
+        if matched_user is not None:
+            user_id = str(matched_user.get("id", "") or user_id).strip()
         if matched_user is None:
-            error = "User not found. Choose a valid team member."
+            error = "This scan credential is invalid or revoked." if scan_token else "User not found. Choose a valid team member."
         else:
             selected_role = _normalize_team_role(matched_user.get("role", "staff"))
             if _coerce_bool(matched_user.get("disabled"), False):
@@ -2457,9 +2604,9 @@ def login_view():
                 expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", ""))
                 if expected_pin:
                     owner_pin_required = True
-                    supplied_pin = str(request.form.get("owner_pin", "") or "").strip()
+                    supplied_pin = str(request.form.get("user_pin", "") or "").strip()
                     if not secrets.compare_digest(expected_pin, supplied_pin):
-                        error = "Owner PIN required when additional team members are configured."
+                        error = "PIN required for the owner account when additional team members are configured."
                         return render_template(
                             "login.html",
                             settings=data["settings"],
@@ -2467,6 +2614,7 @@ def login_view():
                             error=error,
                             selected_user_id=user_id,
                             require_owner_pin=True,
+                            scan_token=scan_token,
                             ingress=_effective_ingress_path(),
                         )
                 else:
@@ -2484,6 +2632,7 @@ def login_view():
                         error=error,
                         selected_user_id=user_id,
                         require_owner_pin=owner_pin_required,
+                        scan_token=scan_token,
                         ingress=_effective_ingress_path(),
                     )
 
@@ -2493,6 +2642,10 @@ def login_view():
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
+            if scan_token:
+                _record_team_audit(data, matched_user, "scan_login", str(matched_user.get("id", "")), {"transport": "qr_or_nfc"})
+                save_data(data)
+            if owner_pin_recovery_required:
                 return _redirect_to_endpoint("team_access")
             return _redirect_to_endpoint("index")
 
@@ -2503,8 +2656,45 @@ def login_view():
         error=error,
         selected_user_id=str(request.form.get("user_id", "") or "").strip() if request.method == "POST" else "",
         require_owner_pin=False,
+        scan_token=scan_token,
         ingress=_effective_ingress_path(),
     )
+
+
+@app.route("/auth/scan/<token>", methods=["GET"])
+def scan_login(token: str):
+    data = load_data()
+    user = _find_scan_user(data, token)
+    if user is None:
+        _record_team_audit(data, {"id": "anonymous", "name": "Anonymous", "role": "staff"}, "scan_login_failed", "scan", {"reason": "invalid_or_revoked_credential"})
+        save_data(data)
+        return redirect(url_for("login_view", scan_error="invalid"))
+    if _coerce_bool(user.get("disabled"), False):
+        _record_team_audit(data, {"id": user.get("id", ""), "name": user.get("name", ""), "role": user.get("role", "staff")}, "scan_login_failed", str(user.get("id", "")), {"reason": "disabled_user"})
+        save_data(data)
+        return redirect(url_for("login_view", scan_error="disabled"))
+
+    active_users = [item for item in data.get("team_users", []) if not _coerce_bool(item.get("disabled"), False)]
+    owner_pin_required = (
+        str(user.get("role", "")).lower() == "owner"
+        and len(active_users) > 1
+        and bool(_normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")))
+    )
+    if _scan_requires_pin(user) or owner_pin_required:
+        return redirect(url_for("login_view", scan_token=token))
+
+    session.clear()
+    session["user_id"] = str(user.get("id", "")).strip()
+    session["user_role"] = _normalize_team_role(user.get("role", "staff"))
+    session["user_name"] = str(user.get("name", session["user_id"]))
+    if str(user.get("role", "")).lower() == "owner" and len(active_users) > 1 and not _normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")):
+        session["owner_pin_recovery_required"] = True
+        _record_team_audit(data, user, "scan_login", session["user_id"], {"transport": "qr_or_nfc", "owner_recovery": True})
+        save_data(data)
+        return _redirect_to_endpoint("team_access")
+    _record_team_audit(data, user, "scan_login", session["user_id"], {"transport": "qr_or_nfc"})
+    save_data(data)
+    return _redirect_to_endpoint("index")
 
 
 @app.route("/logout")
@@ -2728,12 +2918,15 @@ def settings():
         return jsonify({"error": "Insufficient permissions"}), 403
 
     ingress_path = _effective_ingress_path()
+    template_settings = json.loads(json.dumps(data["settings"]))
+    template_settings["brewfather_api_key"] = ""
+    template_settings["brewfather_credentials"] = redact_credentials(_brewfather_credentials(data["settings"]))
     return render_template(
         "settings.html",
-        settings=data["settings"],
+        settings=template_settings,
         pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
         pos_sync_provider_catalog=get_pos_provider_catalog(data["settings"]),
-        team_users=data.get("team_users", []),
+        team_users=[_public_team_user(user) for user in data.get("team_users", [])],
         owner_pin_recovery_required=bool(session.get("owner_pin_recovery_required")),
         qr_ready=_qr_is_available(),
         qr_error=QR_IMPORT_ERROR,
@@ -2989,7 +3182,7 @@ def api_get_settings():
     current_user = _get_current_team_user()
     if not _team_can(current_user.get("role", "owner"), "settings"):
         return jsonify({"error": "Insufficient permissions"}), 403
-    return jsonify(data["settings"])
+    return jsonify(_brewfather_settings_response(data["settings"]))
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -3008,6 +3201,8 @@ def api_save_settings():
         "owner_pin",
         "pos_sync_credentials",
         "pos_sync_provider_config_json",
+        "brewfather_user_id",
+        "brewfather_api_key",
         "audit_retention_days",
         "anonymous_telemetry_enabled",
     }
@@ -3030,6 +3225,9 @@ def api_save_settings():
         "pos_sync_provider",
         "pos_sync_credentials",
         "pos_sync_provider_config_json",
+        "brewfather_enabled",
+        "brewfather_user_id",
+        "brewfather_api_key",
         "bar_logo_url",
         "external_base_url",
         "external_api_token_auth_enabled",
@@ -3102,7 +3300,7 @@ def api_save_settings():
         and data["settings"]["anonymous_telemetry_enabled"]
     ):
         _schedule_anonymous_telemetry_heartbeat()
-    return jsonify(data["settings"])
+    return jsonify(_brewfather_settings_response(data["settings"]))
 
 
 @app.route("/api/pos/sync/status", methods=["GET"])
@@ -3228,6 +3426,235 @@ def api_pos_sync_now():
         return jsonify({"ok": False, "error": str(exc), "hint": exc.hint, "status": status}), exc.status_code
 
 
+def _brewfather_authorized_user() -> dict:
+    return _get_current_team_user()
+
+
+@app.route("/api/brewfather/status", methods=["GET"])
+def api_brewfather_status():
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    settings = data["settings"]
+    conflicts = data.get("brewfather_conflicts", [])
+    return jsonify({
+        "enabled": settings["brewfather_enabled"],
+        "credentials": redact_credentials(_brewfather_credentials(settings)),
+        "last_synced_at": settings["brewfather_last_synced_at"],
+        "last_status": settings["brewfather_last_status"],
+        "last_error": settings["brewfather_last_error"],
+        "last_counts": settings["brewfather_last_counts"],
+        "conflicts": len(conflicts) if isinstance(conflicts, list) else 0,
+    })
+
+
+@app.route("/api/brewfather/sync", methods=["POST"])
+def api_brewfather_sync():
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    settings = data["settings"]
+    credentials = _brewfather_credentials(settings)
+    if not credentials_configured(credentials):
+        return jsonify({
+            "ok": False,
+            "error": "Brewfather is not configured.",
+            "hint": "Set the owner-only User ID and API key first.",
+        }), 400
+
+    _record_team_audit(data, current_user, "brewfather_sync_started", "brewfather", {})
+    try:
+        client = BrewfatherClient(credentials["user_id"], credentials["api_key"])
+        recipes = client.fetch_recipes()
+        fetched_batches = client.fetch_batches()
+        batches = [batch for batch in fetched_batches if is_importable_batch(batch)]
+        records = list(recipes)
+        recipe_records = {
+            str(item.get("brewfather_recipe_id", "")): index
+            for index, item in enumerate(records)
+            if item.get("brewfather_recipe_id")
+        }
+        for batch in batches:
+            recipe_index = recipe_records.get(str(batch.get("brewfather_recipe_id", "")))
+            if recipe_index is None:
+                records.append(batch)
+                continue
+            merged = dict(records[recipe_index])
+            merged.update({key: value for key, value in batch.items() if value not in ("", None)})
+            records[recipe_index] = merged
+        now = brewfather_now()
+        conflicts = data.get("brewfather_conflicts", [])
+        conflicts = conflicts if isinstance(conflicts, list) else []
+        existing_conflict_ids = {str(item.get("id")) for item in conflicts if isinstance(item, dict)}
+        counts = {
+            "recipes_received": len(recipes),
+            "batches_received": len(batches),
+            "beers_created": 0,
+            "beers_updated": 0,
+            "conflicts": 0,
+        }
+        imported_ids = []
+        for record in records:
+            beer, outcome, conflict = reconcile_beer(data["beers"], record, now)
+            imported_ids.append(beer.get("id"))
+            if outcome == "created":
+                counts["beers_created"] += 1
+            elif outcome == "updated":
+                counts["beers_updated"] += 1
+            elif outcome == "conflict" and conflict:
+                counts["conflicts"] += 1
+                if conflict["id"] not in existing_conflict_ids:
+                    conflicts.insert(0, conflict)
+                    existing_conflict_ids.add(conflict["id"])
+
+        data["brewfather_conflicts"] = conflicts[:500]
+        settings["brewfather_last_synced_at"] = now
+        settings["brewfather_last_status"] = "success"
+        settings["brewfather_last_error"] = ""
+        settings["brewfather_last_counts"] = counts
+        _record_team_audit(data, current_user, "brewfather_sync_succeeded", "brewfather", counts)
+        save_data(data)
+        return jsonify({"ok": True, "counts": counts, "beer_ids": imported_ids, "conflicts": data["brewfather_conflicts"]})
+    except BrewfatherError as exc:
+        settings["brewfather_last_status"] = "failed"
+        settings["brewfather_last_error"] = str(exc)
+        _record_team_audit(data, current_user, "brewfather_sync_failed", "brewfather", {"error": str(exc), "hint": exc.hint})
+        save_data(data)
+        return jsonify({"ok": False, "error": str(exc), "hint": exc.hint}), exc.status_code
+
+
+@app.route("/api/brewfather/conflicts", methods=["GET"])
+def api_brewfather_conflicts():
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    return jsonify({"conflicts": data.get("brewfather_conflicts", [])})
+
+
+@app.route("/api/brewfather/conflicts/<conflict_id>/resolve", methods=["POST"])
+def api_brewfather_resolve_conflict(conflict_id: str):
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    body = request.get_json(force=True)
+    resolution = str(body.get("resolution", "")).strip().lower()
+    if resolution not in ("brewfather", "local"):
+        return jsonify({"error": "Resolution must be 'brewfather' or 'local'."}), 400
+    conflicts = data.get("brewfather_conflicts", [])
+    conflict = next((item for item in conflicts if str(item.get("id")) == conflict_id), None)
+    if not conflict:
+        return jsonify({"error": "Conflict not found."}), 404
+    beer = _get_beer_by_id(data, _coerce_int(conflict.get("beer_id"), None))
+    if not beer:
+        return jsonify({"error": "Linked beer not found."}), 404
+    for field, values in conflict.get("fields", {}).items():
+        if field not in BREWFATHER_MANAGED_FIELDS or not isinstance(values, dict):
+            continue
+        selected = values.get("brewfather") if resolution == "brewfather" else values.get("local")
+        beer[field] = str(selected or "").strip()
+        beer.setdefault("brewfather_source_snapshot", {})[field] = beer.get(field, "")
+    beer["brewfather_conflict"] = None
+    beer["brewfather_last_synced_at"] = brewfather_now()
+    data["brewfather_conflicts"] = [item for item in conflicts if str(item.get("id")) != conflict_id]
+    _record_team_audit(data, current_user, "brewfather_conflict_resolved", f"beer:{beer['id']}", {"resolution": resolution})
+    save_data(data)
+    return jsonify({"ok": True, "beer": beer})
+
+
+@app.route("/api/brewfather/batches/<batch_id>", methods=["GET"])
+def api_brewfather_batch_details(batch_id: str):
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    beer = next((item for item in data.get("beers", []) if item.get("brewfather_batch_id") == batch_id), None)
+    if not beer:
+        return jsonify({"error": "Brewfather batch is not linked to a beer."}), 404
+    return jsonify({
+        "batch_id": batch_id,
+        "recipe_id": beer.get("brewfather_recipe_id", ""),
+        "beer": beer,
+        "eligible_for_keg_import": str(beer.get("brewfather_batch_status", "")).lower() in {
+            "completed", "complete", "conditioning", "conditioned",
+        },
+    })
+
+
+@app.route("/api/brewfather/batches/<batch_id>/import-keg", methods=["POST"])
+def api_brewfather_import_keg(batch_id: str):
+    data = load_data()
+    current_user = _brewfather_authorized_user()
+    if not _team_can(current_user.get("role", "owner"), "settings"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    body = request.get_json(silent=True) or {}
+    if body.get("confirm") is not True:
+        return jsonify({"error": "Explicit confirmation is required to import a Brewfather batch as a keg."}), 400
+    beer = next((item for item in data.get("beers", []) if item.get("brewfather_batch_id") == batch_id), None)
+    if not beer:
+        return jsonify({"error": "Brewfather batch is not linked to a beer. Run sync first."}), 404
+    if not is_importable_batch(beer):
+        return jsonify({"error": "Only completed or conditioning Brewfather batches can be imported as kegs."}), 409
+    keg_id = _coerce_int(body.get("keg_id"), None)
+    now = datetime.now(timezone.utc).isoformat()
+    if keg_id is not None:
+        keg = next((item for item in data.get("kegs", []) if item.get("id") == keg_id), None)
+        if not keg:
+            return jsonify({"error": "Keg not found."}), 404
+        if keg.get("status") != "empty":
+            return jsonify({"error": "Only an empty keg can receive a Brewfather batch."}), 409
+        _apply_beer_to_keg(keg, beer)
+        keg["status"] = "full"
+        keg["filled_date"] = beer.get("packaged_on") or _today_utc_date()
+        keg["percent_full"] = 100
+        keg["updated_at"] = now
+        operation = "filled"
+    else:
+        keg = {
+            "id": _next_id(data["kegs"]),
+            "name": str(body.get("name") or beer.get("name") or f"Brewfather {batch_id}").strip(),
+            "serial_number": "",
+            "beer_id": beer.get("id"),
+            "beer_name": beer.get("name", ""),
+            "type": str(body.get("type") or data["settings"].get("default_keg_type", "")).strip(),
+            "size": str(body.get("size") or data["settings"].get("default_keg_type", "")).strip(),
+            "custom_size": "",
+            "status": "full",
+            "coupler_type": "",
+            "ownership_type": "Owned",
+            "location": "",
+            "serving_psi": "",
+            "gas_type": "",
+            "line_cleaning_keg": False,
+            "on_deck": False,
+            "current_volume": _coerce_float(body.get("volume"), None),
+            "volume_unit": _normalize_volume_unit(body.get("volume_unit") or _default_volume_unit(data["settings"].get("measurement", "us"))),
+            "notes": f"Imported from Brewfather batch {batch_id}",
+            "filled_date": beer.get("packaged_on") or _today_utc_date(),
+            "tapped_date": "",
+            "kicked_date": "",
+            "cleaned_date": "",
+            "percent_full": 100,
+            "created_at": now,
+            "updated_at": now,
+        }
+        _apply_beer_to_keg(keg, beer)
+        data["kegs"].append(keg)
+        operation = "created"
+    _record_team_audit(data, current_user, "brewfather_keg_imported", f"keg:{keg['id']}", {
+        "brewfather_batch_id": batch_id,
+        "brewfather_recipe_id": beer.get("brewfather_recipe_id", ""),
+        "beer_id": beer.get("id"),
+        "keg_id": keg.get("id"),
+        "operation": operation,
+    })
+    save_data(data)
+    return jsonify({"ok": True, "keg": keg}), 201 if operation == "created" else 200
+
+
 @app.route("/api/settings/reset", methods=["POST"])
 def api_reset_settings_to_defaults():
     data = load_data()
@@ -3317,7 +3744,7 @@ def api_get_team_users():
     users = data.get("team_users", [])
     if current_user.get("role") == "staff":
         users = [user for user in users if user.get("id") == current_user.get("id")]
-    return jsonify({"users": users})
+    return jsonify({"users": [_public_team_user(user) for user in users]})
 
 
 @app.route("/api/team/users", methods=["POST"])
@@ -3331,6 +3758,8 @@ def api_create_team_user():
     action = str(payload.get("action", "")).strip().lower()
     if action == "delete":
         return api_delete_team_user()
+    if action in ("issue_scan", "rotate_scan", "revoke_scan", "set_scan_policy"):
+        return api_manage_scan_credential()
     if action in (
         "update",
         "update_profile",
@@ -3382,7 +3811,7 @@ def api_create_team_user():
             users.insert(0, user)
         _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
         save_data(data)
-        return jsonify({"user": user})
+        return jsonify({"user": _public_team_user(user)})
 
     user_id = str(payload.get("id") or payload.get("user_id") or f"user-{abs(hash(name)) % 1000000}").strip()
     if any(str(existing.get("id", "")).lower() == user_id.lower() for existing in users):
@@ -3395,11 +3824,57 @@ def api_create_team_user():
         "pin": user_pin,
         "disabled": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "scan_token_hash": "",
+        "scan_issued_at": "",
+        "scan_require_pin": False,
     }
     users.append(user)
     _record_team_audit(data, current_user, "user_created", user_id, {"role": role, "name": name})
     save_data(data)
-    return jsonify({"user": user})
+    return jsonify({"user": _public_team_user(user)})
+
+
+def api_manage_scan_credential():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "owner"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "")).strip().lower()
+    user_id = str(payload.get("user_id") or payload.get("id") or "").strip()
+    user = next(
+        (item for item in data.get("team_users", []) if str(item.get("id", "")).strip().lower() == user_id.lower()),
+        None,
+    )
+    if user is None:
+        return jsonify({"error": "User not found."}), 404
+    if action == "set_scan_policy":
+        user["scan_require_pin"] = _coerce_bool(payload.get("require_pin"), False)
+        _record_team_audit(data, current_user, "user_scan_policy_updated", user_id, {"require_pin": user["scan_require_pin"]})
+        save_data(data)
+        return jsonify({"user": _public_team_user(user)})
+    if action == "revoke_scan":
+        user["scan_token_hash"] = ""
+        user["scan_issued_at"] = ""
+        _record_team_audit(data, current_user, "user_scan_credential_revoked", user_id, {})
+        save_data(data)
+        return jsonify({"user": _public_team_user(user), "revoked": True})
+    if action not in ("issue_scan", "rotate_scan"):
+        return jsonify({"error": "Unsupported scan credential action."}), 400
+
+    token = secrets.token_urlsafe(32)
+    user["scan_token_hash"] = _scan_token_hash(token)
+    user["scan_issued_at"] = datetime.now(timezone.utc).isoformat()
+    user["scan_require_pin"] = _coerce_bool(payload.get("require_pin"), user.get("scan_require_pin", False))
+    _record_team_audit(data, current_user, "user_scan_credential_issued", user_id, {"rotated": action == "rotate_scan"})
+    save_data(data)
+    login_url = _scan_login_url(token)
+    return jsonify({
+        "user": _public_team_user(user),
+        "login_url": login_url,
+        "qr_data_url": _qr_png_data_url(login_url),
+        "nfc_payload": login_url,
+    })
 
 
 @app.route("/api/team/users/update", methods=["POST"])
@@ -3457,7 +3932,7 @@ def api_update_team_user():
             {"from_name": previous_name, "to_name": new_name},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if action in ("set_pin", "update_pin"):
         if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
@@ -3471,7 +3946,7 @@ def api_update_team_user():
             {"pin_set": bool(matching_user.get("pin"))},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if action == "reset_pin":
         if str(current_user.get("id", "")).strip().lower() == user_id.lower() and current_user.get("role") == "manager":
@@ -3485,7 +3960,7 @@ def api_update_team_user():
             {},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if action in ("disable", "set_disabled"):
         disable_value = _coerce_bool(payload.get("disabled"), True)
@@ -3502,7 +3977,7 @@ def api_update_team_user():
             {"disabled": disable_value},
         )
         save_data(data)
-        return jsonify({"user": matching_user})
+        return jsonify({"user": _public_team_user(matching_user)})
 
     if requested_role == "owner" and current_user.get("role") != "owner":
         return jsonify({"error": "Only the owner can promote someone to owner."}), 403
@@ -3517,7 +3992,7 @@ def api_update_team_user():
         {"from_role": previous_role, "to_role": requested_role},
     )
     save_data(data)
-    return jsonify({"user": matching_user})
+    return jsonify({"user": _public_team_user(matching_user)})
 
 
 @app.route("/api/team/users", methods=["DELETE"])
@@ -4192,6 +4667,14 @@ API_REFERENCE_ENDPOINTS = [
     ("PUT", "/api/taps/<id>", "Update a tap"),
     ("POST", "/api/taps/<id>/pour", "Record a pour for the assigned keg"),
     ("DELETE", "/api/taps/<id>", "Delete a tap"),
+    ("POST", "/api/team/users", "Issue, rotate, revoke, or configure a user scan credential"),
+    ("GET", "/auth/scan/<token>", "Sign in with a user QR/NFC scan credential"),
+    ("GET", "/api/brewfather/status", "Get Brewfather sync status"),
+    ("POST", "/api/brewfather/sync", "Run Brewfather recipe and batch sync"),
+    ("GET", "/api/brewfather/conflicts", "List Brewfather catalog conflicts"),
+    ("POST", "/api/brewfather/conflicts/<id>/resolve", "Resolve a Brewfather catalog conflict"),
+    ("GET", "/api/brewfather/batches/<id>", "Review a linked Brewfather batch"),
+    ("POST", "/api/brewfather/batches/<id>/import-keg", "Import a confirmed Brewfather batch as a keg"),
     ("GET", "/api/export/json", "Export portable versioned JSON backup"),
     ("GET", "/api/export/archive", "Export ZIP archive backup"),
     ("GET", "/api/export/csv", "Legacy alias for ZIP archive export"),
@@ -5201,26 +5684,38 @@ def _export_date_stamp() -> str:
 
 
 def _build_export_json_payload(data: dict) -> dict:
+    export_data = json.loads(json.dumps(data))
+    export_settings = export_data.get("settings", {})
+    if isinstance(export_settings, dict):
+        export_settings.pop("brewfather_api_key", None)
+        export_settings.pop("brewfather_user_id", None)
+        export_settings["brewfather_credentials"] = redact_credentials(
+            normalize_credentials(
+                data.get("settings", {}).get("brewfather_user_id"),
+                data.get("settings", {}).get("brewfather_api_key"),
+            )
+        )
     return {
         "format": "bartender-export",
         "version": 1,
         "exported_at": datetime.now(timezone.utc).isoformat(),
-        "data": data,
+        "data": export_data,
     }
 
 
 def _build_export_archive(data: dict) -> bytes:
     """Build a ZIP archive with full BarTender data as separate files."""
     payload = _build_export_json_payload(data)
+    export_data = payload["data"]
     out = io.BytesIO()
     with zipfile.ZipFile(out, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         # Canonical JSON exports by section.
-        zf.writestr("settings.json", json.dumps(data.get("settings", {}), indent=2))
-        zf.writestr("kegs.json", json.dumps(data.get("kegs", []), indent=2))
-        zf.writestr("taps.json", json.dumps(data.get("taps", []), indent=2))
-        zf.writestr("beers.json", json.dumps(data.get("beers", []), indent=2))
-        zf.writestr("bar_stock.json", json.dumps(data.get("bar_stock", []), indent=2))
-        zf.writestr("pour_events.json", json.dumps(data.get("pour_events", []), indent=2))
+        zf.writestr("settings.json", json.dumps(export_data.get("settings", {}), indent=2))
+        zf.writestr("kegs.json", json.dumps(export_data.get("kegs", []), indent=2))
+        zf.writestr("taps.json", json.dumps(export_data.get("taps", []), indent=2))
+        zf.writestr("beers.json", json.dumps(export_data.get("beers", []), indent=2))
+        zf.writestr("bar_stock.json", json.dumps(export_data.get("bar_stock", []), indent=2))
+        zf.writestr("pour_events.json", json.dumps(export_data.get("pour_events", []), indent=2))
         zf.writestr("bartender_export.json", json.dumps(payload, indent=2))
 
         # CSV exports for convenience.

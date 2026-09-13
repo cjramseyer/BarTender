@@ -73,6 +73,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   font-size: 15px;
+  overflow-x: hidden;
   transition:
     background 0.2s,
     color 0.2s;
@@ -240,6 +241,51 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 0.35rem;
+}
+
+.nav-menu-submenu {
+  padding: 0.15rem 0.35rem;
+}
+
+.nav-menu-submenu summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  list-style: none;
+  padding: 0.5rem 0.35rem;
+}
+
+.nav-menu-submenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-menu-submenu summary::after {
+  content: "▸";
+  float: right;
+  color: var(--text-muted);
+}
+
+.nav-menu-submenu[open] summary::after {
+  content: "▾";
+}
+
+.nav-menu-submenu summary:hover,
+.nav-menu-submenu summary:focus-visible {
+  background: var(--surface2);
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.nav-menu-submenu-body {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.15rem 0 0.25rem 0.35rem;
+}
+
+.nav-menu-divider {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  background: var(--border);
 }
 
 .nav-menu-checkbox {
@@ -552,12 +598,14 @@ textarea.form-control {
 }
 .form-row .form-group {
   flex: 1;
+  min-width: 0;
 }
 .form-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-top: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .auth-shell {
@@ -705,6 +753,15 @@ textarea.form-control {
 
 .dashboard-grid > .card > h2 {
   order: -2;
+}
+
+.dashboard-panel-title {
+  margin: -0.15rem -0.15rem 1rem;
+  padding: 0 0.15rem 0.7rem;
+  border-bottom: 2px solid var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
 }
 
 .dashboard-card-title-link {
@@ -1230,6 +1287,76 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 
 @media (max-width: 560px) {
+  .navbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem 0;
+  }
+
+  .nav-brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .nav-brand > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-actions {
+    flex: 0 0 auto;
+    gap: 0.35rem;
+  }
+
+  .nav-links {
+    order: 3;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding: 0 0 0.35rem;
+    margin: 0;
+  }
+
+  .nav-links li {
+    flex: 0 0 auto;
+  }
+
+  .nav-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.82rem;
+  }
+
+  .nav-secondary-btn {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  .nav-menu-label,
+  .nav-avatar-name {
+    display: none;
+  }
+
+  .nav-menu-button,
+  .nav-avatar-button {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    justify-content: center;
+    padding: 0.3rem;
+  }
+
+  .nav-menu-panel,
+  .nav-user-panel {
+    top: calc(100% + 0.4rem);
+  }
+
   .dashboard-pour-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
@@ -1241,6 +1368,73 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
     justify-self: start;
     align-self: center;
     min-height: 2.2rem;
+  }
+  .container {
+    width: 100%;
+    min-width: 0;
+    padding: 1.25rem 0.75rem;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .dashboard-grid,
+  .keg-grid,
+  .taps-grid,
+  .menu-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .form-row .form-group,
+  .form-row > * {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .toolbar,
+  .search-box,
+  .toolbar-actions {
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  .search-box {
+    flex-basis: 100%;
+  }
+
+  .table {
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+
+  .table th,
+  .table td {
+    min-width: 0;
+    padding: 0.45rem 0.3rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .table th {
+    font-size: 0.68rem;
+  }
+
+  .table td:last-child {
+    white-space: normal;
+  }
+
+  .table .btn {
+    max-width: 100%;
+    white-space: normal;
+    word-break: break-word;
   }
 }
 

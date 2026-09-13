@@ -2,6 +2,7 @@
 .venv/
 depr/
 bartender/.data/
+bartender/preview-data/
 bartender/bartender/__pycache__/
 
 # Python build, virtualenv, and test artifacts

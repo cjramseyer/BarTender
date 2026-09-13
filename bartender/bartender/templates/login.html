@@ -13,6 +13,10 @@
     {% endif %}
 
     <form method="post" action="{{ ingress }}/login" class="auth-form">
+      {% if scan_token %}
+      <input type="hidden" name="scan_token" value="{{ scan_token }}" />
+      <p class="muted">Scan credential recognized. Enter any required PIN to continue.</p>
+      {% endif %}
       <div class="form-group">
         <label for="user_id">Team member</label>
         <select id="user_id" name="user_id" class="form-control" required>
@@ -25,35 +29,26 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="user_pin">User PIN (if required)</label>
+        <label for="user_pin">PIN (if required)</label>
         <input
           id="user_pin"
           name="user_pin"
           type="password"
           class="form-control"
-          placeholder="Enter user PIN"
+          placeholder="Enter PIN"
           autocomplete="current-password"
         />
       </div>
-      {% if require_owner_pin or (selected_user_id and selected_user_id ==
-      'owner' and users|length > 1) %}
-      <div class="form-group">
-        <label for="owner_pin">Owner PIN</label>
-        <input
-          id="owner_pin"
-          name="owner_pin"
-          type="password"
-          class="form-control"
-          placeholder="Enter owner PIN"
-          autocomplete="current-password"
-        />
-      </div>
-      {% endif %}
       <button type="submit" class="btn btn-primary btn-block">Sign in</button>
     </form>
 
     <div class="auth-footer">
       <p class="muted">Only configured team members can access the app.</p>
+      {% if scan_token %}
+      <p class="muted">Scan not working? <a href="{{ ingress }}/login">Use manual sign-in</a>.</p>
+      {% else %}
+      <p class="muted">QR/NFC unavailable? Manual sign-in is always available.</p>
+      {% endif %}
     </div>
   </div>
 </div>
