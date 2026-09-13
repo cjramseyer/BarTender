@@ -34,11 +34,11 @@ bashio::log.info "Starting BarTender external API server on port ${EXTERNAL_API_
 
 cd /app || exit 1
 
-# Start the read-only display server in the background
-python3 -m bartender.display &
+# Start the read-only display server with a production WSGI server in the background
+waitress-serve --threads=1 --listen="0.0.0.0:${DISPLAY_PORT}" bartender.display_wsgi:display_app &
 
-# Start external API-only listener in the background
-EXTERNAL_API_MODE="true" PORT="${EXTERNAL_API_PORT}" python3 -m bartender.app &
+# Start external API-only listener with a production WSGI server in the background
+EXTERNAL_API_MODE="true" waitress-serve --threads=1 --listen="0.0.0.0:${EXTERNAL_API_PORT}" bartender.wsgi:app &
 
-# Start the management server in the foreground
-python3 -m bartender.app
+# Start the management server with a production WSGI server in the foreground
+waitress-serve --threads=1 --listen="0.0.0.0:${PORT}" bartender.wsgi:app

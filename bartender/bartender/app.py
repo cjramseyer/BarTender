@@ -61,6 +61,7 @@ from flask import (
     render_template,
     request,
     jsonify,
+    g,
     send_file,
     redirect,
     session,
@@ -254,6 +255,20 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "bartender-dev-secret-change-me")
+DATA_STATE_LOCK = threading.RLock()
+
+
+@app.before_request
+def acquire_mutation_lock():
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        DATA_STATE_LOCK.acquire()
+        g.data_state_lock_acquired = True
+
+
+@app.teardown_request
+def release_mutation_lock(exception=None):
+    if getattr(g, "data_state_lock_acquired", False):
+        DATA_STATE_LOCK.release()
 
 
 def _effective_ingress_path() -> str:
@@ -528,7 +543,7 @@ DEFAULT_DATA = {
 }
 
 
-def load_data() -> dict:
+def _load_data_unlocked() -> dict:
     database = create_state_store(
         DATA_FILE.with_name("bartender.db"),
         os.environ.get("STORAGE_BACKEND", "internal"),
@@ -800,15 +815,25 @@ def load_data() -> dict:
     return json.loads(json.dumps(data))
 
 
+def load_data() -> dict:
+    with DATA_STATE_LOCK:
+        return _load_data_unlocked()
+
+
 def save_data(data: dict) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    create_state_store(
-        DATA_FILE.with_name("bartender.db"),
-        os.environ.get("STORAGE_BACKEND", "internal"),
-        os.environ.get("DATABASE_URL", ""),
-    ).save(data)
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    with DATA_STATE_LOCK:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        create_state_store(
+            DATA_FILE.with_name("bartender.db"),
+            os.environ.get("STORAGE_BACKEND", "internal"),
+            os.environ.get("DATABASE_URL", ""),
+        ).save(data)
+        temporary_file = DATA_FILE.with_name(f"{DATA_FILE.name}.tmp")
+        with open(temporary_file, "w", encoding="utf-8") as file_handle:
+            json.dump(data, file_handle, indent=2)
+            file_handle.flush()
+            os.fsync(file_handle.fileno())
+        os.replace(temporary_file, DATA_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -6071,14 +6096,3 @@ def import_json_preview():
     existing = load_data()
     preview_payload = _apply_import_payload(existing, extracted, mode)
     return jsonify({"ok": True, "summary": _import_summary(preview_payload), "mode": mode})
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8099))
-    if not EXTERNAL_API_MODE:
-        _schedule_anonymous_telemetry_heartbeat()
-    app.run(host="0.0.0.0", port=port, debug=False)
