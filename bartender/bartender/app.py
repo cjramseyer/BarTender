@@ -18,7 +18,7 @@ import uuid
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Protocol, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -606,8 +606,9 @@ def _load_data_unlocked() -> dict:
         os.environ.get("STORAGE_BACKEND", "internal"),
         os.environ.get("DATABASE_URL", ""),
     )
-    if database.path.exists() or DATA_FILE.exists():
-        if database.path.exists():
+    database_path: Path | None = getattr(database, "path", None)
+    if (database_path is not None and database_path.exists()) or DATA_FILE.exists():
+        if database_path is not None and database_path.exists():
             data = database.load(DEFAULT_DATA)
         else:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -1117,10 +1118,11 @@ def _current_user_release_seen_version() -> str:
 
 
 def _qr_png_data_url(value: str) -> str:
-    if not _qr_is_available():
+    if qrcode is None:
         return ""
     buffer = io.BytesIO()
-    qrcode.make(value).save(buffer, format="PNG")
+    qr_module = cast(Any, qrcode)
+    qr_module.make(value).save(buffer, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
