@@ -27,3 +27,7 @@ macos/Pods/
 
 # Generated
 pubspec.lock
+
+# IDE
+.idea/
+*.iml
