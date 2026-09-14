@@ -86,14 +86,16 @@ EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
 
 def _session_timeout_minutes() -> int:
     try:
-        configured = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "480") or "480")
+        configured = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "240") or "240")
     except (TypeError, ValueError):
-        configured = 480
+        configured = 240
     return max(5, min(configured, 43200))
 
 
 SESSION_TIMEOUT_MINUTES = _session_timeout_minutes()
 DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE = 120
+DEFAULT_MOBILE_SESSION_TIMEOUT_MINUTES = 30
+DEFAULT_STATION_SESSION_TIMEOUT_MINUTES = 30
 _EXTERNAL_API_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
 _EXTERNAL_API_RATE_LIMIT_LOCK = threading.Lock()
 MAX_LOGO_UPLOAD_BYTES = 2 * 1024 * 1024
@@ -105,6 +107,46 @@ ALLOWED_LOGO_MIME_TYPES = {
     "image/svg+xml": ".svg",
 }
 LOGO_FILENAME_PREFIX = "bar-logo"
+
+
+def _normalize_mobile_session_timeout_minutes(value) -> int:
+    try:
+        configured = int(value)
+    except (TypeError, ValueError):
+        configured = DEFAULT_MOBILE_SESSION_TIMEOUT_MINUTES
+    return max(5, min(configured, SESSION_TIMEOUT_MINUTES))
+
+
+def _normalize_station_session_timeout_minutes(value) -> int:
+    try:
+        configured = int(value)
+    except (TypeError, ValueError):
+        configured = DEFAULT_STATION_SESSION_TIMEOUT_MINUTES
+    return max(5, min(configured, SESSION_TIMEOUT_MINUTES))
+
+
+def _is_mobile_user_agent(user_agent: str) -> bool:
+    return bool(
+        re.search(
+            r"android|iphone|ipad|ipod|mobile|windows phone",
+            str(user_agent or "").lower(),
+        )
+    )
+
+
+def _station_token_hash(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _registered_station(data: dict) -> dict | None:
+    token = str(request.cookies.get("bartender_station_token", "") or "").strip()
+    if not token:
+        return None
+    token_hash = _station_token_hash(token)
+    for station in data.get("station_registrations", []):
+        if station.get("token_hash") == token_hash and not station.get("revoked_at"):
+            return station
+    return None
 
 
 def _load_or_create_secret_key() -> str:
@@ -299,6 +341,87 @@ def release_mutation_lock(exception=None):
         DATA_STATE_LOCK.release()
 
 
+def _session_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _session_timeout_for_type(data: dict, session_type: str, user_agent: str = "") -> int:
+    if session_type == "station":
+        return _normalize_station_session_timeout_minutes(
+            data.get("settings", {}).get("station_session_timeout_minutes")
+        )
+    if _is_mobile_user_agent(user_agent):
+        return _normalize_mobile_session_timeout_minutes(
+            data.get("settings", {}).get("mobile_session_timeout_minutes")
+        )
+    return SESSION_TIMEOUT_MINUTES
+
+
+def _prune_user_sessions(data: dict) -> None:
+    sessions = data.get("user_sessions", [])
+    if not isinstance(sessions, list):
+        data["user_sessions"] = []
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    retained = []
+    for record in sessions:
+        if not isinstance(record, dict):
+            continue
+        terminal_at = record.get("revoked_at") or record.get("expires_at")
+        if terminal_at:
+            try:
+                terminal_time = datetime.fromisoformat(str(terminal_at).replace("Z", "+00:00"))
+                if terminal_time.tzinfo is None:
+                    terminal_time = terminal_time.replace(tzinfo=timezone.utc)
+                if terminal_time < cutoff:
+                    continue
+            except ValueError:
+                pass
+        retained.append(record)
+    data["user_sessions"] = retained[-500:]
+
+
+def _create_user_session(
+    data: dict,
+    user: dict,
+    login_method: str,
+    station_mode: bool = False,
+) -> str:
+    session_id = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    user_agent = str(request.headers.get("User-Agent", "") or "").strip()[:512]
+    session_type = "station" if station_mode else ("mobile" if _is_mobile_user_agent(user_agent) else "desktop")
+    timeout_minutes = _session_timeout_for_type(data, session_type, user_agent)
+    record = {
+        "id": session_id,
+        "user_id": str(user.get("id", "") or "").strip(),
+        "user_name": str(user.get("name", "") or "").strip(),
+        "user_role": _normalize_team_role(user.get("role", "staff")),
+        "login_method": login_method,
+        "device_type": "mobile" if session_type == "mobile" else "desktop",
+        "session_type": session_type,
+        "user_agent": user_agent,
+        "ip_address": str(_get_client_ip_address() or ""),
+        "created_at": now.isoformat(),
+        "last_activity_at": now.isoformat(),
+        "expires_at": (now + timedelta(minutes=timeout_minutes)).isoformat(),
+        "timeout_minutes": timeout_minutes,
+        "revoked_at": "",
+    }
+    data.setdefault("user_sessions", []).append(record)
+    _prune_user_sessions(data)
+    session["session_id"] = session_id
+    session["last_activity_at"] = now.timestamp()
+    return session_id
+
+
+def _find_user_session(data: dict, session_id: str) -> dict | None:
+    return next(
+        (record for record in data.get("user_sessions", []) if record.get("id") == session_id),
+        None,
+    )
+
+
 @app.before_request
 def enforce_session_timeout():
     if EXTERNAL_API_MODE:
@@ -308,13 +431,58 @@ def enforce_session_timeout():
     if not session_user_id:
         return None
 
+    data = load_data()
     now = time.time()
+    session_id = str(session.get("session_id", "") or "").strip()
+    record = _find_user_session(data, session_id) if session_id else None
+    if record is None:
+        legacy_last_activity = session.get("last_activity_at", now)
+        current_user = _get_current_team_user()
+        _create_user_session(data, current_user, "legacy")
+        session_id = str(session.get("session_id", ""))
+        record = _find_user_session(data, session_id)
+        try:
+            legacy_last_activity = float(legacy_last_activity)
+        except (TypeError, ValueError):
+            legacy_last_activity = now
+        if record:
+            record["last_activity_at"] = datetime.fromtimestamp(
+                legacy_last_activity, timezone.utc
+            ).isoformat()
+        session["last_activity_at"] = legacy_last_activity
+        save_data(data)
+
+    if record and record.get("revoked_at"):
+        session.clear()
+        if _normalized_request_path().startswith("/api/"):
+            return jsonify({"error": "Session revoked. Please log in again."}), 401
+        return _redirect_to_endpoint("login_view")
+
+    timeout_minutes = SESSION_TIMEOUT_MINUTES
+    if record:
+        if record.get("session_type") == "station":
+            timeout_minutes = _normalize_station_session_timeout_minutes(
+                data.get("settings", {}).get("station_session_timeout_minutes")
+            )
+        elif record.get("session_type") == "mobile" or record.get("device_type") == "mobile":
+            timeout_minutes = _normalize_mobile_session_timeout_minutes(
+                data.get("settings", {}).get("mobile_session_timeout_minutes")
+            )
+        else:
+            timeout_minutes = int(record.get("timeout_minutes", SESSION_TIMEOUT_MINUTES))
+        record["timeout_minutes"] = timeout_minutes
     try:
         last_activity = float(session.get("last_activity_at", now))
     except (TypeError, ValueError):
         last_activity = now
 
-    if now - last_activity > SESSION_TIMEOUT_MINUTES * 60:
+    if now - last_activity > timeout_minutes * 60:
+        if record:
+            record["expires_at"] = _session_now_iso()
+            _record_team_audit(data, _get_current_team_user(), "session_expired", session_id, {
+                "device_type": record.get("device_type", "desktop"),
+            })
+            save_data(data)
         session.clear()
         if _normalized_request_path().startswith("/api/"):
             return jsonify({"error": "Session expired. Please log in again."}), 401
@@ -325,6 +493,12 @@ def enforce_session_timeout():
 
     session.permanent = True
     session["last_activity_at"] = now
+    if record:
+        record["last_activity_at"] = datetime.fromtimestamp(now, timezone.utc).isoformat()
+        record["expires_at"] = datetime.fromtimestamp(
+            now + timeout_minutes * 60, timezone.utc
+        ).isoformat()
+        save_data(data)
     return None
 
 
@@ -581,6 +755,8 @@ DEFAULT_DATA = {
         "anonymous_telemetry_enabled": False,
         "anonymous_telemetry_installation_id": "",
         "anonymous_telemetry_last_heartbeat_date": "",
+        "mobile_session_timeout_minutes": DEFAULT_MOBILE_SESSION_TIMEOUT_MINUTES,
+        "station_session_timeout_minutes": DEFAULT_STATION_SESSION_TIMEOUT_MINUTES,
     },
     "bar_stock": [],
     "beers": [],
@@ -596,6 +772,8 @@ DEFAULT_DATA = {
         }
     ],
     "team_audit": [],
+    "user_sessions": [],
+    "station_registrations": [],
     "brewfather_conflicts": [],
 }
 
@@ -772,8 +950,18 @@ def _load_data_unlocked() -> dict:
             data["settings"].get("anonymous_telemetry_enabled"),
             False,
         )
+        data["settings"]["mobile_session_timeout_minutes"] = _normalize_mobile_session_timeout_minutes(
+            data["settings"].get("mobile_session_timeout_minutes")
+        )
+        data["settings"]["station_session_timeout_minutes"] = _normalize_station_session_timeout_minutes(
+            data["settings"].get("station_session_timeout_minutes")
+        )
         data["settings"].setdefault("anonymous_telemetry_installation_id", "")
         data["settings"].setdefault("anonymous_telemetry_last_heartbeat_date", "")
+        if not isinstance(data.get("user_sessions"), list):
+            data["user_sessions"] = []
+        if not isinstance(data.get("station_registrations"), list):
+            data["station_registrations"] = []
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
             data["settings"].get("keg_type_choices", []),
@@ -2654,6 +2842,7 @@ def inject_runtime_metadata():
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),
         "current_user_release_seen_version": _current_user_release_seen_version(),
+        "station_registered": bool(_registered_station(load_data())),
     }
 
 
@@ -2676,15 +2865,32 @@ def login_view():
 
     if request.method == "POST":
         user_id = str(request.form.get("user_id", "") or "").strip()
+        station_mode = str(request.form.get("station_mode", "") or "").strip().lower() in ("1", "true", "on")
         matched_user = _find_scan_user(data, scan_token) if scan_token else _find_team_user_by_identifier(all_team_users, user_id)
         if matched_user is not None:
             user_id = str(matched_user.get("id", "") or user_id).strip()
         if matched_user is None:
             error = "This scan credential is invalid or revoked." if scan_token else "User not found. Choose a valid team member."
+            _record_team_audit(
+                data,
+                {"id": "anonymous", "name": "Anonymous", "role": "staff"},
+                "login_failed",
+                user_id or "unknown",
+                {"method": "qr_nfc" if scan_token else "manual"},
+            )
+            save_data(data)
         else:
             selected_role = _normalize_team_role(matched_user.get("role", "staff"))
             if _coerce_bool(matched_user.get("disabled"), False):
                 error = "This user account is disabled."
+                _record_team_audit(
+                    data,
+                    matched_user,
+                    "login_failed",
+                    user_id,
+                    {"reason": "disabled", "method": "qr_nfc" if scan_token else "manual"},
+                )
+                save_data(data)
                 return render_template(
                     "login.html",
                     settings=data["settings"],
@@ -2739,11 +2945,25 @@ def login_view():
             session["user_role"] = selected_role
             session["user_name"] = str(matched_user.get("name", session["user_id"]))
             session["last_activity_at"] = time.time()
+            session_id = _create_user_session(
+                data,
+                matched_user,
+                "manual" if not scan_token else "qr_nfc",
+                station_mode=station_mode,
+            )
+            registered_station = _registered_station(data)
+            if registered_station and station_mode:
+                registered_station["last_used_at"] = _session_now_iso()
+            _record_team_audit(data, matched_user, "login", session_id, {
+                "method": "manual" if not scan_token else "qr_nfc",
+                "session_type": "station" if station_mode else "auto",
+                "device_type": "mobile" if _is_mobile_user_agent(request.headers.get("User-Agent", "")) else "desktop",
+            })
             if owner_pin_recovery_required:
                 session["owner_pin_recovery_required"] = True
             if scan_token:
                 _record_team_audit(data, matched_user, "scan_login", str(matched_user.get("id", "")), {"transport": "qr_or_nfc"})
-                save_data(data)
+            save_data(data)
             if owner_pin_recovery_required:
                 return _redirect_to_endpoint("team_access")
             return _redirect_to_endpoint("index")
@@ -2788,6 +3008,19 @@ def scan_login(token: str):
     session["user_role"] = _normalize_team_role(user.get("role", "staff"))
     session["user_name"] = str(user.get("name", session["user_id"]))
     session["last_activity_at"] = time.time()
+    registered_station = _registered_station(data)
+    session_id = _create_user_session(
+        data,
+        user,
+        "qr_nfc",
+        station_mode=bool(registered_station),
+    )
+    if registered_station:
+        registered_station["last_used_at"] = _session_now_iso()
+    _record_team_audit(data, user, "login", session_id, {
+        "method": "qr_nfc",
+        "device_type": "mobile" if _is_mobile_user_agent(request.headers.get("User-Agent", "")) else "desktop",
+    })
     if str(user.get("role", "")).lower() == "owner" and len(active_users) > 1 and not _normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")):
         session["owner_pin_recovery_required"] = True
         _record_team_audit(data, user, "scan_login", session["user_id"], {"transport": "qr_or_nfc", "owner_recovery": True})
@@ -2800,6 +3033,13 @@ def scan_login(token: str):
 
 @app.route("/logout")
 def logout_view():
+    data = load_data()
+    session_id = str(session.get("session_id", "") or "").strip()
+    record = _find_user_session(data, session_id) if session_id else None
+    if record and not record.get("revoked_at"):
+        record["revoked_at"] = _session_now_iso()
+        _record_team_audit(data, _get_current_team_user(), "logout", session_id, {})
+        save_data(data)
     session.clear()
     return _redirect_to_endpoint("login_view")
 
@@ -3356,6 +3596,8 @@ def api_save_settings():
         "brewfather_user_id",
         "brewfather_api_key",
         "audit_retention_days",
+        "mobile_session_timeout_minutes",
+        "station_session_timeout_minutes",
         "anonymous_telemetry_enabled",
     }
     if current_user.get("role") != "owner":
@@ -3392,6 +3634,8 @@ def api_save_settings():
         "external_api_rate_limit_enabled",
         "external_api_rate_limit_per_minute",
         "audit_retention_days",
+        "mobile_session_timeout_minutes",
+        "station_session_timeout_minutes",
         "api_reference_enabled",
         "pour_mode",
         "environment_mode",
@@ -3897,6 +4141,126 @@ def api_get_team_users():
     if current_user.get("role") == "staff":
         users = [user for user in users if user.get("id") == current_user.get("id")]
     return jsonify({"users": [_public_team_user(user) for user in users]})
+
+
+@app.route("/api/team/sessions", methods=["GET", "POST"])
+def api_team_sessions():
+    data = load_data()
+    current_user = _get_current_team_user()
+    current_user_id = str(current_user.get("id", "")).strip().lower()
+    if request.method == "GET":
+        requested_user_id = str(request.args.get("user_id", "") or "").strip()
+        if requested_user_id and requested_user_id.lower() != current_user_id:
+            if not _team_can(current_user.get("role", "staff"), "team_manage"):
+                return jsonify({"error": "Insufficient permissions"}), 403
+        target_user_id = requested_user_id or str(current_user.get("id", "")).strip()
+        sessions = []
+        for record in data.get("user_sessions", []):
+            if str(record.get("user_id", "")).strip().lower() != target_user_id.lower():
+                continue
+            if record.get("revoked_at"):
+                continue
+            sessions.append({
+                "id": record.get("id", ""),
+                "user_id": record.get("user_id", ""),
+                "user_name": record.get("user_name", ""),
+                "login_method": record.get("login_method", ""),
+                "device_type": record.get("device_type", "desktop"),
+                "user_agent": record.get("user_agent", ""),
+                "ip_address": record.get("ip_address", ""),
+                "created_at": record.get("created_at", ""),
+                "last_activity_at": record.get("last_activity_at", ""),
+                "expires_at": record.get("expires_at", ""),
+                "is_current": record.get("id") == session.get("session_id"),
+            })
+        return jsonify({"sessions": sessions})
+
+    if not _team_can(current_user.get("role", "staff"), "team_view"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "")).strip().lower()
+    session_id = str(payload.get("session_id", "")).strip()
+    if action != "revoke" or not session_id:
+        return jsonify({"error": "A session ID is required."}), 400
+    record = _find_user_session(data, session_id)
+    if record is None or record.get("revoked_at"):
+        return jsonify({"error": "Session not found."}), 404
+    if (
+        str(record.get("user_id", "")).strip().lower() != current_user_id
+        and current_user.get("role") not in ("owner", "manager")
+    ):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    record["revoked_at"] = _session_now_iso()
+    _record_team_audit(data, current_user, "session_revoked", session_id, {
+        "user_id": record.get("user_id", ""),
+        "device_type": record.get("device_type", "desktop"),
+    })
+    save_data(data)
+    return jsonify({"ok": True, "session_id": session_id})
+
+
+@app.route("/api/team/stations", methods=["GET", "POST"])
+def api_team_stations():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "staff"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    if request.method == "GET":
+        stations = [
+            {
+                "id": station.get("id", ""),
+                "name": station.get("name", ""),
+                "created_at": station.get("created_at", ""),
+                "last_used_at": station.get("last_used_at", ""),
+                "revoked_at": station.get("revoked_at", ""),
+            }
+            for station in data.get("station_registrations", [])
+            if not station.get("revoked_at")
+        ]
+        return jsonify({"stations": stations})
+
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "register")).strip().lower()
+    if action == "revoke":
+        station_id = str(payload.get("station_id", "")).strip()
+        station = next(
+            (item for item in data.get("station_registrations", []) if item.get("id") == station_id),
+            None,
+        )
+        if station is None or station.get("revoked_at"):
+            return jsonify({"error": "Station registration not found."}), 404
+        current_station = _registered_station(data)
+        station["revoked_at"] = _session_now_iso()
+        _record_team_audit(data, current_user, "station_revoked", station_id, {"name": station.get("name", "")})
+        save_data(data)
+        response = jsonify({"ok": True, "station_id": station_id})
+        if current_station and current_station.get("id") == station_id:
+            response.delete_cookie("bartender_station_token")
+        return response
+
+    name = str(payload.get("name", "")).strip()[:80]
+    if not name:
+        return jsonify({"error": "Station name is required."}), 400
+    token = secrets.token_urlsafe(32)
+    station = {
+        "id": f"station-{secrets.token_urlsafe(10)}",
+        "name": name,
+        "token_hash": _station_token_hash(token),
+        "created_by": str(current_user.get("id", "")),
+        "created_at": _session_now_iso(),
+        "last_used_at": "",
+        "revoked_at": "",
+    }
+    data.setdefault("station_registrations", []).append(station)
+    _record_team_audit(data, current_user, "station_registered", station["id"], {"name": name})
+    save_data(data)
+    response = jsonify({
+        "ok": True,
+        "station": {key: station[key] for key in ("id", "name", "created_at", "last_used_at")},
+    })
+    response.set_cookie("bartender_station_token", token, max_age=31536000, httponly=True, samesite="Lax")
+    return response
 
 
 @app.route("/api/team/users", methods=["POST"])

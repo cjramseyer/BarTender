@@ -41,6 +41,12 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
 
+### POS Sync Providers
+
+Built-in providers: Arryved, Clover, Lightspeed, MOCK (testing/sandbox), Square,
+and Toast. Custom static providers can also be configured from **Settings -> POS
+Sync**. The selected provider is displayed in the Settings About panel.
+
 ## Features
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
@@ -134,8 +140,25 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 
 Most BarTender settings are managed from within the web UI after the add-on starts.
 The add-on configuration includes `session_timeout_minutes`, which controls the idle
-timeout for signed-in browser sessions. It defaults to 480 minutes (8 hours), accepts
-values from 5 minutes to 30 days, and takes effect after restarting the add-on.
+timeout for signed-in browser sessions. It defaults to 240 minutes (4 hours), accepts
+values from 5 minutes to 240 minutes, and takes effect after restarting the add-on.
+The Settings UI also provides separate mobile and pour-station session timeouts. Both
+default to 30 minutes and cannot exceed the global timeout. Staff can select pour
+station mode at login. Session and device
+metadata are retained for up to 90 days after termination and include limited
+user-agent and IP information for access management.
+
+## Browser Support
+
+BarTender is intended for modern browsers. Supported baseline versions are Chrome 60+,
+Firefox 54+, Safari 11+, iOS/iPadOS Safari 11+, Chromium-based Edge 79+, Android
+Chrome/WebView 67+, and Samsung Internet 8+.
+
+Internet Explorer 11, Edge Legacy, Safari 10 and older, iOS 10 and older, and old
+embedded Android WebViews are not supported. Station registration requires cookies;
+copy buttons generally require HTTPS or localhost; and QR credential printing may be
+blocked by popup settings. NFC writing is handled by device-supported tools rather
+than by the browser UI.
 
 ## Core Usage Flows
 

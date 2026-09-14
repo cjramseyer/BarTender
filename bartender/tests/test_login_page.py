@@ -87,6 +87,25 @@ def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
     assert 'id="updateNoticeModal"' in page
 
 
+def test_pro_profile_shows_title_bar_indicator(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'title="Pro bar profile is active"' in page
+    assert "Pro" in page
+
+
 def test_team_access_renders_scan_credential_modal(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -174,6 +193,126 @@ def test_authenticated_session_expires_after_idle_timeout(tmp_path):
     assert response.headers["Location"].startswith("/login")
     with client.session_transaction() as session:
         assert "user_id" not in session
+
+
+def test_authenticated_session_is_listed_and_can_be_revoked(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/api/team/sessions", headers={"User-Agent": "Mozilla/5.0"})
+
+    assert response.status_code == 200
+    sessions = response.get_json()["sessions"]
+    assert len(sessions) == 1
+    assert sessions[0]["is_current"] is True
+    session_id = sessions[0]["id"]
+
+    revoked = client.post(
+        "/api/team/sessions",
+        json={"action": "revoke", "session_id": session_id},
+    )
+
+    assert revoked.status_code == 200
+    rejected = client.get("/api/team/sessions")
+    assert rejected.status_code == 401
+
+
+def test_mobile_session_uses_configured_shorter_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["mobile_session_timeout_minutes"] = 30
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get(
+        "/api/team/sessions",
+        headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile"},
+    )
+
+    assert response.status_code == 200
+    session_record = response.get_json()["sessions"][0]
+    assert session_record["device_type"] == "mobile"
+    stored = app_module.load_data()["user_sessions"][0]
+    assert stored["timeout_minutes"] == 30
+
+
+def test_station_login_uses_station_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/login",
+        data={"user_id": "owner", "station_mode": "1"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    sessions = app_module.load_data()["user_sessions"]
+    assert sessions[-1]["session_type"] == "station"
+    assert sessions[-1]["timeout_minutes"] == 30
+
+
+def test_station_registration_persists_for_future_logins_and_can_be_revoked(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    registered = client.post(
+        "/api/team/stations",
+        json={"name": "Main Pour Station"},
+    )
+
+    assert registered.status_code == 200
+    station = registered.get_json()["station"]
+    assert station["name"] == "Main Pour Station"
+    assert app_module.load_data()["station_registrations"][0]["token_hash"]
+
+    login_page = client.get("/login")
+    login_body = login_page.get_data(as_text=True)
+    assert 'name="station_mode"' in login_body
+    assert 'value="1"' in login_body
+    assert "checked" in login_body
+
+    revoked = client.post(
+        "/api/team/stations",
+        json={"action": "revoke", "station_id": station["id"]},
+    )
+
+    assert revoked.status_code == 200
+    assert 'name="station_mode" value="1" checked' not in client.get("/login").get_data(as_text=True)
+
+
+def test_session_timeout_settings_are_clamped_to_global_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post(
+        "/api/settings",
+        json={
+            "mobile_session_timeout_minutes": 999,
+            "station_session_timeout_minutes": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    settings = app_module.load_data()["settings"]
+    assert settings["mobile_session_timeout_minutes"] == 240
+    assert settings["station_session_timeout_minutes"] == 5
 
 
 def test_user_scan_credential_logs_in_and_can_be_revoked(tmp_path):
@@ -497,6 +636,7 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     data = app_module.load_data()
     data["settings"]["brewery_type"] = "homebrewer"
     data["settings"]["display_count"] = 2
+    data["settings"]["pos_sync_provider"] = "square"
     app_module.save_data(data)
 
     with client.session_transaction() as session:
@@ -510,6 +650,8 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     body = response.get_data(as_text=True)
     assert "App Version" in body
     assert f"v{app_module.APP_VERSION}" in body
+    assert "POS Sync Provider" in body
+    assert "Square" in body
     assert "Number of Displays" in body
     assert "Homebrewer installs default to 2 displays." in body
     assert "Basic settings save automatically." in body

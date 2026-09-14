@@ -35,6 +35,21 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
 
+### POS Sync Providers
+
+The built-in POS sync provider catalog currently includes:
+
+- Arryved
+- Clover
+- Lightspeed
+- MOCK (testing and sandbox use)
+- Square
+- Toast
+
+Custom static providers can also be configured from **Settings -> POS Sync** when
+the built-in providers do not cover the installation's POS system. The currently
+selected provider is shown in the Settings About panel.
+
 ## Features
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
@@ -93,13 +108,60 @@ Most BarTender settings are managed from within the web UI after the add-on star
 The add-on configuration also provides:
 
 - `session_timeout_minutes`: idle timeout for signed-in browser sessions. The default is
-  `480` minutes (8 hours); valid values range from 5 minutes to 30 days. Change this
+  `240` minutes (4 hours); valid values range from 5 minutes to 240 minutes. Change this
   under the add-on's **Configuration** tab and restart the add-on for the new value to
   take effect.
 
 Sessions are signed with a secret persisted in `/data/.secret_key`, so normal add-on
 restarts do not invalidate active sessions. Removing the add-on's stored data or
 changing an explicitly supplied `SECRET_KEY` invalidates existing sessions.
+
+The Settings UI provides separate mobile and pour-station idle timeouts. Both default
+to 30 minutes and accept values from 5 minutes through the global timeout. A user can
+choose **Use this device as a pour station** at login; station sessions use the station
+timeout while retaining the normal application permissions.
+
+BarTender records active browser sessions with the signed-in user, login method,
+device category, user-agent, IP address, login time, last activity, expiration, and
+revocation state. Session records are retained for up to 90 days after expiration or
+revocation and are limited to the most recent 500 records. Device classification uses
+conservative user-agent matching; BarTender does not use invasive browser fingerprinting.
+IP addresses and user-agent strings are operational security data and should be handled
+according to the operator's privacy and retention requirements.
+
+## Browser Support
+
+BarTender is intended for modern browsers. The practical supported baseline is:
+
+| Browser                | Minimum version | Approximate release age |
+| ---------------------- | --------------: | ----------------------: |
+| Chrome                 |     60 or newer |           About 9 years |
+| Firefox                |     54 or newer |           About 9 years |
+| Safari on macOS        |     11 or newer |           About 9 years |
+| Safari on iOS/iPadOS   |     11 or newer |           About 9 years |
+| Chromium-based Edge    |     79 or newer |         About 6.5 years |
+| Android Chrome/WebView |     67 or newer |           About 8 years |
+| Samsung Internet       |      8 or newer |           About 8 years |
+
+Internet Explorer 11, Edge Legacy, Safari 10 and older, iOS 10 and older, and old
+embedded Android WebViews are not supported. Very old browsers may fail to load the
+application because it uses `fetch`, Promises, `async`/`await`, modern DOM APIs,
+template literals, and `CSS.escape`.
+
+Some features have additional browser requirements:
+
+- Station registration requires cookies. Private browsing, blocked cookies, or a
+  separate browser profile will not retain a station registration.
+- Copy buttons use the Clipboard API, which generally requires HTTPS or localhost
+  and may be blocked by embedded WebViews or browser permissions.
+- Printing QR/NFC credentials opens a popup, so popup blocking can prevent the print
+  window from opening.
+- QR generation requires the server-side QR dependency; it does not depend on the
+  browser's QR scanner.
+- NFC writing is not performed by BarTender's browser UI. The generated login URL
+  must be copied or written using device-supported NFC tools.
+- Mobile session classification uses the browser user-agent and may be affected by
+  tablet or "request desktop site" modes.
 
 ## Core Usage Flows
 
