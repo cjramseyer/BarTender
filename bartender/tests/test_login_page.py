@@ -33,6 +33,26 @@ def test_login_page_redirects_when_not_authenticated(tmp_path):
     assert response.headers["Location"].startswith("/login")
 
 
+def test_first_time_setup_can_save_without_authentication(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.app.config["TESTING"] = False
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/api/settings",
+        json={
+            "bar_name": "New Bar",
+            "measurement": "us",
+            "theme": "light",
+            "brewery_type": "homebrewer",
+            "setup_completed": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert app_module.load_data()["settings"]["setup_completed"] is True
+
+
 def test_cors_allows_only_configured_origins(tmp_path, monkeypatch):
     monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "http://127.0.0.1:5055, https://mobile.example")
     app_module = _load_app_module(tmp_path)
