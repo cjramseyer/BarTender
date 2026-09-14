@@ -1,7 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Team Access{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Team Access{% endblock %} {% block
+content %}
 <div class="page-header">
   <div>
     <p class="eyebrow">Users</p>
@@ -10,12 +8,15 @@
 </div>
 
 {% if owner_pin_recovery_required %}
-<div class="card settings-card settings-warning-block" style="margin-bottom: 1rem">
+<div
+  class="card settings-card settings-warning-block"
+  style="margin-bottom: 1rem"
+>
   <div class="settings-collapsible-body">
     <label>Owner Recovery Mode</label>
     <p class="muted" style="margin-top: 0.35rem">
       This installation has multiple team members but no owner PIN yet.
-      Save an Owner PIN here to unlock the rest of the app.
+      <span>Save an Owner PIN here</span> to unlock the rest of the app.
     </p>
     <p class="muted" style="margin-top: 0.25rem">
       Team management actions stay locked until the Owner PIN is saved.
@@ -45,7 +46,9 @@
           Save Owner Name
         </button>
       </div>
-      <small class="muted">This is the display name shown for the owner account.</small>
+      <small class="muted"
+        >This is the display name shown for the owner account.</small
+      >
     </div>
     <div class="form-group">
       <label>Owner PIN</label>
@@ -58,10 +61,13 @@
         autocomplete="new-password"
       />
       <small class="muted">
-        Require this PIN for the owner login when there is more than one team member.
-        Leave blank if you want only the single-owner setup.
+        Require this PIN for the owner login when there is more than one team
+        member. Leave blank if you want only the single-owner setup.
       </small>
-      <div class="form-row" style="gap: 0.5rem; align-items: center; margin-top: 0.75rem">
+      <div
+        class="form-row"
+        style="gap: 0.5rem; align-items: center; margin-top: 0.75rem"
+      >
         <button
           type="button"
           class="btn btn-secondary btn-sm"
@@ -79,7 +85,11 @@
         Save the Owner PIN above before adding or changing team members.
       </small>
       {% endif %}
-      <div id="teamUsersList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <div
+        id="teamUsersList"
+        class="stack-gap-sm"
+        style="margin-top: 8px"
+      ></div>
     </div>
     <div class="form-group">
       <label>Invite User</label>
@@ -117,7 +127,8 @@
         </button>
       </div>
       <small class="muted">
-        Owners and managers can manage users. Staff access is restricted to their own account.
+        Owners and managers can manage users. Staff access is restricted to
+        their own account.
       </small>
     </div>
   </div>
@@ -126,8 +137,52 @@
   <div class="settings-collapsible-body">
     <div class="form-group">
       <label>Active Sessions</label>
-      <small class="muted">Review signed-in browsers and revoke access for an individual session.</small>
-      <div id="userSessionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <small class="muted"
+        >Review signed-in browsers and revoke access for an individual
+        session.</small
+      >
+      <div
+        id="userSessionsList"
+        class="stack-gap-sm"
+        style="margin-top: 8px"
+      ></div>
+    </div>
+  </div>
+</div>
+<div class="card settings-card settings-team-card">
+  <div class="settings-collapsible-body">
+    <div class="form-group">
+      <label>Registered Pour Stations</label>
+      <small class="muted"
+        >Register this browser once to preselect pour-station mode on future
+        logins.</small
+      >
+      <div
+        class="form-row"
+        style="gap: 0.5rem; align-items: end; margin-top: 0.75rem"
+      >
+        <div class="form-group" style="flex: 1; min-width: 180px">
+          <input
+            type="text"
+            id="stationName"
+            class="form-control"
+            placeholder="Station name"
+          />
+        </div>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          onclick="registerStation()"
+        >
+          Register This Station
+        </button>
+      </div>
+      <span id="stationRegistrationMsg" class="save-msg"></span>
+      <div
+        id="registeredStationsList"
+        class="stack-gap-sm"
+        style="margin-top: 8px"
+      ></div>
     </div>
   </div>
 </div>
@@ -135,18 +190,30 @@
   <div class="modal-dialog modal-dialog-lg">
     <div class="modal-header">
       <h3 id="scanCredentialTitle">QR / NFC Credential</h3>
-      <button class="btn btn-icon" onclick="closeModal('scanCredentialModal')">✕</button>
+      <button class="btn btn-icon" onclick="closeModal('scanCredentialModal')">
+        ✕
+      </button>
     </div>
     <div id="scanCredentialBody" class="stack-gap-sm"></div>
     <div class="modal-footer">
-      <button type="button" class="btn" onclick="closeModal('scanCredentialModal')">Close</button>
-      <button type="button" class="btn btn-secondary" onclick="printScanCredential()">Print Badge</button>
+      <button
+        type="button"
+        class="btn"
+        onclick="closeModal('scanCredentialModal')"
+      >
+        Close
+      </button>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        onclick="printScanCredential()"
+      >
+        Print Badge
+      </button>
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
   let TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
@@ -301,6 +368,66 @@
       console.error(err);
       alert(err.message || "Unable to revoke session.");
     }
+  }
+
+  async function refreshRegisteredStations() {
+    const list = document.getElementById("registeredStationsList");
+    if (!list) return;
+    const response = await fetch(`${INGRESS}/api/team/stations`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      list.innerHTML = `<p class="muted">${escapeSessionText(body.error || "Unable to load stations.")}</p>`;
+      return;
+    }
+    const stations = Array.isArray(body.stations) ? body.stations : [];
+    list.innerHTML = stations.length
+      ? stations.map((station) => `
+          <div class="settings-user-row" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
+            <div><strong>${escapeSessionText(station.name)}</strong><div class="muted" style="font-size:0.8rem;">Last used: ${escapeSessionText(station.last_used_at || "Never")}</div></div>
+            <button type="button" class="btn btn-danger btn-sm" data-station-id="${escapeSessionText(station.id)}" onclick="revokeStation(this)">Revoke</button>
+          </div>`).join("")
+      : '<p class="muted">No registered stations.</p>';
+  }
+
+  async function registerStation() {
+    const nameInput = document.getElementById("stationName");
+    const message = document.getElementById("stationRegistrationMsg");
+    const name = nameInput ? nameInput.value.trim() : "";
+    if (!name) {
+      if (message) message.textContent = "Station name is required.";
+      return;
+    }
+    try {
+      const response = await fetch(`${INGRESS}/api/team/stations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Unable to register station.");
+      nameInput.value = "";
+      if (message) message.textContent = "✓ This browser is registered as a pour station.";
+      await refreshRegisteredStations();
+    } catch (err) {
+      console.error(err);
+      if (message) message.textContent = err.message || "Unable to register station.";
+    }
+  }
+
+  async function revokeStation(button) {
+    const stationId = button.dataset.stationId;
+    if (!stationId || !window.confirm("Revoke this station registration?")) return;
+    const response = await fetch(`${INGRESS}/api/team/stations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "revoke", station_id: stationId }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(body.error || "Unable to revoke station.");
+      return;
+    }
+    await refreshRegisteredStations();
   }
 
   let activeScanCredential = null;
@@ -571,5 +698,6 @@
 
   renderTeamUsers(TEAM_USERS || []);
   refreshUserSessions();
+  refreshRegisteredStations();
 </script>
 {% endblock %}

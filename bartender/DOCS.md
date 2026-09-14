@@ -129,6 +129,40 @@ conservative user-agent matching; BarTender does not use invasive browser finger
 IP addresses and user-agent strings are operational security data and should be handled
 according to the operator's privacy and retention requirements.
 
+## Browser Support
+
+BarTender is intended for modern browsers. The practical supported baseline is:
+
+| Browser                | Minimum version | Approximate release age |
+| ---------------------- | --------------: | ----------------------: |
+| Chrome                 |     60 or newer |           About 9 years |
+| Firefox                |     54 or newer |           About 9 years |
+| Safari on macOS        |     11 or newer |           About 9 years |
+| Safari on iOS/iPadOS   |     11 or newer |           About 9 years |
+| Chromium-based Edge    |     79 or newer |         About 6.5 years |
+| Android Chrome/WebView |     67 or newer |           About 8 years |
+| Samsung Internet       |      8 or newer |           About 8 years |
+
+Internet Explorer 11, Edge Legacy, Safari 10 and older, iOS 10 and older, and old
+embedded Android WebViews are not supported. Very old browsers may fail to load the
+application because it uses `fetch`, Promises, `async`/`await`, modern DOM APIs,
+template literals, and `CSS.escape`.
+
+Some features have additional browser requirements:
+
+- Station registration requires cookies. Private browsing, blocked cookies, or a
+  separate browser profile will not retain a station registration.
+- Copy buttons use the Clipboard API, which generally requires HTTPS or localhost
+  and may be blocked by embedded WebViews or browser permissions.
+- Printing QR/NFC credentials opens a popup, so popup blocking can prevent the print
+  window from opening.
+- QR generation requires the server-side QR dependency; it does not depend on the
+  browser's QR scanner.
+- NFC writing is not performed by BarTender's browser UI. The generated login URL
+  must be copied or written using device-supported NFC tools.
+- Mobile session classification uses the browser user-agent and may be affected by
+  tablet or "request desktop site" modes.
+
 ## Core Usage Flows
 
 ### Kegs

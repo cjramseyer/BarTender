@@ -15,16 +15,24 @@
     <form method="post" action="{{ ingress }}/login" class="auth-form">
       {% if scan_token %}
       <input type="hidden" name="scan_token" value="{{ scan_token }}" />
-      <p class="muted">Scan credential recognized. Enter any required PIN to continue.</p>
+      <p class="muted">
+        Scan credential recognized. Enter any required PIN to continue.
+      </p>
       {% endif %}
       <div class="form-group">
         <label for="user_id">Team member</label>
         <select id="user_id" name="user_id" class="form-control" required>
           <option value="">Select a user...</option>
           {% for user in users %}
-          <option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>
+          {% if selected_user_id == user.id %}
+          <option value="{{ user.id }}" selected>
             {{ user.name }} ({{ user.role }}{% if user.disabled %}, disabled{% endif %})
           </option>
+          {% else %}
+          <option value="{{ user.id }}">
+            {{ user.name }} ({{ user.role }}{% if user.disabled %}, disabled{% endif %})
+          </option>
+          {% endif %}
           {% endfor %}
         </select>
       </div>
@@ -40,7 +48,16 @@
         />
       </div>
       <label class="nav-menu-checkbox">
+        {% if station_registered %}
+        <input
+          type="checkbox"
+          name="station_mode"
+          value="1"
+          checked
+        />
+        {% else %}
         <input type="checkbox" name="station_mode" value="1" />
+        {% endif %}
         Use this device as a pour station
       </label>
       <button type="submit" class="btn btn-primary btn-block">Sign in</button>
@@ -49,9 +66,13 @@
     <div class="auth-footer">
       <p class="muted">Only configured team members can access the app.</p>
       {% if scan_token %}
-      <p class="muted">Scan not working? <a href="{{ ingress }}/login">Use manual sign-in</a>.</p>
+      <p class="muted">
+        Scan not working? <a href="{{ ingress }}/login">Use manual sign-in</a>.
+      </p>
       {% else %}
-      <p class="muted">QR/NFC unavailable? Manual sign-in is always available.</p>
+      <p class="muted">
+        QR/NFC unavailable? Manual sign-in is always available.
+      </p>
       {% endif %}
     </div>
   </div>

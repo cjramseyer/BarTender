@@ -260,6 +260,39 @@ def test_station_login_uses_station_timeout(tmp_path):
     assert sessions[-1]["timeout_minutes"] == 30
 
 
+def test_station_registration_persists_for_future_logins_and_can_be_revoked(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    registered = client.post(
+        "/api/team/stations",
+        json={"name": "Main Pour Station"},
+    )
+
+    assert registered.status_code == 200
+    station = registered.get_json()["station"]
+    assert station["name"] == "Main Pour Station"
+    assert app_module.load_data()["station_registrations"][0]["token_hash"]
+
+    login_page = client.get("/login")
+    login_body = login_page.get_data(as_text=True)
+    assert 'name="station_mode"' in login_body
+    assert 'value="1"' in login_body
+    assert "checked" in login_body
+
+    revoked = client.post(
+        "/api/team/stations",
+        json={"action": "revoke", "station_id": station["id"]},
+    )
+
+    assert revoked.status_code == 200
+    assert 'name="station_mode" value="1" checked' not in client.get("/login").get_data(as_text=True)
+
+
 def test_session_timeout_settings_are_clamped_to_global_timeout(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

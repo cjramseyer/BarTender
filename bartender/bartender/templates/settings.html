@@ -60,7 +60,12 @@ content %}
             <div class="radio-group">
               <label class="radio-label">
                 {% if (settings.brewery_type or 'homebrewer') == 'homebrewer' %}
-                <input type="radio" name="brewery_type" value="homebrewer" checked />
+                <input
+                  type="radio"
+                  name="brewery_type"
+                  value="homebrewer"
+                  checked
+                />
                 {% else %}
                 <input type="radio" name="brewery_type" value="homebrewer" />
                 {% endif %} Homebrewer
@@ -73,7 +78,11 @@ content %}
                 {% endif %} Pro
               </label>
             </div>
-            <small class="muted">Homebrewer installs default to 2 displays and manual pour tracking. Switch to Pro to unlock multiple displays, POS integration, and higher capacity.</small>
+            <small class="muted"
+              >Homebrewer installs default to 2 displays and manual pour
+              tracking. Switch to Pro to unlock multiple displays, POS
+              integration, and higher capacity.</small
+            >
           </div>
           <div class="form-group">
             <label>Bar Logo URL (optional)</label>
@@ -153,7 +162,9 @@ content %}
             >
           </div>
           <div class="form-group">
-            <label for="mobileSessionTimeoutMinutes">Mobile Session Timeout (minutes)</label>
+            <label for="mobileSessionTimeoutMinutes"
+              >Mobile Session Timeout (minutes)</label
+            >
             <input
               type="number"
               id="mobileSessionTimeoutMinutes"
@@ -164,11 +175,14 @@ content %}
               value="{{ settings.mobile_session_timeout_minutes or 30 }}"
             />
             <small class="muted"
-              >Mobile sessions use this shorter idle timeout. The value cannot exceed the global add-on timeout.</small
+              >Mobile sessions use this shorter idle timeout. The value cannot
+              exceed the global add-on timeout.</small
             >
           </div>
           <div class="form-group">
-            <label for="stationSessionTimeoutMinutes">Station Session Timeout (minutes)</label>
+            <label for="stationSessionTimeoutMinutes"
+              >Station Session Timeout (minutes)</label
+            >
             <input
               type="number"
               id="stationSessionTimeoutMinutes"
@@ -179,7 +193,8 @@ content %}
               value="{{ settings.station_session_timeout_minutes or 30 }}"
             />
             <small class="muted"
-              >Pour-station sessions use this idle timeout. The value cannot exceed the global add-on timeout.</small
+              >Pour-station sessions use this idle timeout. The value cannot
+              exceed the global add-on timeout.</small
             >
           </div>
           {% if qr_ready %}
@@ -281,7 +296,9 @@ content %}
             </div>
           </div>
           <div class="form-group">
-            <label for="displayTitleOnTap">Display Title for “What’s on Tap”</label>
+            <label for="displayTitleOnTap"
+              >Display Title for “What’s on Tap”</label
+            >
             <input
               id="displayTitleOnTap"
               type="text"
@@ -289,7 +306,9 @@ content %}
               value="{{ settings.display_title_on_tap or 'On Draft' }}"
               maxlength="80"
             />
-            <small class="muted">Defaults to “On Draft” and appears on the display page.</small>
+            <small class="muted"
+              >Defaults to “On Draft” and appears on the display page.</small
+            >
           </div>
           <div class="form-group">
             <label class="radio-label">
@@ -300,39 +319,63 @@ content %}
               {% endif %} Full-Width Display Layout
             </label>
             <small class="muted"
-              >When enabled, the display view expands across 100% of the screen/browser width instead of centering within a fixed container.</small
+              >When enabled, the display view expands across 100% of the
+              screen/browser width instead of centering within a fixed
+              container.</small
             >
           </div>
           <div class="form-group" id="proDisplaySettings">
             <label for="displayCount">Number of Displays</label>
+            {% if (settings.brewery_type or 'homebrewer') != 'pro' %}
             <input
               id="displayCount"
               type="number"
               min="1"
               max="12"
               class="form-control"
-              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}disabled{% endif %}
+              disabled
               value="{{ settings.display_count or 2 }}"
             />
-            <small
-              id="displayCountProNote"
-              class="muted"
-              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}hidden{% endif %}
-              >Choose how many display boards this installation should serve.</small
+            {% else %}
+            <input
+              id="displayCount"
+              type="number"
+              min="1"
+              max="12"
+              class="form-control"
+              value="{{ settings.display_count or 2 }}"
+            />
+            {% endif %} {% if (settings.brewery_type or 'homebrewer') != 'pro'
+            %}
+            <small id="displayCountProNote" class="muted" hidden
+              >Choose how many display boards this installation should
+              serve.</small
             >
-            <small
-              id="displayCountHomebrewerNote"
-              class="muted"
-              {% if (settings.brewery_type or 'homebrewer') == 'pro' %}hidden{% endif %}
-            >
-              Homebrewer installs default to 2 displays. Switch Bar Profile to Pro to enable multiple displays.
+            <small id="displayCountHomebrewerNote" class="muted">
+              Homebrewer installs default to 2 displays. Switch Bar Profile to
+              Pro to enable multiple displays.
             </small>
             <div
               id="displayTapAssignments"
               class="stack-gap-sm"
-              style="margin-top: 0.75rem;"
-              {% if (settings.brewery_type or 'homebrewer') != 'pro' %}hidden{% endif %}
+              style="margin-top: 0.75rem"
+              hidden
             ></div>
+            {% else %}
+            <small id="displayCountProNote" class="muted"
+              >Choose how many display boards this installation should
+              serve.</small
+            >
+            <small id="displayCountHomebrewerNote" class="muted" hidden>
+              Homebrewer installs default to 2 displays. Switch Bar Profile to
+              Pro to enable multiple displays.
+            </small>
+            <div
+              id="displayTapAssignments"
+              class="stack-gap-sm"
+              style="margin-top: 0.75rem"
+            ></div>
+            {% endif %}
           </div>
           <div class="form-group">
             <label>Dashboard Manage Button Position</label>
@@ -475,13 +518,12 @@ content %}
               <option value="manual" selected>Manual</option>
               {% else %}
               <option value="manual">Manual</option>
-              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
-                {% if (settings.pour_mode or 'manual') == 'pos' %}
-                <option value="pos" selected>POS (API)</option>
-                {% else %}
-                <option value="pos">POS (API)</option>
-                {% endif %}
-              {% endif %} {% if (settings.pour_mode or 'manual') ==
+              {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro'
+              %} {% if (settings.pour_mode or 'manual') == 'pos' %}
+              <option value="pos" selected>POS (API)</option>
+              {% else %}
+              <option value="pos">POS (API)</option>
+              {% endif %} {% endif %} {% if (settings.pour_mode or 'manual') ==
               'inline_device' %}
               <option value="inline_device" selected>Inline Device</option>
               {% else %}
@@ -489,23 +531,28 @@ content %}
               {% endif %}
             </select>
             <small class="muted"
-              >POS mode is only available for Pro setups. Inline Device is available for both modes. Non-manual modes hide the pour button in the UI.</small
+              >POS mode is only available for Pro setups. Inline Device is
+              available for both modes. Non-manual modes hide the pour button in
+              the UI.</small
             >
           </div>
-          {% if (settings.brewery_type or 'homebrewer') == 'pro' and (settings.pour_mode or 'manual') == 'pos' %}
+          {% if (settings.brewery_type or 'homebrewer') == 'pro' and
+          (settings.pour_mode or 'manual') == 'pos' %}
           <div class="form-group">
             <label>Common POS System</label>
             <select id="posSystem" class="form-control">
               <option value="">Select an option</option>
-              {% for option in ["Square", "Toast", "Clover", "Lightspeed", "Arryved", "Shopify POS", "Aloha", "Barmetrix", "Other"] %}
-                {% if (settings.pos_system or '') == option %}
-                <option value="{{ option }}" selected>{{ option }}</option>
-                {% else %}
-                <option value="{{ option }}">{{ option }}</option>
-                {% endif %}
-              {% endfor %}
+              {% for option in ["Square", "Toast", "Clover", "Lightspeed",
+              "Arryved", "Shopify POS", "Aloha", "Barmetrix", "Other"] %} {% if
+              (settings.pos_system or '') == option %}
+              <option value="{{ option }}" selected>{{ option }}</option>
+              {% else %}
+              <option value="{{ option }}">{{ option }}</option>
+              {% endif %} {% endfor %}
             </select>
-            <small class="muted">Choose the common POS provider used by this Pro setup.</small>
+            <small class="muted"
+              >Choose the common POS provider used by this Pro setup.</small
+            >
           </div>
           {% endif %}
           <div class="form-group">
@@ -549,20 +596,22 @@ content %}
               {% endif %} Enable POS Sync
             </label>
             <small class="muted"
-              >Keeps tap/menu mapping data in sync with an external provider.</small
+              >Keeps tap/menu mapping data in sync with an external
+              provider.</small
             >
           </div>
           <div class="form-group">
             <label>POS Sync Provider</label>
             <select id="posSyncProvider" class="form-control">
               <option value="">Select provider</option>
-              {% for provider in pos_sync_provider_catalog %}
-                {% if (settings.pos_sync_provider or '') == provider.key %}
-                <option value="{{ provider.key }}" selected>{{ provider.name }}</option>
-                {% else %}
-                <option value="{{ provider.key }}">{{ provider.name }}</option>
-                {% endif %}
-              {% endfor %}
+              {% for provider in pos_sync_provider_catalog %} {% if
+              (settings.pos_sync_provider or '') == provider.key %}
+              <option value="{{ provider.key }}" selected>
+                {{ provider.name }}
+              </option>
+              {% else %}
+              <option value="{{ provider.key }}">{{ provider.name }}</option>
+              {% endif %} {% endfor %}
             </select>
             <small class="muted"
               >Mock provider is available as a sandbox proof-of-concept.</small
@@ -620,9 +669,12 @@ content %}
               class="form-control"
               rows="5"
               placeholder='{"static_taps":[{"number":1,"label":"Tap 1","item_name":"IPA","serving_size":"16 oz","price_label":"$6.00","available":true}]}'
-            >{{ settings.pos_sync_provider_config_json or '' }}</textarea>
+            >
+{{ settings.pos_sync_provider_config_json or '' }}</textarea>
             <small class="muted"
-              >Optional when adding providers. Required only when the selected provider needs runtime config and sync is enabled or Sync Now is used.</small
+              >Optional when adding providers. Required only when the selected
+              provider needs runtime config and sync is enabled or Sync Now is
+              used.</small
             >
           </div>
           <div class="form-group">
@@ -666,21 +718,33 @@ content %}
           <div class="form-group">
             <label>Sync Status</label>
             <p class="muted" style="margin-top: 0.35rem">
-              Last Result: <strong id="posSyncLastStatus">{{ settings.pos_sync_last_status or 'never' }}</strong>
+              Last Result:
+              <strong id="posSyncLastStatus"
+                >{{ settings.pos_sync_last_status or 'never' }}</strong
+              >
             </p>
             <p class="muted" style="margin-top: 0.25rem">
-              Last Run: <span id="posSyncLastRunAt">{{ settings.pos_sync_last_run_at or 'Never' }}</span>
+              Last Run:
+              <span id="posSyncLastRunAt"
+                >{{ settings.pos_sync_last_run_at or 'Never' }}</span
+              >
             </p>
             <p class="muted" style="margin-top: 0.25rem">
               Last Counts:
               <span id="posSyncLastCounts">
-                items={{ (settings.pos_sync_last_counts.items_received if settings.pos_sync_last_counts is defined else 0) or 0 }},
-                updated={{ (settings.pos_sync_last_counts.taps_updated if settings.pos_sync_last_counts is defined else 0) or 0 }},
-                created={{ (settings.pos_sync_last_counts.taps_created if settings.pos_sync_last_counts is defined else 0) or 0 }}
+                items={{ (settings.pos_sync_last_counts.items_received if
+                settings.pos_sync_last_counts is defined else 0) or 0 }},
+                updated={{ (settings.pos_sync_last_counts.taps_updated if
+                settings.pos_sync_last_counts is defined else 0) or 0 }},
+                created={{ (settings.pos_sync_last_counts.taps_created if
+                settings.pos_sync_last_counts is defined else 0) or 0 }}
               </span>
             </p>
             <p class="muted" style="margin-top: 0.25rem">
-              Last Error: <span id="posSyncLastError">{{ settings.pos_sync_last_error or 'None' }}</span>
+              Last Error:
+              <span id="posSyncLastError"
+                >{{ settings.pos_sync_last_error or 'None' }}</span
+              >
             </p>
           </div>
           <details class="settings-collapsible">
@@ -688,7 +752,8 @@ content %}
             <div class="settings-collapsible-body">
               <div id="posProviderCatalogList" class="stack-gap-sm"></div>
               <small class="muted"
-                >Reference list of built-in and custom providers. It updates when a provider is added or imported.</small
+                >Reference list of built-in and custom providers. It updates
+                when a provider is added or imported.</small
               >
             </div>
           </details>
@@ -700,30 +765,76 @@ content %}
         <div class="settings-collapsible-body">
           <div class="form-group">
             <label class="radio-label">
-              <input type="checkbox" id="brewfatherEnabled" {% if settings.brewfather_enabled %}checked{% endif %} />
+              <input
+                type="checkbox"
+                id="brewfatherEnabled"
+                {%
+                if
+                settings.brewfather_enabled
+                %}checked{%
+                endif
+                %}
+              />
               Enable read-only Brewfather sync
             </label>
-            <small class="muted">Only recipes and batches are imported. BarTender remains responsible for keg and pour operations.</small>
+            <small class="muted"
+              >Only recipes and batches are imported. BarTender remains
+              responsible for keg and pour operations.</small
+            >
           </div>
           <div class="form-group">
             <label for="brewfatherUserId">Brewfather User ID</label>
-            <input type="text" id="brewfatherUserId" class="form-control" value="{{ settings.brewfather_user_id or '' }}" autocomplete="off" />
+            <input
+              type="text"
+              id="brewfatherUserId"
+              class="form-control"
+              value="{{ settings.brewfather_user_id or '' }}"
+              autocomplete="off"
+            />
           </div>
           <div class="form-group">
             <label for="brewfatherApiKey">Read-only API key</label>
-            <input type="password" id="brewfatherApiKey" class="form-control" value="" autocomplete="new-password" placeholder="Leave blank to keep the saved key" />
-            <small class="muted">The key is never returned in settings responses, exports, audit events, or logs.</small>
+            <input
+              type="password"
+              id="brewfatherApiKey"
+              class="form-control"
+              value=""
+              autocomplete="new-password"
+              placeholder="Leave blank to keep the saved key"
+            />
+            <small class="muted"
+              >The key is never returned in settings responses, exports, audit
+              events, or logs.</small
+            >
           </div>
           <div class="form-actions">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="runBrewfatherSync()">Sync Brewfather</button>
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="runBrewfatherSync()"
+            >
+              Sync Brewfather
+            </button>
             <span id="brewfatherMsg" class="save-msg"></span>
           </div>
           <p class="muted" style="margin-top: 0.5rem">
-            Status: <strong id="brewfatherLastStatus">{{ settings.brewfather_last_status or 'never' }}</strong>
-            · Last sync: <span id="brewfatherLastSync">{{ settings.brewfather_last_synced_at or 'Never' }}</span>
+            Status:
+            <strong id="brewfatherLastStatus"
+              >{{ settings.brewfather_last_status or 'never' }}</strong
+            >
+            · Last sync:
+            <span id="brewfatherLastSync"
+              >{{ settings.brewfather_last_synced_at or 'Never' }}</span
+            >
           </p>
-          <p class="muted">Conflicts: <span id="brewfatherConflictCount">0</span></p>
-          <div id="brewfatherConflictList" class="stack-gap-sm" style="margin-top: 0.5rem"></div>
+          <p class="muted">
+            Conflicts: <span id="brewfatherConflictCount">0</span>
+          </p>
+          <div
+            id="brewfatherConflictList"
+            class="stack-gap-sm"
+            style="margin-top: 0.5rem"
+          ></div>
         </div>
       </details>
 
@@ -950,7 +1061,7 @@ content %}
               forecasting.</small
             >
           </div>
-          <div class="form-group" style="margin-top: 1rem;">
+          <div class="form-group" style="margin-top: 1rem">
             <button
               type="button"
               class="btn btn-danger btn-sm"
@@ -976,7 +1087,9 @@ content %}
               {% endif %} Share Anonymous Usage Statistics
             </label>
             <small class="muted">
-              Sends a daily anonymous installation ID and app/add-on versions to help measure active installs. No bar, inventory, user, device, or network data is sent.
+              Sends a daily anonymous installation ID and app/add-on versions to
+              help measure active installs. No bar, inventory, user, device, or
+              network data is sent.
             </small>
           </div>
         </div>
@@ -984,7 +1097,9 @@ content %}
       {% endif %}
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Advanced Settings</button>
+        <button type="submit" class="btn btn-primary">
+          Save Advanced Settings
+        </button>
         <button
           type="button"
           class="btn btn-danger"
@@ -995,7 +1110,8 @@ content %}
         <span id="saveMsg" class="save-msg"></span>
       </div>
       <p class="muted" style="margin-top: 0.65rem">
-        Basic settings save automatically. Use Save Advanced Settings for POS sync, API tokens, allowlists, and custom keg or pour configuration.
+        Basic settings save automatically. Use Save Advanced Settings for POS
+        sync, API tokens, allowlists, and custom keg or pour configuration.
       </p>
       <p class="muted" style="margin-top: 0.35rem">
         This resets settings only. Beers, kegs, taps, team users, and audit
@@ -1038,23 +1154,36 @@ content %}
         <div class="form-group">
           <label>App Version</label>
           <div>
-            <span class="badge" style="background: var(--surface2); color: var(--text); border: 1px solid var(--border); font-size: 0.9rem; padding: 0.25rem 0.6rem;">v{{ app_version }}</span>
+            <span
+              class="badge"
+              style="
+                background: var(--surface2);
+                color: var(--text);
+                border: 1px solid var(--border);
+                font-size: 0.9rem;
+                padding: 0.25rem 0.6rem;
+              "
+              >v{{ app_version }}</span
+            >
           </div>
         </div>
-        {% set selected_pos_provider = namespace(name="Not configured") %}
-        {% for provider in pos_sync_provider_catalog or [] %}
-        {% if provider.key == (settings.pos_sync_provider or '') %}
-        {% set selected_pos_provider.name = provider.name %}
-        {% endif %}
-        {% endfor %}
+        {% set selected_pos_provider = namespace(name="Not configured") %} {%
+        for provider in pos_sync_provider_catalog or [] %} {% if provider.key ==
+        (settings.pos_sync_provider or '') %} {% set selected_pos_provider.name
+        = provider.name %} {% endif %} {% endfor %}
         <div class="form-group">
           <label>POS Sync Provider</label>
           <div>{{ selected_pos_provider.name }}</div>
         </div>
         <div class="form-group" style="margin-bottom: 0">
           <label>Storage Status</label>
-          <p class="muted" style="margin-top: 0.25rem">Database selection is managed by the Home Assistant add-on configuration.</p>
-          <div id="storageStatus" class="stack-gap-sm">Loading storage status...</div>
+          <p class="muted" style="margin-top: 0.25rem">
+            Database selection is managed by the Home Assistant add-on
+            configuration.
+          </p>
+          <div id="storageStatus" class="stack-gap-sm">
+            Loading storage status...
+          </div>
         </div>
       </div>
     </div>
@@ -1133,7 +1262,9 @@ content %}
               Copy
             </button>
           </div>
-          <p class="muted" style="margin-top: 0.75rem">Local Printable Menu URL</p>
+          <p class="muted" style="margin-top: 0.75rem">
+            Local Printable Menu URL
+          </p>
           <div class="settings-url-row">
             <a
               id="localMenuUrl"
@@ -1151,8 +1282,20 @@ content %}
               Copy
             </button>
           </div>
-          <div id="externalMenuUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
-            <p class="muted" style="margin-top: 0.35rem">External Printable Menu URL</p>
+          <div
+            id="externalMenuUrlBlock"
+            {%
+            if
+            not
+            settings.external_base_url
+            %}style="display: none;"
+            {%
+            endif
+            %}
+          >
+            <p class="muted" style="margin-top: 0.35rem">
+              External Printable Menu URL
+            </p>
             <div class="settings-url-row">
               <a
                 id="externalMenuUrl"
@@ -1172,8 +1315,9 @@ content %}
             </div>
           </div>
           <div id="displayUrlsContainer">
-            {% set active_display_count = (settings.display_count or 2) if (settings.brewery_type or 'homebrewer') == 'pro' else 2 %}
-            {% if active_display_count == 1 %}
+            {% set active_display_count = (settings.display_count or 2) if
+            (settings.brewery_type or 'homebrewer') == 'pro' else 2 %} {% if
+            active_display_count == 1 %}
             <p class="muted" style="margin-top: 0.75rem">Local Display URL</p>
             <div class="settings-url-row">
               <a
@@ -1192,8 +1336,20 @@ content %}
                 Copy
               </button>
             </div>
-            <div id="externalDisplayUrlBlock" {% if not settings.external_base_url %}style="display: none;"{% endif %}>
-              <p class="muted" style="margin-top: 0.35rem">External Display URL</p>
+            <div
+              id="externalDisplayUrlBlock"
+              {%
+              if
+              not
+              settings.external_base_url
+              %}style="display: none;"
+              {%
+              endif
+              %}
+            >
+              <p class="muted" style="margin-top: 0.35rem">
+                External Display URL
+              </p>
               <div class="settings-url-row">
                 <a
                   id="externalDisplayUrl"
@@ -1212,9 +1368,10 @@ content %}
                 </button>
               </div>
             </div>
-            {% else %}
-            {% for i in range(1, active_display_count + 1) %}
-            <p class="muted" style="margin-top: 0.75rem">Local Display {{ i }} URL</p>
+            {% else %} {% for i in range(1, active_display_count + 1) %}
+            <p class="muted" style="margin-top: 0.75rem">
+              Local Display {{ i }} URL
+            </p>
             <div class="settings-url-row">
               <a
                 id="localDisplayUrl-{{ i }}"
@@ -1233,7 +1390,9 @@ content %}
               </button>
             </div>
             {% if settings.external_base_url %}
-            <p class="muted" style="margin-top: 0.35rem">External Display {{ i }} URL</p>
+            <p class="muted" style="margin-top: 0.35rem">
+              External Display {{ i }} URL
+            </p>
             <div class="settings-url-row">
               <a
                 id="externalDisplayUrl-{{ i }}"
@@ -1251,9 +1410,7 @@ content %}
                 Copy
               </button>
             </div>
-            {% endif %}
-            {% endfor %}
-            {% endif %}
+            {% endif %} {% endfor %} {% endif %}
           </div>
         </div>
       </details>
@@ -1448,7 +1605,10 @@ content %}
     const displayCountInput = document.getElementById("displayCount");
     if (!container || !displayCountInput) return;
 
-    const displayCount = Math.max(1, Math.min(12, Number.parseInt(displayCountInput.value, 10) || 1));
+    const displayCount = Math.max(
+      1,
+      Math.min(12, Number.parseInt(displayCountInput.value, 10) || 1),
+    );
     displayCountInput.value = String(displayCount);
     const normalizedAssignments = collectSelectedDisplayTapAssignments().length
       ? normalizeDisplayTapAssignments(collectSelectedDisplayTapAssignments())
@@ -1460,8 +1620,12 @@ content %}
       .sort((a, b) => a - b);
 
     const assignments = Array.from({ length: displayCount }, (_, index) => {
-      const saved = Array.isArray(normalizedAssignments[index]) ? normalizedAssignments[index] : [];
-      return saved.map((value) => Number.parseInt(value, 10)).filter((value) => Number.isFinite(value));
+      const saved = Array.isArray(normalizedAssignments[index])
+        ? normalizedAssignments[index]
+        : [];
+      return saved
+        .map((value) => Number.parseInt(value, 10))
+        .filter((value) => Number.isFinite(value));
     });
 
     container.innerHTML = assignments
@@ -1471,10 +1635,18 @@ content %}
           <div class="form-group">
             <label for="${selectId}">Display ${index + 1} taps</label>
             <select id="${selectId}" class="form-control display-tap-assignment-select" multiple size="${Math.min(8, Math.max(4, tapNumbers.length || 4))}">
-              ${tapNumbers.length ? tapNumbers.map((tapNumber) => {
-                const selected = selectedNumbers.includes(tapNumber) ? "selected" : "";
-                return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
-              }).join("") : '<option value="">No taps available</option>'}
+              ${
+                tapNumbers.length
+                  ? tapNumbers
+                      .map((tapNumber) => {
+                        const selected = selectedNumbers.includes(tapNumber)
+                          ? "selected"
+                          : "";
+                        return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
+                      })
+                      .join("")
+                  : '<option value="">No taps available</option>'
+              }
             </select>
             <small class="muted">Choose which taps should appear on this display.</small>
           </div>
@@ -1482,22 +1654,28 @@ content %}
       })
       .join("");
 
-    container.querySelectorAll(".display-tap-assignment-select").forEach((select) => {
-      select.addEventListener("change", () => {
-        currentDisplayTapAssignments = normalizeDisplayTapAssignments(
-          collectSelectedDisplayTapAssignments(),
-        );
-        scheduleAutoSave(100);
+    container
+      .querySelectorAll(".display-tap-assignment-select")
+      .forEach((select) => {
+        select.addEventListener("change", () => {
+          currentDisplayTapAssignments = normalizeDisplayTapAssignments(
+            collectSelectedDisplayTapAssignments(),
+          );
+          scheduleAutoSave(100);
+        });
       });
-    });
   }
 
   function syncDisplaySettingsAvailability() {
     const isPro = currentBreweryType() === "pro";
     const displayCountInput = document.getElementById("displayCount");
-    const displayTapAssignments = document.getElementById("displayTapAssignments");
+    const displayTapAssignments = document.getElementById(
+      "displayTapAssignments",
+    );
     const proNote = document.getElementById("displayCountProNote");
-    const homebrewerNote = document.getElementById("displayCountHomebrewerNote");
+    const homebrewerNote = document.getElementById(
+      "displayCountHomebrewerNote",
+    );
 
     if (displayCountInput) {
       if (isPro) {
@@ -1578,7 +1756,8 @@ content %}
         43200,
       ),
       display_title_on_tap: document.getElementById("displayTitleOnTap")
-        ? document.getElementById("displayTitleOnTap").value.trim() || "On Draft"
+        ? document.getElementById("displayTitleOnTap").value.trim() ||
+          "On Draft"
         : "On Draft",
       display_full_width: document.getElementById("displayFullWidth")
         ? document.getElementById("displayFullWidth").checked
@@ -1610,9 +1789,12 @@ content %}
     if (menuQrModeInput) {
       payload.menu_qr_mode = menuQrModeInput.value;
     }
-    const anonymousTelemetryEnabledInput = document.getElementById("anonymousTelemetryEnabled");
+    const anonymousTelemetryEnabledInput = document.getElementById(
+      "anonymousTelemetryEnabled",
+    );
     if (anonymousTelemetryEnabledInput) {
-      payload.anonymous_telemetry_enabled = anonymousTelemetryEnabledInput.checked;
+      payload.anonymous_telemetry_enabled =
+        anonymousTelemetryEnabledInput.checked;
     }
 
     if (payload.brewery_type !== "pro") {
@@ -1701,7 +1883,9 @@ content %}
     )
       ? document.getElementById("externalApiAllowlistEnabled").checked
       : false;
-    payload.external_api_allowlist = document.getElementById("externalApiAllowlist")
+    payload.external_api_allowlist = document.getElementById(
+      "externalApiAllowlist",
+    )
       ? document.getElementById("externalApiAllowlist").value
       : "";
     payload.external_api_rate_limit_enabled = document.getElementById(
@@ -1751,7 +1935,10 @@ content %}
     document.body.dataset.managePos = savedManagePosition;
 
     const externalBaseUrlInput = document.getElementById("externalBaseUrl");
-    if (externalBaseUrlInput && typeof savedSettings.external_base_url === "string") {
+    if (
+      externalBaseUrlInput &&
+      typeof savedSettings.external_base_url === "string"
+    ) {
       externalBaseUrlInput.value = savedSettings.external_base_url;
     }
     const barNameInput = document.getElementById("barName");
@@ -1770,10 +1957,15 @@ content %}
       displayTitleOnTapInput.value = savedSettings.display_title_on_tap;
     }
     const displayFullWidthInput = document.getElementById("displayFullWidth");
-    if (displayFullWidthInput && savedSettings.display_full_width !== undefined) {
+    if (
+      displayFullWidthInput &&
+      savedSettings.display_full_width !== undefined
+    ) {
       displayFullWidthInput.checked = Boolean(savedSettings.display_full_width);
     }
-    const analyticsLowThresholdInput = document.getElementById("analyticsLowThreshold");
+    const analyticsLowThresholdInput = document.getElementById(
+      "analyticsLowThreshold",
+    );
     if (
       analyticsLowThresholdInput &&
       savedSettings.analytics_low_keg_threshold_percent !== undefined
@@ -1782,14 +1974,18 @@ content %}
         savedSettings.analytics_low_keg_threshold_percent,
       );
     }
-    const analyticsDaysMethodInput = document.getElementById("analyticsDaysMethod");
+    const analyticsDaysMethodInput = document.getElementById(
+      "analyticsDaysMethod",
+    );
     if (
       analyticsDaysMethodInput &&
       typeof savedSettings.analytics_days_left_method === "string"
     ) {
       analyticsDaysMethodInput.value = savedSettings.analytics_days_left_method;
     }
-    const analyticsDaysWindowInput = document.getElementById("analyticsDaysWindow");
+    const analyticsDaysWindowInput = document.getElementById(
+      "analyticsDaysWindow",
+    );
     if (
       analyticsDaysWindowInput &&
       savedSettings.analytics_days_left_window_days !== undefined
@@ -1798,9 +1994,15 @@ content %}
         savedSettings.analytics_days_left_window_days,
       );
     }
-    const auditRetentionDaysInput = document.getElementById("auditRetentionDays");
-    if (auditRetentionDaysInput && savedSettings.audit_retention_days !== undefined) {
-      auditRetentionDaysInput.value = String(savedSettings.audit_retention_days);
+    const auditRetentionDaysInput =
+      document.getElementById("auditRetentionDays");
+    if (
+      auditRetentionDaysInput &&
+      savedSettings.audit_retention_days !== undefined
+    ) {
+      auditRetentionDaysInput.value = String(
+        savedSettings.audit_retention_days,
+      );
     }
     const displayCountInput = document.getElementById("displayCount");
     if (displayCountInput && savedSettings.display_count !== undefined) {
@@ -1843,11 +2045,17 @@ content %}
         savedSettings.default_keg_type || "",
       );
     }
-    if (Array.isArray(savedSettings.pour_options) && document.getElementById("pourOptionsList")) {
+    if (
+      Array.isArray(savedSettings.pour_options) &&
+      document.getElementById("pourOptionsList")
+    ) {
       const pourOptionsList = document.getElementById("pourOptionsList");
       pourOptionsList.innerHTML = "";
-      savedSettings.pour_options.forEach((option) => addPourOptionRow(option, { refresh: false }));
-      const defaultPourPresetSelect = document.getElementById("defaultPourPreset");
+      savedSettings.pour_options.forEach((option) =>
+        addPourOptionRow(option, { refresh: false }),
+      );
+      const defaultPourPresetSelect =
+        document.getElementById("defaultPourPreset");
       if (defaultPourPresetSelect) {
         defaultPourPresetSelect.dataset.initialDefault =
           savedSettings.default_pour_preset || "";
@@ -1918,15 +2126,29 @@ content %}
 
     const allUsers = Array.isArray(users) ? users : [];
     const ownerUser =
-      allUsers.find((user) => String(user.id || "").trim().toLowerCase() === "owner") ||
-      allUsers.find((user) => String(user.role || "").trim().toLowerCase() === "owner") ||
+      allUsers.find(
+        (user) =>
+          String(user.id || "")
+            .trim()
+            .toLowerCase() === "owner",
+      ) ||
+      allUsers.find(
+        (user) =>
+          String(user.role || "")
+            .trim()
+            .toLowerCase() === "owner",
+      ) ||
       null;
     if (ownerNameInput) {
-      ownerNameInput.value = ownerUser && ownerUser.name ? ownerUser.name : "Owner";
+      ownerNameInput.value =
+        ownerUser && ownerUser.name ? ownerUser.name : "Owner";
     }
 
     const additionalUsers = allUsers.filter((user) => {
-      if (ownerUser && String(user.id || "").trim() === String(ownerUser.id || "").trim()) {
+      if (
+        ownerUser &&
+        String(user.id || "").trim() === String(ownerUser.id || "").trim()
+      ) {
         return false;
       }
       return true;
@@ -1936,8 +2158,7 @@ content %}
       list.innerHTML = '<p class="muted">No additional team users yet.</p>';
     } else {
       list.innerHTML = additionalUsers
-      .map(
-        (user) => {
+        .map((user) => {
           const isDisabled = Boolean(user.disabled);
           const pinSet = Boolean((user.pin || "").trim());
           const statusLabel = isDisabled ? "Disabled" : "Active";
@@ -1964,9 +2185,8 @@ content %}
             </div>
           </div>
         `;
-        },
-      )
-      .join("");
+        })
+        .join("");
     }
 
     if (auditList) {
@@ -2030,7 +2250,9 @@ content %}
   }
 
   async function refreshTeamUsers() {
-    const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
+    const users = await fetch(`${INGRESS}/api/team/users`).then((r) =>
+      r.json(),
+    );
     renderTeamUsers(users.users || []);
   }
 
@@ -2045,7 +2267,11 @@ content %}
       const res = await fetch(`${INGRESS}/api/team/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update_profile", user_id: "owner", name: ownerName }),
+        body: JSON.stringify({
+          action: "update_profile",
+          user_id: "owner",
+          name: ownerName,
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -2093,7 +2319,11 @@ content %}
       const res = await fetch(`${INGRESS}/api/team/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "set_pin", user_id: userId, pin: nextPin }),
+        body: JSON.stringify({
+          action: "set_pin",
+          user_id: userId,
+          pin: nextPin,
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -2136,7 +2366,9 @@ content %}
 
     if (
       !window.confirm(
-        nextDisabled ? "Disable this user account?" : "Enable this user account?",
+        nextDisabled
+          ? "Disable this user account?"
+          : "Enable this user account?",
       )
     ) {
       return;
@@ -2209,7 +2441,12 @@ content %}
 
   function updateExternalReadonlyLinks(externalBaseUrl = "") {
     const overrideInput = document.getElementById("externalBaseUrl");
-    const rawOverride = externalBaseUrl !== "" ? externalBaseUrl : (overrideInput ? overrideInput.value : "");
+    const rawOverride =
+      externalBaseUrl !== ""
+        ? externalBaseUrl
+        : overrideInput
+          ? overrideInput.value
+          : "";
     const overrideBase = String(rawOverride || "")
       .trim()
       .replace(/\/+$/, "");
@@ -2514,7 +2751,9 @@ content %}
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) {
-        throw new Error(body.error || `Unable to add provider (${response.status})`);
+        throw new Error(
+          body.error || `Unable to add provider (${response.status})`,
+        );
       }
 
       renderPosProviderCatalog(body.providers || []);
@@ -2614,18 +2853,27 @@ content %}
     const msg = document.getElementById("brewfatherMsg");
     if (msg) msg.textContent = "Syncing...";
     try {
-      const response = await fetch(`${INGRESS}/api/brewfather/sync`, { method: "POST" });
+      const response = await fetch(`${INGRESS}/api/brewfather/sync`, {
+        method: "POST",
+      });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.ok) {
-        if (msg) msg.textContent = body.error || `Sync failed: ${response.status}`;
+        if (msg)
+          msg.textContent = body.error || `Sync failed: ${response.status}`;
         return;
       }
-      const status = await fetch(`${INGRESS}/api/brewfather/status`).then((item) => item.json());
-      document.getElementById("brewfatherLastStatus").textContent = status.last_status || "success";
-      document.getElementById("brewfatherLastSync").textContent = status.last_synced_at || "Never";
-      document.getElementById("brewfatherConflictCount").textContent = status.conflicts || 0;
+      const status = await fetch(`${INGRESS}/api/brewfather/status`).then(
+        (item) => item.json(),
+      );
+      document.getElementById("brewfatherLastStatus").textContent =
+        status.last_status || "success";
+      document.getElementById("brewfatherLastSync").textContent =
+        status.last_synced_at || "Never";
+      document.getElementById("brewfatherConflictCount").textContent =
+        status.conflicts || 0;
       await loadBrewfatherConflicts();
-      if (msg) msg.textContent = `Imported ${body.counts?.beers_created || 0}, updated ${body.counts?.beers_updated || 0}.`;
+      if (msg)
+        msg.textContent = `Imported ${body.counts?.beers_created || 0}, updated ${body.counts?.beers_updated || 0}.`;
     } catch (err) {
       if (msg) msg.textContent = "Unable to run Brewfather sync.";
       console.error(err);
@@ -2633,13 +2881,17 @@ content %}
   }
 
   function escapeBrewfatherText(value) {
-    return String(value || "").replace(/[&<>"']/g, (character) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    })[character]);
+    return String(value || "").replace(
+      /[&<>"']/g,
+      (character) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[character],
+    );
   }
 
   async function loadBrewfatherConflicts() {
@@ -2651,7 +2903,9 @@ content %}
     const count = document.getElementById("brewfatherConflictCount");
     if (count) count.textContent = conflicts.length;
     list.innerHTML = conflicts.length
-      ? conflicts.map((conflict) => `
+      ? conflicts
+          .map(
+            (conflict) => `
           <div class="settings-warning-block">
             <strong>${escapeBrewfatherText(conflict.brewfather_batch_id || conflict.brewfather_recipe_id || "Catalog conflict")}</strong>
             <span class="muted">${Object.keys(conflict.fields || {}).length} field(s) changed locally and remotely.</span>
@@ -2659,7 +2913,9 @@ content %}
               <button type="button" class="btn btn-sm btn-secondary" onclick="resolveBrewfatherConflict('${escapeBrewfatherText(conflict.id)}', 'brewfather')">Use Brewfather</button>
               <button type="button" class="btn btn-sm btn-secondary" onclick="resolveBrewfatherConflict('${escapeBrewfatherText(conflict.id)}', 'local')">Keep Local</button>
             </div>
-          </div>`).join("")
+          </div>`,
+          )
+          .join("")
       : "";
   }
 
@@ -2669,8 +2925,11 @@ content %}
     try {
       const response = await fetch(`${INGRESS}/api/storage/status`);
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Unable to load storage status.");
-      const location = body.location || [body.host, body.port, body.database].filter(Boolean).join(":");
+      if (!response.ok)
+        throw new Error(body.error || "Unable to load storage status.");
+      const location =
+        body.location ||
+        [body.host, body.port, body.database].filter(Boolean).join(":");
       container.innerHTML = `
         <p><strong>Backend:</strong> ${escapeBrewfatherText(body.engine || body.backend || "Unknown")}</p>
         <p><strong>Status:</strong> ${body.configured ? "Configured" : "Not configured"}</p>
@@ -2682,19 +2941,25 @@ content %}
   }
 
   async function resolveBrewfatherConflict(conflictId, resolution) {
-    const response = await fetch(`${INGRESS}/api/brewfather/conflicts/${encodeURIComponent(conflictId)}/resolve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resolution }),
-    });
+    const response = await fetch(
+      `${INGRESS}/api/brewfather/conflicts/${encodeURIComponent(conflictId)}/resolve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolution }),
+      },
+    );
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       alert(body.error || "Unable to resolve Brewfather conflict.");
       return;
     }
     await loadBrewfatherConflicts();
-    const status = await fetch(`${INGRESS}/api/brewfather/status`).then((item) => item.json());
-    document.getElementById("brewfatherConflictCount").textContent = status.conflicts || 0;
+    const status = await fetch(`${INGRESS}/api/brewfather/status`).then(
+      (item) => item.json(),
+    );
+    document.getElementById("brewfatherConflictCount").textContent =
+      status.conflicts || 0;
   }
 
   loadBrewfatherConflicts();
@@ -3109,7 +3374,9 @@ content %}
     });
   }
 
-  const breweryTypeInputs = document.querySelectorAll('input[name="brewery_type"]');
+  const breweryTypeInputs = document.querySelectorAll(
+    'input[name="brewery_type"]',
+  );
 
   function syncNavIndicators() {
     const navLinks = document.querySelector(".navbar .nav-links");
@@ -3133,7 +3400,8 @@ content %}
 
     syncIndicator(
       "navSandboxIndicator",
-      getCheckedRadioValue("environment_mode", DEFAULT_ENVIRONMENT_MODE) === "sandbox",
+      getCheckedRadioValue("environment_mode", DEFAULT_ENVIRONMENT_MODE) ===
+        "sandbox",
       "Sandbox Mode",
       "Sandbox mode is active",
     );
