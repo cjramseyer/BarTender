@@ -5,13 +5,15 @@ Doc scope: Flutter mobile viewer in mobile/
 
 ## Overview
 
-The mobile app is a read-only viewer for BarTender data. It connects to the BarTender API and displays:
+The mobile app connects to the BarTender API and displays:
 
 - Taps
 - Kegs
 - Bar stock
 
-The app does not create, edit, or delete records at this time.
+It can also record a standard pour against a tap using the current BarTender pour API.
+
+The app does not create, edit, or delete inventory, tap, or keg records at this time.
 
 ## Supported Platforms
 
@@ -94,6 +96,8 @@ The mobile viewer reads from:
 - GET /api/taps
 - GET /api/kegs
 - GET /api/stock
+- POST /api/taps/<id>/pour
+- POST /api/mobile/login
 
 Additional endpoint available for integrations:
 
@@ -103,6 +107,8 @@ Failure behavior:
 
 - Non-2xx status throws an exception.
 - UI displays an error state with retry button.
+- Mobile API requests include the authenticated bearer token. Expired or revoked
+  tokens require signing in again.
 
 Timeout behavior:
 
@@ -112,32 +118,19 @@ Timeout behavior:
 
 Implemented:
 
-- Setup screen for server URL.
-- Taps tab display with keg status badges.
-- Kegs tab list with metadata chips.
-- Stock tab grouped by category.
-- Pull-to-refresh and retry affordances.
-
-Not implemented:
-
-- Authentication workflow.
-- Write operations (add/edit/delete).
+- Mobile sign-in using a team member ID and PIN. Tokens are stored in platform secure storage.
+- Inventory, tap, and keg write operations are not supported beyond recording a tap pour.
 - Beer catalog management UI (currently web UI only).
 - Background sync or push notifications.
-- Offline caching beyond saved server URL.
 
-## Current Limitations
+Current limitations:
 
-- Read-only by design.
+- Read-only inventory/tap/keg management beyond tap pours.
 - Error details are generic for end users.
-- No in-app API diagnostics screen.
 - No advanced connection profile support (multiple servers, cert pinning, etc.).
-
-## Troubleshooting
 
 Connection cannot be established:
 
-- Verify server URL includes protocol (http:// or https://).
 - Confirm phone and server are on reachable networks.
 - Test URL in mobile browser first.
 

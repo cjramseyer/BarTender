@@ -23,7 +23,9 @@ options:
   storage_backend: internal
   database_url: ""
   session_timeout_minutes: 240
+  cors_allowed_origins: ""
 schema:
   storage_backend: list(internal|postgresql|mariadb)
   database_url: str
   session_timeout_minutes: int(5,43200)
+  cors_allowed_origins: str

@@ -18,7 +18,8 @@ export EXTERNAL_API_PORT="8110"
 STORAGE_BACKEND="$(bashio::config 'storage_backend')"
 DATABASE_URL="$(bashio::config 'database_url')"
 SESSION_TIMEOUT_MINUTES="$(bashio::config 'session_timeout_minutes')"
-export STORAGE_BACKEND DATABASE_URL SESSION_TIMEOUT_MINUTES
+CORS_ALLOWED_ORIGINS="$(bashio::config 'cors_allowed_origins')"
+export STORAGE_BACKEND DATABASE_URL SESSION_TIMEOUT_MINUTES CORS_ALLOWED_ORIGINS
 
 if [ -z "${STORAGE_BACKEND}" ]; then
 	export STORAGE_BACKEND="internal"

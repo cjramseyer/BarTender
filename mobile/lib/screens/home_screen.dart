@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../services/api_service.dart';
 import 'taps_screen.dart';
@@ -9,8 +10,9 @@ import 'setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String serverUrl;
+  final String token;
 
-  const HomeScreen({super.key, required this.serverUrl});
+  const HomeScreen({super.key, required this.serverUrl, required this.token});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -23,12 +25,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _api = ApiService(widget.serverUrl);
+    _api = ApiService(widget.serverUrl, token: widget.token);
   }
 
   Future<void> _disconnect() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('server_url');
+    await prefs.remove('mobile_token');
+    await const FlutterSecureStorage().delete(key: 'mobile_token');
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const SetupScreen()),
