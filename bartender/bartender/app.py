@@ -84,6 +84,17 @@ TELEMETRY_HEARTBEAT_URL = "https://bartender-telemetry.td2.info/v1/heartbeat"
 EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
 
 
+def _parse_cors_origins(value: str) -> frozenset[str]:
+    return frozenset(
+        origin.strip().rstrip("/")
+        for origin in re.split(r"[\s,;]+", str(value or ""))
+        if origin.strip()
+    )
+
+
+CORS_ALLOWED_ORIGINS = _parse_cors_origins(os.environ.get("CORS_ALLOWED_ORIGINS", ""))
+
+
 def _session_timeout_minutes() -> int:
     try:
         configured = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "240") or "240")
@@ -136,6 +147,34 @@ def _is_mobile_user_agent(user_agent: str) -> bool:
 
 def _station_token_hash(token: str) -> str:
     return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _mobile_token_hash(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _mobile_principal(data: dict) -> dict | None:
+    presented = _extract_request_api_token()
+    if not presented:
+        return None
+    now = datetime.now(timezone.utc)
+    token_hash = _mobile_token_hash(presented)
+    for token in data.get("mobile_tokens", []):
+        if token.get("token_hash") != token_hash or token.get("revoked_at"):
+            continue
+        try:
+            expires_at = datetime.fromisoformat(str(token.get("expires_at", "")).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if expires_at <= now:
+            continue
+        return {
+            "id": token.get("user_id", ""),
+            "name": token.get("user_name", token.get("user_id", "")),
+            "role": _normalize_team_role(token.get("user_role", "staff")),
+            "auth_type": "mobile",
+        }
+    return None
 
 
 def _registered_station(data: dict) -> dict | None:
@@ -326,6 +365,22 @@ app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 DATA_STATE_LOCK = threading.RLock()
+
+
+@app.after_request
+def add_cors_headers(response):
+    origin = str(request.headers.get("Origin", "") or "").strip().rstrip("/")
+    if origin and origin in CORS_ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, X-API-Token"
+        )
+        response.headers["Access-Control-Allow-Methods"] = (
+            "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
+        )
+        response.headers.add("Vary", "Origin")
+    return response
 
 
 @app.before_request
@@ -554,7 +609,20 @@ def require_login_for_web_views():
     if normalized_path in ("/login", "/logout") or normalized_path.startswith("/auth/scan/"):
         return None
     if normalized_path.startswith("/api/"):
-        return None
+        if normalized_path == "/api/mobile/login":
+            return None
+        if request.method == "OPTIONS":
+            return None
+        if EXTERNAL_API_MODE:
+            return None
+        if app.testing:
+            return None
+        mobile_user = _mobile_principal(load_data())
+        if mobile_user:
+            g.mobile_user = mobile_user
+        if session.get("user_id") or mobile_user:
+            return None
+        return jsonify({"error": "Authentication required."}), 401
     if session.get("user_id"):
         return None
     ingress = _effective_ingress_path()
@@ -774,6 +842,7 @@ DEFAULT_DATA = {
     "team_audit": [],
     "user_sessions": [],
     "station_registrations": [],
+    "mobile_tokens": [],
     "brewfather_conflicts": [],
 }
 
@@ -962,6 +1031,8 @@ def _load_data_unlocked() -> dict:
             data["user_sessions"] = []
         if not isinstance(data.get("station_registrations"), list):
             data["station_registrations"] = []
+        if not isinstance(data.get("mobile_tokens"), list):
+            data["mobile_tokens"] = []
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
             data["settings"].get("keg_type_choices", []),
@@ -1236,6 +1307,9 @@ def _normalize_team_role(value) -> str:
 
 
 def _get_current_team_user() -> dict:
+    mobile_user = getattr(g, "mobile_user", None)
+    if mobile_user:
+        return mobile_user
     session_user_id = str(session.get("user_id", "") or "").strip()
     session_role = session.get("user_role")
     session_name = session.get("user_name")
@@ -1246,6 +1320,8 @@ def _get_current_team_user() -> dict:
             "role": _normalize_team_role(session_role),
         }
 
+    if not app.testing:
+        return {"id": "anonymous", "name": "Anonymous", "role": "staff"}
     user_id = str(request.headers.get("X-BarTender-User-Id", "owner") or "owner").strip()
     role = _normalize_team_role(request.headers.get("X-BarTender-Role", "owner"))
     name = str(request.headers.get("X-BarTender-Name", user_id or "Owner")).strip() or "Owner"
@@ -3042,6 +3118,42 @@ def logout_view():
         save_data(data)
     session.clear()
     return _redirect_to_endpoint("login_view")
+
+
+@app.route("/api/mobile/login", methods=["POST"])
+def mobile_login():
+    data = load_data()
+    payload = request.get_json(silent=True) or {}
+    identifier = str(payload.get("user_id", "") or "").strip()
+    pin = str(payload.get("pin", "") or "").strip()
+    user = _find_team_user_by_identifier(data.get("team_users", []), identifier)
+    if user is None or _coerce_bool(user.get("disabled"), False):
+        return jsonify({"error": "Invalid mobile login."}), 401
+
+    expected_pin = _normalize_team_user_pin(user.get("pin", ""))
+    if str(user.get("role", "")).lower() == "owner" and len(data.get("team_users", [])) > 1:
+        expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")) or expected_pin
+    if not expected_pin or not secrets.compare_digest(expected_pin, pin):
+        return jsonify({"error": "Invalid mobile login."}), 401
+
+    raw_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+    data.setdefault("mobile_tokens", []).append({
+        "token_hash": _mobile_token_hash(raw_token),
+        "user_id": str(user.get("id", "")),
+        "user_name": str(user.get("name", "")),
+        "user_role": _normalize_team_role(user.get("role", "staff")),
+        "created_at": _session_now_iso(),
+        "expires_at": expires_at.isoformat(),
+        "revoked_at": "",
+    })
+    _record_team_audit(data, user, "mobile_login", str(user.get("id", "")), {})
+    save_data(data)
+    return jsonify({"token": raw_token, "expires_at": expires_at.isoformat(), "user": {
+        "id": user.get("id", ""),
+        "name": user.get("name", ""),
+        "role": _normalize_team_role(user.get("role", "staff")),
+    }})
 
 
 # ---------------------------------------------------------------------------

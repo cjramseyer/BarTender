@@ -148,6 +148,11 @@ station mode at login. Session and device
 metadata are retained for up to 90 days after termination and include limited
 user-agent and IP information for access management.
 
+Browser clients hosted on another origin require the add-on option
+`cors_allowed_origins`. Set it to a comma-, space-, or newline-separated allowlist of
+trusted origins, such as `http://127.0.0.1:5055,https://mobile.example`. Leave it
+empty when cross-origin browser access is not needed.
+
 ## Browser Support
 
 BarTender is intended for modern browsers. Supported baseline versions are Chrome 60+,

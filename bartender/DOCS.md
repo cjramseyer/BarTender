@@ -129,6 +129,11 @@ conservative user-agent matching; BarTender does not use invasive browser finger
 IP addresses and user-agent strings are operational security data and should be handled
 according to the operator's privacy and retention requirements.
 
+For Flutter web or another browser client hosted on a different origin, configure the
+add-on option `cors_allowed_origins` as a comma-, space-, or newline-separated list of
+trusted origins, such as `http://127.0.0.1:5055,https://mobile.example`. Leave it
+empty unless browser cross-origin access is required. Wildcard `*` access is not used.
+
 ## Browser Support
 
 BarTender is intended for modern browsers. The practical supported baseline is:

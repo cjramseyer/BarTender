@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'home_screen.dart';
+import 'login_screen.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -21,7 +21,7 @@ class _SetupScreenState extends State<SetupScreen> {
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => HomeScreen(serverUrl: _urlController.text.trim()),
+        builder: (_) => LoginScreen(serverUrl: _urlController.text.trim()),
       ),
     );
   }
