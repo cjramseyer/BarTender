@@ -22,7 +22,7 @@ panel_title: "BarTender"
 options:
   storage_backend: internal
   database_url: ""
-  session_timeout_minutes: 480
+  session_timeout_minutes: 240
 schema:
   storage_backend: list(internal|postgresql|mariadb)
   database_url: str
