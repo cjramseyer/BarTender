@@ -148,6 +148,18 @@ station mode at login. Session and device
 metadata are retained for up to 90 days after termination and include limited
 user-agent and IP information for access management.
 
+## Browser Support
+
+BarTender is intended for modern browsers. Supported baseline versions are Chrome 60+,
+Firefox 54+, Safari 11+, iOS/iPadOS Safari 11+, Chromium-based Edge 79+, Android
+Chrome/WebView 67+, and Samsung Internet 8+.
+
+Internet Explorer 11, Edge Legacy, Safari 10 and older, iOS 10 and older, and old
+embedded Android WebViews are not supported. Station registration requires cookies;
+copy buttons generally require HTTPS or localhost; and QR credential printing may be
+blocked by popup settings. NFC writing is handled by device-supported tools rather
+than by the browser UI.
+
 ## Core Usage Flows
 
 ### Kegs
