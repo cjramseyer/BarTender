@@ -134,6 +134,21 @@ def _is_mobile_user_agent(user_agent: str) -> bool:
     )
 
 
+def _station_token_hash(token: str) -> str:
+    return hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+
+
+def _registered_station(data: dict) -> dict | None:
+    token = str(request.cookies.get("bartender_station_token", "") or "").strip()
+    if not token:
+        return None
+    token_hash = _station_token_hash(token)
+    for station in data.get("station_registrations", []):
+        if station.get("token_hash") == token_hash and not station.get("revoked_at"):
+            return station
+    return None
+
+
 def _load_or_create_secret_key() -> str:
     secret_path = DATA_DIR / ".secret_key"
     try:
@@ -758,6 +773,7 @@ DEFAULT_DATA = {
     ],
     "team_audit": [],
     "user_sessions": [],
+    "station_registrations": [],
     "brewfather_conflicts": [],
 }
 
@@ -944,6 +960,8 @@ def _load_data_unlocked() -> dict:
         data["settings"].setdefault("anonymous_telemetry_last_heartbeat_date", "")
         if not isinstance(data.get("user_sessions"), list):
             data["user_sessions"] = []
+        if not isinstance(data.get("station_registrations"), list):
+            data["station_registrations"] = []
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
             data["settings"].get("keg_type_choices", []),
@@ -2824,6 +2842,7 @@ def inject_runtime_metadata():
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),
         "current_user_release_seen_version": _current_user_release_seen_version(),
+        "station_registered": bool(_registered_station(load_data())),
     }
 
 
@@ -2932,6 +2951,9 @@ def login_view():
                 "manual" if not scan_token else "qr_nfc",
                 station_mode=station_mode,
             )
+            registered_station = _registered_station(data)
+            if registered_station and station_mode:
+                registered_station["last_used_at"] = _session_now_iso()
             _record_team_audit(data, matched_user, "login", session_id, {
                 "method": "manual" if not scan_token else "qr_nfc",
                 "session_type": "station" if station_mode else "auto",
@@ -2986,7 +3008,15 @@ def scan_login(token: str):
     session["user_role"] = _normalize_team_role(user.get("role", "staff"))
     session["user_name"] = str(user.get("name", session["user_id"]))
     session["last_activity_at"] = time.time()
-    session_id = _create_user_session(data, user, "qr_nfc")
+    registered_station = _registered_station(data)
+    session_id = _create_user_session(
+        data,
+        user,
+        "qr_nfc",
+        station_mode=bool(registered_station),
+    )
+    if registered_station:
+        registered_station["last_used_at"] = _session_now_iso()
     _record_team_audit(data, user, "login", session_id, {
         "method": "qr_nfc",
         "device_type": "mobile" if _is_mobile_user_agent(request.headers.get("User-Agent", "")) else "desktop",
@@ -4167,6 +4197,70 @@ def api_team_sessions():
     })
     save_data(data)
     return jsonify({"ok": True, "session_id": session_id})
+
+
+@app.route("/api/team/stations", methods=["GET", "POST"])
+def api_team_stations():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "staff"), "team_manage"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+
+    if request.method == "GET":
+        stations = [
+            {
+                "id": station.get("id", ""),
+                "name": station.get("name", ""),
+                "created_at": station.get("created_at", ""),
+                "last_used_at": station.get("last_used_at", ""),
+                "revoked_at": station.get("revoked_at", ""),
+            }
+            for station in data.get("station_registrations", [])
+            if not station.get("revoked_at")
+        ]
+        return jsonify({"stations": stations})
+
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "register")).strip().lower()
+    if action == "revoke":
+        station_id = str(payload.get("station_id", "")).strip()
+        station = next(
+            (item for item in data.get("station_registrations", []) if item.get("id") == station_id),
+            None,
+        )
+        if station is None or station.get("revoked_at"):
+            return jsonify({"error": "Station registration not found."}), 404
+        current_station = _registered_station(data)
+        station["revoked_at"] = _session_now_iso()
+        _record_team_audit(data, current_user, "station_revoked", station_id, {"name": station.get("name", "")})
+        save_data(data)
+        response = jsonify({"ok": True, "station_id": station_id})
+        if current_station and current_station.get("id") == station_id:
+            response.delete_cookie("bartender_station_token")
+        return response
+
+    name = str(payload.get("name", "")).strip()[:80]
+    if not name:
+        return jsonify({"error": "Station name is required."}), 400
+    token = secrets.token_urlsafe(32)
+    station = {
+        "id": f"station-{secrets.token_urlsafe(10)}",
+        "name": name,
+        "token_hash": _station_token_hash(token),
+        "created_by": str(current_user.get("id", "")),
+        "created_at": _session_now_iso(),
+        "last_used_at": "",
+        "revoked_at": "",
+    }
+    data.setdefault("station_registrations", []).append(station)
+    _record_team_audit(data, current_user, "station_registered", station["id"], {"name": name})
+    save_data(data)
+    response = jsonify({
+        "ok": True,
+        "station": {key: station[key] for key in ("id", "name", "created_at", "last_used_at")},
+    })
+    response.set_cookie("bartender_station_token", token, max_age=31536000, httponly=True, samesite="Lax")
+    return response
 
 
 @app.route("/api/team/users", methods=["POST"])

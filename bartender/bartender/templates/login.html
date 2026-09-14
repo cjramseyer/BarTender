@@ -40,7 +40,7 @@
         />
       </div>
       <label class="nav-menu-checkbox">
-        <input type="checkbox" name="station_mode" value="1" />
+        <input type="checkbox" name="station_mode" value="1" {% if station_registered %}checked{% endif %} />
         Use this device as a pour station
       </label>
       <button type="submit" class="btn btn-primary btn-block">Sign in</button>
