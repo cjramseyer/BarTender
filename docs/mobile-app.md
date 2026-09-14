@@ -5,13 +5,15 @@ Doc scope: Flutter mobile viewer in mobile/
 
 ## Overview
 
-The mobile app is a read-only viewer for BarTender data. It connects to the BarTender API and displays:
+The mobile app connects to the BarTender API and displays:
 
 - Taps
 - Kegs
 - Bar stock
 
-The app does not create, edit, or delete records at this time.
+It can also record a standard pour against a tap using the current BarTender pour API.
+
+The app does not create, edit, or delete inventory, tap, or keg records at this time.
 
 ## Supported Platforms
 
@@ -114,6 +116,7 @@ Implemented:
 
 - Setup screen for server URL.
 - Taps tab display with keg status badges.
+- Record half-pint, pint, or large-pour actions from a tap with confirmation feedback.
 - Kegs tab list with metadata chips.
 - Stock tab grouped by category.
 - Pull-to-refresh and retry affordances.
@@ -121,7 +124,7 @@ Implemented:
 Not implemented:
 
 - Authentication workflow.
-- Write operations (add/edit/delete).
+- Inventory, tap, and keg write operations beyond recording a tap pour.
 - Beer catalog management UI (currently web UI only).
 - Background sync or push notifications.
 - Offline caching beyond saved server URL.
