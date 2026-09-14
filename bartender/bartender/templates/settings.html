@@ -46,12 +46,6 @@ content %}
         <summary>General</summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
-            <label>App Version</label>
-            <div>
-              <span class="badge" style="background: var(--surface2); color: var(--text); border: 1px solid var(--border); font-size: 0.9rem; padding: 0.25rem 0.6rem;">v{{ app_version }}</span>
-            </div>
-          </div>
-          <div class="form-group">
             <label>Bar Name</label>
             <input
               type="text"
@@ -894,14 +888,6 @@ content %}
       </details>
 
       <details class="settings-collapsible">
-        <summary>Storage Status</summary>
-        <div class="settings-collapsible-body">
-          <p class="muted">Database selection is managed by the Home Assistant add-on configuration. Credentials are never shown here.</p>
-          <div id="storageStatus" class="stack-gap-sm">Loading storage status...</div>
-        </div>
-      </details>
-
-      <details class="settings-collapsible">
         <summary>Analytics</summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
@@ -1044,6 +1030,22 @@ content %}
   </div>
 
   <div class="settings-side-column">
+    <div class="card settings-card settings-about-card">
+      <div class="settings-collapsible-body">
+        <h2 style="margin-top: 0">About</h2>
+        <div class="form-group">
+          <label>App Version</label>
+          <div>
+            <span class="badge" style="background: var(--surface2); color: var(--text); border: 1px solid var(--border); font-size: 0.9rem; padding: 0.25rem 0.6rem;">v{{ app_version }}</span>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0">
+          <label>Storage Status</label>
+          <p class="muted" style="margin-top: 0.25rem">Database selection is managed by the Home Assistant add-on configuration.</p>
+          <div id="storageStatus" class="stack-gap-sm">Loading storage status...</div>
+        </div>
+      </div>
+    </div>
     <div class="card settings-card settings-external-card">
       <details class="settings-collapsible" open>
         <summary>📺 External URLs</summary>
