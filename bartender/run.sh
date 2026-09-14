@@ -6,7 +6,7 @@ INGRESS_PATH="$(bashio::app.ingress_entry)"
 export INGRESS_PATH
 
 # Read addon version provided by Home Assistant
-ADDON_VERSION="$(bashio::addon.version)"
+ADDON_VERSION="$(bashio::app.version)"
 export ADDON_VERSION
 APP_VERSION="${ADDON_VERSION}"
 export APP_VERSION
