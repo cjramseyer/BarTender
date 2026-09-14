@@ -33,6 +33,21 @@ def test_login_page_redirects_when_not_authenticated(tmp_path):
     assert response.headers["Location"].startswith("/login")
 
 
+def test_cors_allows_only_configured_origins(tmp_path, monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "http://127.0.0.1:5055, https://mobile.example")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    allowed = client.get("/api/taps", headers={"Origin": "http://127.0.0.1:5055"})
+    assert allowed.status_code == 200
+    assert allowed.headers["Access-Control-Allow-Origin"] == "http://127.0.0.1:5055"
+    assert allowed.headers["Access-Control-Allow-Credentials"] == "true"
+
+    denied = client.get("/api/taps", headers={"Origin": "https://untrusted.example"})
+    assert denied.status_code == 200
+    assert "Access-Control-Allow-Origin" not in denied.headers
+
+
 def test_login_page_does_not_render_whats_new_notice(tmp_path):
     app_module = _load_app_module(tmp_path)
     data = app_module.load_data()

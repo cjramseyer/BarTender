@@ -84,6 +84,17 @@ TELEMETRY_HEARTBEAT_URL = "https://bartender-telemetry.td2.info/v1/heartbeat"
 EXTERNAL_API_PORT = os.environ.get("EXTERNAL_API_PORT", "8110")
 
 
+def _parse_cors_origins(value: str) -> frozenset[str]:
+    return frozenset(
+        origin.strip().rstrip("/")
+        for origin in re.split(r"[\s,;]+", str(value or ""))
+        if origin.strip()
+    )
+
+
+CORS_ALLOWED_ORIGINS = _parse_cors_origins(os.environ.get("CORS_ALLOWED_ORIGINS", ""))
+
+
 def _session_timeout_minutes() -> int:
     try:
         configured = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "240") or "240")
@@ -326,6 +337,22 @@ app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 DATA_STATE_LOCK = threading.RLock()
+
+
+@app.after_request
+def add_cors_headers(response):
+    origin = str(request.headers.get("Origin", "") or "").strip().rstrip("/")
+    if origin and origin in CORS_ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, X-API-Token"
+        )
+        response.headers["Access-Control-Allow-Methods"] = (
+            "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
+        )
+        response.headers.add("Vary", "Origin")
+    return response
 
 
 @app.before_request

@@ -34,7 +34,11 @@ class _TapsScreenState extends State<TapsScreen> {
     );
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+    setState(() {
+      _future = _load();
+    });
+  }
 
   Future<void> _pour(Tap tap) async {
     final amount = await showDialog<double>(
