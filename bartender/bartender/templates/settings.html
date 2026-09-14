@@ -158,6 +158,36 @@ content %}
               updates.</small
             >
           </div>
+          <div class="form-group">
+            <label for="mobileSessionTimeoutMinutes">Mobile Session Timeout (minutes)</label>
+            <input
+              type="number"
+              id="mobileSessionTimeoutMinutes"
+              class="form-control"
+              min="5"
+              max="43200"
+              step="1"
+              value="{{ settings.mobile_session_timeout_minutes or 30 }}"
+            />
+            <small class="muted"
+              >Mobile sessions use this shorter idle timeout. The value cannot exceed the global add-on timeout.</small
+            >
+          </div>
+          <div class="form-group">
+            <label for="stationSessionTimeoutMinutes">Station Session Timeout (minutes)</label>
+            <input
+              type="number"
+              id="stationSessionTimeoutMinutes"
+              class="form-control"
+              min="5"
+              max="43200"
+              step="1"
+              value="{{ settings.station_session_timeout_minutes or 30 }}"
+            />
+            <small class="muted"
+              >Pour-station sessions use this idle timeout. The value cannot exceed the global add-on timeout.</small
+            >
+          </div>
           {% if qr_ready %}
           <div class="form-group">
             <label>Printable Menu QR Code</label>
@@ -1520,6 +1550,18 @@ content %}
       environment_mode: getCheckedRadioValue(
         "environment_mode",
         DEFAULT_ENVIRONMENT_MODE,
+      ),
+      mobile_session_timeout_minutes: getClampedIntegerValue(
+        "mobileSessionTimeoutMinutes",
+        30,
+        5,
+        43200,
+      ),
+      station_session_timeout_minutes: getClampedIntegerValue(
+        "stationSessionTimeoutMinutes",
+        30,
+        5,
+        43200,
       ),
       display_title_on_tap: document.getElementById("displayTitleOnTap")
         ? document.getElementById("displayTitleOnTap").value.trim() || "On Draft"
@@ -3054,9 +3096,45 @@ content %}
   }
 
   const breweryTypeInputs = document.querySelectorAll('input[name="brewery_type"]');
+
+  function syncNavIndicators() {
+    const navLinks = document.querySelector(".navbar .nav-links");
+    if (!navLinks) return;
+
+    const syncIndicator = (id, enabled, text, title) => {
+      let indicator = document.getElementById(id);
+      if (!enabled) {
+        if (indicator) indicator.remove();
+        return;
+      }
+      if (!indicator) {
+        indicator = document.createElement("span");
+        indicator.id = id;
+        indicator.className = "nav-mode-indicator";
+        navLinks.before(indicator);
+      }
+      indicator.title = title;
+      indicator.textContent = text;
+    };
+
+    syncIndicator(
+      "navSandboxIndicator",
+      getCheckedRadioValue("environment_mode", DEFAULT_ENVIRONMENT_MODE) === "sandbox",
+      "Sandbox Mode",
+      "Sandbox mode is active",
+    );
+    syncIndicator(
+      "navProIndicator",
+      currentBreweryType() === "pro",
+      "Pro",
+      "Pro bar profile is active",
+    );
+  }
+
   breweryTypeInputs.forEach((input) => {
     input.addEventListener("change", () => {
       syncDisplaySettingsAvailability();
+      syncNavIndicators();
       scheduleAutoSave(100);
     });
   });
@@ -3070,6 +3148,12 @@ content %}
     .forEach((input) => {
       input.addEventListener("change", () => scheduleAutoSave(100));
     });
+
+  document
+    .querySelectorAll('input[name="environment_mode"]')
+    .forEach((input) => input.addEventListener("change", syncNavIndicators));
+
+  syncNavIndicators();
 
   [
     "menuQrMode",

@@ -39,8 +39,13 @@
         <span>{{ settings.bar_name }}</span>
       </a>
       {% if (settings.environment_mode or 'production') == 'sandbox' %}
-      <span class="nav-mode-indicator" title="Sandbox mode is active"
+      <span id="navSandboxIndicator" class="nav-mode-indicator" title="Sandbox mode is active"
         >Sandbox Mode</span
+      >
+      {% endif %}
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+      <span id="navProIndicator" class="nav-mode-indicator" title="Pro bar profile is active"
+        >Pro</span
       >
       {% endif %}
       <ul class="nav-links">

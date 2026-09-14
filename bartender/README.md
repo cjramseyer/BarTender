@@ -134,8 +134,13 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 
 Most BarTender settings are managed from within the web UI after the add-on starts.
 The add-on configuration includes `session_timeout_minutes`, which controls the idle
-timeout for signed-in browser sessions. It defaults to 480 minutes (8 hours), accepts
-values from 5 minutes to 30 days, and takes effect after restarting the add-on.
+timeout for signed-in browser sessions. It defaults to 240 minutes (4 hours), accepts
+values from 5 minutes to 240 minutes, and takes effect after restarting the add-on.
+The Settings UI also provides separate mobile and pour-station session timeouts. Both
+default to 30 minutes and cannot exceed the global timeout. Staff can select pour
+station mode at login. Session and device
+metadata are retained for up to 90 days after termination and include limited
+user-agent and IP information for access management.
 
 ## Core Usage Flows
 

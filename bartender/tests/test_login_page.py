@@ -87,6 +87,25 @@ def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
     assert 'id="updateNoticeModal"' in page
 
 
+def test_pro_profile_shows_title_bar_indicator(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'title="Pro bar profile is active"' in page
+    assert "Pro" in page
+
+
 def test_team_access_renders_scan_credential_modal(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -174,6 +193,93 @@ def test_authenticated_session_expires_after_idle_timeout(tmp_path):
     assert response.headers["Location"].startswith("/login")
     with client.session_transaction() as session:
         assert "user_id" not in session
+
+
+def test_authenticated_session_is_listed_and_can_be_revoked(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/api/team/sessions", headers={"User-Agent": "Mozilla/5.0"})
+
+    assert response.status_code == 200
+    sessions = response.get_json()["sessions"]
+    assert len(sessions) == 1
+    assert sessions[0]["is_current"] is True
+    session_id = sessions[0]["id"]
+
+    revoked = client.post(
+        "/api/team/sessions",
+        json={"action": "revoke", "session_id": session_id},
+    )
+
+    assert revoked.status_code == 200
+    rejected = client.get("/api/team/sessions")
+    assert rejected.status_code == 401
+
+
+def test_mobile_session_uses_configured_shorter_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["mobile_session_timeout_minutes"] = 30
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get(
+        "/api/team/sessions",
+        headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile"},
+    )
+
+    assert response.status_code == 200
+    session_record = response.get_json()["sessions"][0]
+    assert session_record["device_type"] == "mobile"
+    stored = app_module.load_data()["user_sessions"][0]
+    assert stored["timeout_minutes"] == 30
+
+
+def test_station_login_uses_station_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/login",
+        data={"user_id": "owner", "station_mode": "1"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    sessions = app_module.load_data()["user_sessions"]
+    assert sessions[-1]["session_type"] == "station"
+    assert sessions[-1]["timeout_minutes"] == 30
+
+
+def test_session_timeout_settings_are_clamped_to_global_timeout(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post(
+        "/api/settings",
+        json={
+            "mobile_session_timeout_minutes": 999,
+            "station_session_timeout_minutes": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    settings = app_module.load_data()["settings"]
+    assert settings["mobile_session_timeout_minutes"] == 240
+    assert settings["station_session_timeout_minutes"] == 5
 
 
 def test_user_scan_credential_logs_in_and_can_be_revoked(tmp_path):

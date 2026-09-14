@@ -122,6 +122,15 @@
     </div>
   </div>
 </div>
+<div class="card settings-card settings-team-card">
+  <div class="settings-collapsible-body">
+    <div class="form-group">
+      <label>Active Sessions</label>
+      <small class="muted">Review signed-in browsers and revoke access for an individual session.</small>
+      <div id="userSessionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+    </div>
+  </div>
+</div>
 <div class="modal" id="scanCredentialModal">
   <div class="modal-dialog modal-dialog-lg">
     <div class="modal-header">
@@ -236,6 +245,62 @@
     const users = await fetch(`${INGRESS}/api/team/users`).then((r) => r.json());
     TEAM_USERS = users.users || [];
     renderTeamUsers(TEAM_USERS);
+  }
+
+  function escapeSessionText(value) {
+    return String(value || "").replace(/[&<>\"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[character]));
+  }
+
+  async function refreshUserSessions() {
+    const list = document.getElementById("userSessionsList");
+    if (!list) return;
+    try {
+      const response = await fetch(`${INGRESS}/api/team/sessions`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Unable to load sessions.");
+      const sessions = Array.isArray(body.sessions) ? body.sessions : [];
+      if (!sessions.length) {
+        list.innerHTML = '<p class="muted">No active sessions found.</p>';
+        return;
+      }
+      list.innerHTML = sessions.map((item) => `
+        <div class="settings-user-row" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border:1px solid rgba(148,163,184,0.35); border-radius:8px; background:rgba(148,163,184,0.05);">
+          <div>
+            <strong>${escapeSessionText(item.device_type)}${item.is_current ? " (Current)" : ""}</strong>
+            <div class="muted" style="font-size:0.85rem;">${escapeSessionText(item.user_agent || "Unknown browser")}</div>
+            <div class="muted" style="font-size:0.8rem;">IP: ${escapeSessionText(item.ip_address || "Unavailable")} · Last active: ${escapeSessionText(item.last_activity_at)}</div>
+          </div>
+          <button type="button" class="btn btn-danger btn-sm" data-session-id="${escapeSessionText(item.id)}" onclick="revokeUserSession(this)">Revoke</button>
+        </div>
+      `).join("");
+    } catch (err) {
+      console.error(err);
+      list.innerHTML = `<p class="muted">${escapeSessionText(err.message || "Unable to load sessions.")}</p>`;
+    }
+  }
+
+  async function revokeUserSession(button) {
+    const sessionId = button.dataset.sessionId;
+    if (!sessionId || !window.confirm("Revoke this session?")) return;
+    try {
+      const response = await fetch(`${INGRESS}/api/team/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke", session_id: sessionId }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Unable to revoke session.");
+      await refreshUserSessions();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Unable to revoke session.");
+    }
   }
 
   let activeScanCredential = null;
@@ -505,5 +570,6 @@
   }
 
   renderTeamUsers(TEAM_USERS || []);
+  refreshUserSessions();
 </script>
 {% endblock %}

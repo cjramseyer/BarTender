@@ -93,13 +93,26 @@ Most BarTender settings are managed from within the web UI after the add-on star
 The add-on configuration also provides:
 
 - `session_timeout_minutes`: idle timeout for signed-in browser sessions. The default is
-  `480` minutes (8 hours); valid values range from 5 minutes to 30 days. Change this
+  `240` minutes (4 hours); valid values range from 5 minutes to 240 minutes. Change this
   under the add-on's **Configuration** tab and restart the add-on for the new value to
   take effect.
 
 Sessions are signed with a secret persisted in `/data/.secret_key`, so normal add-on
 restarts do not invalidate active sessions. Removing the add-on's stored data or
 changing an explicitly supplied `SECRET_KEY` invalidates existing sessions.
+
+The Settings UI provides separate mobile and pour-station idle timeouts. Both default
+to 30 minutes and accept values from 5 minutes through the global timeout. A user can
+choose **Use this device as a pour station** at login; station sessions use the station
+timeout while retaining the normal application permissions.
+
+BarTender records active browser sessions with the signed-in user, login method,
+device category, user-agent, IP address, login time, last activity, expiration, and
+revocation state. Session records are retained for up to 90 days after expiration or
+revocation and are limited to the most recent 500 records. Device classification uses
+conservative user-agent matching; BarTender does not use invasive browser fingerprinting.
+IP addresses and user-agent strings are operational security data and should be handled
+according to the operator's privacy and retention requirements.
 
 ## Core Usage Flows
 
