@@ -613,6 +613,10 @@ def require_login_for_web_views():
             return None
         if request.method == "OPTIONS":
             return None
+        if normalized_path == "/api/settings" and request.method == "POST":
+            bootstrap_data = load_data()
+            if not bootstrap_data.get("settings", {}).get("setup_completed"):
+                return None
         if EXTERNAL_API_MODE:
             return None
         if app.testing:
@@ -3693,10 +3697,14 @@ def api_storage_status():
 def api_save_settings():
     data = load_data()
     current_user = _get_current_team_user()
-    if not _team_can(current_user.get("role", "owner"), "settings"):
+    body = request.get_json(force=True)
+    is_setup_bootstrap = (
+        not session.get("user_id")
+        and _coerce_bool(body.get("setup_completed"), False)
+    )
+    if not is_setup_bootstrap and not _team_can(current_user.get("role", "owner"), "settings"):
         return jsonify({"error": "Insufficient permissions"}), 403
 
-    body = request.get_json(force=True)
     restricted_owner_only_keys = {
         "bar_name",
         "external_api_token",
@@ -3712,7 +3720,7 @@ def api_save_settings():
         "station_session_timeout_minutes",
         "anonymous_telemetry_enabled",
     }
-    if current_user.get("role") != "owner":
+    if current_user.get("role") != "owner" and not is_setup_bootstrap:
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
         if restricted_keys_found:
             return jsonify({
