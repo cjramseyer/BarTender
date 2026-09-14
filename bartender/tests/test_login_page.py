@@ -131,6 +131,35 @@ def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
     assert app_module.load_data()["settings"]["license_type"] == ""
 
 
+def test_manager_cannot_activate_license(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "manager-1"
+        session["user_role"] = "manager"
+        session["user_name"] = "Manager"
+
+    response = client.post("/api/licensing/activate", json={"token": "token"})
+
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "Only the owner can activate a license."
+
+
+def test_external_api_listener_does_not_expose_licensing(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.EXTERNAL_API_MODE = True
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/api/licensing/activate",
+        json={"token": "token"},
+        headers={"X-API-Token": "external-token"},
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "Licensing is available only through the management UI."
+
+
 def test_owner_can_clear_license_state(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -768,6 +797,8 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     assert "Save Advanced Settings" in body
     assert 'id="posSyncProvider"' not in body
     assert "POS Sync Provider" not in body
+    assert "Licensing" not in body
+    assert 'onclick="activateLicense()"' not in body
     assert 'id="displayCount"' in body
     assert 'disabled' in body
     assert 'value="2"' in body

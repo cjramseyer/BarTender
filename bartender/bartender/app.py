@@ -687,8 +687,11 @@ def enforce_external_api_controls():
     if not EXTERNAL_API_MODE:
         return None
 
-    if not _normalized_request_path().startswith("/api/"):
+    request_path = _normalized_request_path()
+    if not request_path.startswith("/api/"):
         return jsonify({"error": "External API listener exposes API routes only."}), 404
+    if request_path.startswith("/api/licensing/"):
+        return jsonify({"error": "Licensing is available only through the management UI."}), 404
 
     data = load_data()
     settings = data.get("settings", {}) if isinstance(data.get("settings", {}), dict) else {}
