@@ -48,6 +48,36 @@ def test_cors_allows_only_configured_origins(tmp_path, monkeypatch):
     assert "Access-Control-Allow-Origin" not in denied.headers
 
 
+def test_production_api_requires_authentication(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.app.config["TESTING"] = False
+    client = app_module.app.test_client()
+
+    response = client.post("/api/taps/1/pour", json={"amount": 16, "unit": "oz"})
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "Authentication required."
+
+
+def test_mobile_login_issues_token_for_user_pin(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["team_users"][0]["pin"] = "2468"
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/api/mobile/login",
+        json={"user_id": "owner", "pin": "2468"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["token"]
+    assert payload["user"]["id"] == "owner"
+    assert app_module.load_data()["mobile_tokens"]
+
+
 def test_login_page_does_not_render_whats_new_notice(tmp_path):
     app_module = _load_app_module(tmp_path)
     data = app_module.load_data()
