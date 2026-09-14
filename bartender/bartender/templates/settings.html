@@ -1187,6 +1187,50 @@ content %}
         </div>
       </div>
     </div>
+    {% if current_user_role == 'owner' %}
+    <div class="card settings-card settings-about-card">
+      <div class="settings-collapsible-body">
+        <h2 style="margin-top: 0">Licensing</h2>
+        <div id="licenseStatus" class="stack-gap-sm">
+          Loading license status...
+        </div>
+        <div class="form-group" style="margin-top: 0.75rem">
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary"
+            onclick="startLicenseTrial()"
+          >
+            Start 30-Day Pro Trial
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-danger"
+            onclick="clearLicense()"
+          >
+            Clear License
+          </button>
+        </div>
+        <div class="form-group">
+          <label for="licenseToken">Pro License Token</label>
+          <textarea
+            id="licenseToken"
+            class="form-control"
+            rows="4"
+            placeholder="Paste a signed license token"
+          ></textarea>
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary"
+            style="margin-top: 0.5rem"
+            onclick="activateLicense()"
+          >
+            Activate License
+          </button>
+          <span id="licenseMessage" class="save-msg"></span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     <div class="card settings-card settings-external-card">
       <details class="settings-collapsible" open>
         <summary>📺 External URLs</summary>
@@ -2940,6 +2984,78 @@ content %}
     }
   }
 
+  async function loadLicenseStatus() {
+    const container = document.getElementById("licenseStatus");
+    if (!container) return;
+    try {
+      const response = await fetch(`${INGRESS}/api/licensing/status`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(body.error || "Unable to load license status.");
+      container.innerHTML = `
+        <p><strong>Plan:</strong> ${escapeBrewfatherText(body.plan || "Base")}</p>
+        <p><strong>Status:</strong> ${body.active ? "Active" : "Not activated"}</p>
+        ${body.expires_at ? `<p><strong>Expires:</strong> ${escapeBrewfatherText(body.expires_at)}</p>` : ""}
+        ${body.active ? `<p><strong>Days remaining:</strong> ${body.days_remaining}</p>` : ""}
+      `;
+    } catch (error) {
+      container.textContent = error.message || "Unable to load license status.";
+    }
+  }
+
+  async function startLicenseTrial() {
+    const message = document.getElementById("licenseMessage");
+    try {
+      const response = await fetch(`${INGRESS}/api/licensing/trial`, {
+        method: "POST",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Unable to start trial.");
+      if (message) message.textContent = "✓ Trial started.";
+      await loadLicenseStatus();
+    } catch (error) {
+      if (message)
+        message.textContent = error.message || "Unable to start trial.";
+    }
+  }
+
+  async function activateLicense() {
+    const input = document.getElementById("licenseToken");
+    const message = document.getElementById("licenseMessage");
+    try {
+      const response = await fetch(`${INGRESS}/api/licensing/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: input ? input.value.trim() : "" }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(body.error || "Unable to activate license.");
+      if (message) message.textContent = "✓ License activated.";
+      if (input) input.value = "";
+      await loadLicenseStatus();
+    } catch (error) {
+      if (message)
+        message.textContent = error.message || "Unable to activate license.";
+    }
+  }
+
+  async function clearLicense() {
+    const message = document.getElementById("licenseMessage");
+    if (!window.confirm("Clear the current license or trial?")) return;
+    const response = await fetch(`${INGRESS}/api/licensing/clear`, {
+      method: "POST",
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (message)
+        message.textContent = body.error || "Unable to clear licensing state.";
+      return;
+    }
+    if (message) message.textContent = "License cleared.";
+    await loadLicenseStatus();
+  }
+
   async function resolveBrewfatherConflict(conflictId, resolution) {
     const response = await fetch(
       `${INGRESS}/api/brewfather/conflicts/${encodeURIComponent(conflictId)}/resolve`,
@@ -2964,6 +3080,7 @@ content %}
 
   loadBrewfatherConflicts();
   loadStorageStatus();
+  loadLicenseStatus();
 
   function createPourOptionRow(option = {}) {
     const row = document.createElement("div");

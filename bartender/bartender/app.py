@@ -15,6 +15,7 @@ import math
 import time
 import threading
 import uuid
+import binascii
 from collections import deque
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -22,6 +23,11 @@ from typing import Any, Protocol, cast, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:  # pragma: no cover - dependency is installed in production
+    Ed25519PublicKey = None
 
 from bartender.pos_sync.service import (
     POS_SYNC_PROVIDERS,
@@ -93,6 +99,9 @@ def _parse_cors_origins(value: str) -> frozenset[str]:
 
 
 CORS_ALLOWED_ORIGINS = _parse_cors_origins(os.environ.get("CORS_ALLOWED_ORIGINS", ""))
+LICENSE_PUBLIC_KEY = str(os.environ.get("LICENSE_PUBLIC_KEY", "") or "").strip()
+LICENSE_APP_ID = "bartender"
+TRIAL_DAYS = 30
 
 
 def _session_timeout_minutes() -> int:
@@ -829,6 +838,12 @@ DEFAULT_DATA = {
         "anonymous_telemetry_last_heartbeat_date": "",
         "mobile_session_timeout_minutes": DEFAULT_MOBILE_SESSION_TIMEOUT_MINUTES,
         "station_session_timeout_minutes": DEFAULT_STATION_SESSION_TIMEOUT_MINUTES,
+        "license_type": "",
+        "license_token": "",
+        "license_expires_at": "",
+        "license_features": [],
+        "trial_started_at": "",
+        "trial_expires_at": "",
     },
     "bar_stock": [],
     "beers": [],
@@ -1029,6 +1044,12 @@ def _load_data_unlocked() -> dict:
         data["settings"]["station_session_timeout_minutes"] = _normalize_station_session_timeout_minutes(
             data["settings"].get("station_session_timeout_minutes")
         )
+        data["settings"]["license_type"] = str(data["settings"].get("license_type", "") or "").strip().lower()
+        data["settings"]["license_token"] = str(data["settings"].get("license_token", "") or "").strip()
+        data["settings"]["license_expires_at"] = str(data["settings"].get("license_expires_at", "") or "").strip()
+        data["settings"]["license_features"] = data["settings"].get("license_features", []) if isinstance(data["settings"].get("license_features", []), list) else []
+        data["settings"]["trial_started_at"] = str(data["settings"].get("trial_started_at", "") or "").strip()
+        data["settings"]["trial_expires_at"] = str(data["settings"].get("trial_expires_at", "") or "").strip()
         data["settings"].setdefault("anonymous_telemetry_installation_id", "")
         data["settings"].setdefault("anonymous_telemetry_last_heartbeat_date", "")
         if not isinstance(data.get("user_sessions"), list):
@@ -1301,6 +1322,65 @@ def _normalize_environment_mode(value) -> str:
     if mode in ("sandbox", "production"):
         return mode
     return "production"
+
+
+def _license_b64decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(str(value).encode("ascii") + b"=" * (-len(str(value)) % 4))
+
+
+def _license_b64encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _license_status(settings: dict) -> dict:
+    now = datetime.now(timezone.utc)
+    license_type = str(settings.get("license_type", "") or "").strip().lower()
+    expires_at = str(settings.get("license_expires_at", "") or "").strip()
+    if license_type == "trial" and not expires_at:
+        expires_at = str(settings.get("trial_expires_at", "") or "").strip()
+    try:
+        expiration = datetime.fromisoformat(expires_at.replace("Z", "+00:00")) if expires_at else None
+        if expiration and expiration.tzinfo is None:
+            expiration = expiration.replace(tzinfo=timezone.utc)
+    except ValueError:
+        expiration = None
+
+    if license_type in ("trial", "paid") and expiration and expiration > now:
+        return {
+            "plan": "Trial" if license_type == "trial" else "Pro",
+            "license_type": license_type,
+            "active": True,
+            "expires_at": expiration.isoformat(),
+            "days_remaining": max(0, (expiration.date() - now.date()).days),
+            "features": settings.get("license_features", []),
+        }
+    return {
+        "plan": "Base",
+        "license_type": "",
+        "active": False,
+        "expires_at": "",
+        "days_remaining": 0,
+        "features": [],
+    }
+
+
+def _validate_license_token(token: str) -> dict:
+    if not LICENSE_PUBLIC_KEY or Ed25519PublicKey is None:
+        raise ValueError("License verification is not configured.")
+    parts = str(token or "").strip().split(".")
+    if len(parts) != 2:
+        raise ValueError("Invalid license token format.")
+    payload_bytes = _license_b64decode(parts[0])
+    signature = _license_b64decode(parts[1])
+    try:
+        public_key = Ed25519PublicKey.from_public_bytes(_license_b64decode(LICENSE_PUBLIC_KEY))
+        public_key.verify(signature, payload_bytes)
+        payload = json.loads(payload_bytes.decode("utf-8"))
+    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
+        raise ValueError("Invalid license signature or payload.") from exc
+    if payload.get("app_id") != LICENSE_APP_ID or payload.get("plan") != "pro":
+        raise ValueError("License is not valid for this application.")
+    return payload
 
 
 def _normalize_team_role(value) -> str:
@@ -3640,6 +3720,78 @@ def api_get_settings():
     if not _team_can(current_user.get("role", "owner"), "settings"):
         return jsonify({"error": "Insufficient permissions"}), 403
     return jsonify(_brewfather_settings_response(data["settings"]))
+
+
+@app.route("/api/licensing/status", methods=["GET"])
+def api_licensing_status():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("id") == "anonymous":
+        return jsonify({"error": "Authentication required."}), 401
+    return jsonify({"app_id": LICENSE_APP_ID, **_license_status(data["settings"])})
+
+
+@app.route("/api/licensing/trial", methods=["POST"])
+def api_start_license_trial():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Only the owner can start a trial."}), 403
+    status = _license_status(data["settings"])
+    if status["active"]:
+        return jsonify({"error": "A license or trial is already active."}), 409
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=TRIAL_DAYS)
+    data["settings"].update({
+        "license_type": "trial",
+        "license_expires_at": expires_at.isoformat(),
+        "trial_started_at": now.isoformat(),
+        "trial_expires_at": expires_at.isoformat(),
+        "license_features": ["pro"],
+    })
+    _record_team_audit(data, current_user, "license_trial_started", LICENSE_APP_ID, {"expires_at": expires_at.isoformat()})
+    save_data(data)
+    return jsonify(_license_status(data["settings"]))
+
+
+@app.route("/api/licensing/activate", methods=["POST"])
+def api_activate_license():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Only the owner can activate a license."}), 403
+    token = str((request.get_json(silent=True) or {}).get("token", "") or "").strip()
+    try:
+        payload = _validate_license_token(token)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    data["settings"].update({
+        "license_type": "paid",
+        "license_token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        "license_expires_at": str(payload.get("expires_at", "")),
+        "license_features": payload.get("features", []) if isinstance(payload.get("features", []), list) else [],
+    })
+    _record_team_audit(data, current_user, "license_activated", LICENSE_APP_ID, {"expires_at": data["settings"]["license_expires_at"]})
+    save_data(data)
+    return jsonify(_license_status(data["settings"]))
+
+
+@app.route("/api/licensing/clear", methods=["POST"])
+def api_clear_license():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Only the owner can clear licensing state."}), 403
+    data["settings"].update({
+        "license_type": "",
+        "license_token": "",
+        "license_token_hash": "",
+        "license_expires_at": "",
+        "license_features": [],
+    })
+    _record_team_audit(data, current_user, "license_cleared", LICENSE_APP_ID, {})
+    save_data(data)
+    return jsonify(_license_status(data["settings"]))
 
 
 @app.route("/api/user/release-seen", methods=["POST"])

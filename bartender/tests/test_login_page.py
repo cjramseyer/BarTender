@@ -98,6 +98,54 @@ def test_mobile_login_issues_token_for_user_pin(tmp_path):
     assert app_module.load_data()["mobile_tokens"]
 
 
+def test_owner_can_start_pro_trial(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post("/api/licensing/trial")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["plan"] == "Trial"
+    assert payload["active"] is True
+    assert payload["days_remaining"] == 30
+    assert app_module.load_data()["settings"]["license_type"] == "trial"
+
+
+def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
+    monkeypatch.setenv("LICENSE_PUBLIC_KEY", "invalid")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post("/api/licensing/activate", json={"token": "bad-token"})
+
+    assert response.status_code == 400
+    assert app_module.load_data()["settings"]["license_type"] == ""
+
+
+def test_owner_can_clear_license_state(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+    client.post("/api/licensing/trial")
+
+    response = client.post("/api/licensing/clear")
+
+    assert response.status_code == 200
+    assert app_module.load_data()["settings"]["license_type"] == ""
+
+
 def test_login_page_does_not_render_whats_new_notice(tmp_path):
     app_module = _load_app_module(tmp_path)
     data = app_module.load_data()

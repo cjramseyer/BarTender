@@ -148,6 +148,11 @@ station mode at login. Session and device
 metadata are retained for up to 90 days after termination and include limited
 user-agent and IP information for access management.
 
+Owners can manage licensing from the Settings About panel. The app supports a local
+30-day Pro trial and signed Pro license tokens verified with the configured Ed25519
+public key. The private signing key belongs in a separate licensing service, never in
+the add-on repository.
+
 Browser clients hosted on another origin require the add-on option
 `cors_allowed_origins`. Set it to a comma-, space-, or newline-separated allowlist of
 trusted origins, such as `http://127.0.0.1:5055,https://mobile.example`. Leave it
