@@ -1,7 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Team Access{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Team Access{% endblock %} {% block
+content %}
 <div class="page-header">
   <div>
     <p class="eyebrow">Users</p>
@@ -10,12 +8,15 @@
 </div>
 
 {% if owner_pin_recovery_required %}
-<div class="card settings-card settings-warning-block" style="margin-bottom: 1rem">
+<div
+  class="card settings-card settings-warning-block"
+  style="margin-bottom: 1rem"
+>
   <div class="settings-collapsible-body">
     <label>Owner Recovery Mode</label>
     <p class="muted" style="margin-top: 0.35rem">
       This installation has multiple team members but no owner PIN yet.
-      Save an Owner PIN here to unlock the rest of the app.
+      <span>Save an Owner PIN here</span> to unlock the rest of the app.
     </p>
     <p class="muted" style="margin-top: 0.25rem">
       Team management actions stay locked until the Owner PIN is saved.
@@ -45,7 +46,9 @@
           Save Owner Name
         </button>
       </div>
-      <small class="muted">This is the display name shown for the owner account.</small>
+      <small class="muted"
+        >This is the display name shown for the owner account.</small
+      >
     </div>
     <div class="form-group">
       <label>Owner PIN</label>
@@ -58,10 +61,13 @@
         autocomplete="new-password"
       />
       <small class="muted">
-        Require this PIN for the owner login when there is more than one team member.
-        Leave blank if you want only the single-owner setup.
+        Require this PIN for the owner login when there is more than one team
+        member. Leave blank if you want only the single-owner setup.
       </small>
-      <div class="form-row" style="gap: 0.5rem; align-items: center; margin-top: 0.75rem">
+      <div
+        class="form-row"
+        style="gap: 0.5rem; align-items: center; margin-top: 0.75rem"
+      >
         <button
           type="button"
           class="btn btn-secondary btn-sm"
@@ -79,7 +85,11 @@
         Save the Owner PIN above before adding or changing team members.
       </small>
       {% endif %}
-      <div id="teamUsersList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <div
+        id="teamUsersList"
+        class="stack-gap-sm"
+        style="margin-top: 8px"
+      ></div>
     </div>
     <div class="form-group">
       <label>Invite User</label>
@@ -117,7 +127,8 @@
         </button>
       </div>
       <small class="muted">
-        Owners and managers can manage users. Staff access is restricted to their own account.
+        Owners and managers can manage users. Staff access is restricted to
+        their own account.
       </small>
     </div>
   </div>
@@ -126,8 +137,15 @@
   <div class="settings-collapsible-body">
     <div class="form-group">
       <label>Active Sessions</label>
-      <small class="muted">Review signed-in browsers and revoke access for an individual session.</small>
-      <div id="userSessionsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <small class="muted"
+        >Review signed-in browsers and revoke access for an individual
+        session.</small
+      >
+      <div
+        id="userSessionsList"
+        class="stack-gap-sm"
+        style="margin-top: 8px"
+      ></div>
     </div>
   </div>
 </div>
@@ -135,15 +153,36 @@
   <div class="settings-collapsible-body">
     <div class="form-group">
       <label>Registered Pour Stations</label>
-      <small class="muted">Register this browser once to preselect pour-station mode on future logins.</small>
-      <div class="form-row" style="gap: 0.5rem; align-items: end; margin-top: 0.75rem">
+      <small class="muted"
+        >Register this browser once to preselect pour-station mode on future
+        logins.</small
+      >
+      <div
+        class="form-row"
+        style="gap: 0.5rem; align-items: end; margin-top: 0.75rem"
+      >
         <div class="form-group" style="flex: 1; min-width: 180px">
-          <input type="text" id="stationName" class="form-control" placeholder="Station name" />
+          <input
+            type="text"
+            id="stationName"
+            class="form-control"
+            placeholder="Station name"
+          />
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="registerStation()">Register This Station</button>
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          onclick="registerStation()"
+        >
+          Register This Station
+        </button>
       </div>
       <span id="stationRegistrationMsg" class="save-msg"></span>
-      <div id="registeredStationsList" class="stack-gap-sm" style="margin-top: 8px"></div>
+      <div
+        id="registeredStationsList"
+        class="stack-gap-sm"
+        style="margin-top: 8px"
+      ></div>
     </div>
   </div>
 </div>
@@ -151,18 +190,30 @@
   <div class="modal-dialog modal-dialog-lg">
     <div class="modal-header">
       <h3 id="scanCredentialTitle">QR / NFC Credential</h3>
-      <button class="btn btn-icon" onclick="closeModal('scanCredentialModal')">✕</button>
+      <button class="btn btn-icon" onclick="closeModal('scanCredentialModal')">
+        ✕
+      </button>
     </div>
     <div id="scanCredentialBody" class="stack-gap-sm"></div>
     <div class="modal-footer">
-      <button type="button" class="btn" onclick="closeModal('scanCredentialModal')">Close</button>
-      <button type="button" class="btn btn-secondary" onclick="printScanCredential()">Print Badge</button>
+      <button
+        type="button"
+        class="btn"
+        onclick="closeModal('scanCredentialModal')"
+      >
+        Close
+      </button>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        onclick="printScanCredential()"
+      >
+        Print Badge
+      </button>
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
   const INGRESS = "{{ ingress }}";
   let TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);

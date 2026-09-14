@@ -133,15 +133,15 @@ according to the operator's privacy and retention requirements.
 
 BarTender is intended for modern browsers. The practical supported baseline is:
 
-| Browser | Minimum version | Approximate release age |
-| --- | ---: | ---: |
-| Chrome | 60 or newer | About 9 years |
-| Firefox | 54 or newer | About 9 years |
-| Safari on macOS | 11 or newer | About 9 years |
-| Safari on iOS/iPadOS | 11 or newer | About 9 years |
-| Chromium-based Edge | 79 or newer | About 6.5 years |
-| Android Chrome/WebView | 67 or newer | About 8 years |
-| Samsung Internet | 8 or newer | About 8 years |
+| Browser                | Minimum version | Approximate release age |
+| ---------------------- | --------------: | ----------------------: |
+| Chrome                 |     60 or newer |           About 9 years |
+| Firefox                |     54 or newer |           About 9 years |
+| Safari on macOS        |     11 or newer |           About 9 years |
+| Safari on iOS/iPadOS   |     11 or newer |           About 9 years |
+| Chromium-based Edge    |     79 or newer |         About 6.5 years |
+| Android Chrome/WebView |     67 or newer |           About 8 years |
+| Samsung Internet       |      8 or newer |           About 8 years |
 
 Internet Explorer 11, Edge Legacy, Safari 10 and older, iOS 10 and older, and old
 embedded Android WebViews are not supported. Very old browsers may fail to load the

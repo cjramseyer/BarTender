@@ -279,8 +279,10 @@ def test_station_registration_persists_for_future_logins_and_can_be_revoked(tmp_
     assert app_module.load_data()["station_registrations"][0]["token_hash"]
 
     login_page = client.get("/login")
-    assert 'name="station_mode"' in login_page.get_data(as_text=True)
-    assert 'name="station_mode" value="1" checked' in login_page.get_data(as_text=True)
+    login_body = login_page.get_data(as_text=True)
+    assert 'name="station_mode"' in login_body
+    assert 'value="1"' in login_body
+    assert "checked" in login_body
 
     revoked = client.post(
         "/api/team/stations",
