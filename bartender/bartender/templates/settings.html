@@ -569,13 +569,6 @@ content %}
             >
           </div>
           <div class="form-group">
-            <label>Provider Catalog</label>
-            <div id="posProviderCatalogList" class="stack-gap-sm"></div>
-            <small class="muted"
-              >Add providers directly in app or import a provider JSON payload.</small
-            >
-          </div>
-          <div class="form-group">
             <label>New Provider Key</label>
             <input
               type="text"
@@ -690,6 +683,15 @@ content %}
               Last Error: <span id="posSyncLastError">{{ settings.pos_sync_last_error or 'None' }}</span>
             </p>
           </div>
+          <details class="settings-collapsible">
+            <summary>Provider Catalog</summary>
+            <div class="settings-collapsible-body">
+              <div id="posProviderCatalogList" class="stack-gap-sm"></div>
+              <small class="muted"
+                >Reference list of built-in and custom providers. It updates when a provider is added or imported.</small
+              >
+            </div>
+          </details>
         </div>
       </details>
 
@@ -1038,6 +1040,16 @@ content %}
           <div>
             <span class="badge" style="background: var(--surface2); color: var(--text); border: 1px solid var(--border); font-size: 0.9rem; padding: 0.25rem 0.6rem;">v{{ app_version }}</span>
           </div>
+        </div>
+        {% set selected_pos_provider = namespace(name="Not configured") %}
+        {% for provider in pos_sync_provider_catalog or [] %}
+        {% if provider.key == (settings.pos_sync_provider or '') %}
+        {% set selected_pos_provider.name = provider.name %}
+        {% endif %}
+        {% endfor %}
+        <div class="form-group">
+          <label>POS Sync Provider</label>
+          <div>{{ selected_pos_provider.name }}</div>
         </div>
         <div class="form-group" style="margin-bottom: 0">
           <label>Storage Status</label>

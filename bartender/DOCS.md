@@ -35,6 +35,21 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
 
+### POS Sync Providers
+
+The built-in POS sync provider catalog currently includes:
+
+- Arryved
+- Clover
+- Lightspeed
+- MOCK (testing and sandbox use)
+- Square
+- Toast
+
+Custom static providers can also be configured from **Settings -> POS Sync** when
+the built-in providers do not cover the installation's POS system. The currently
+selected provider is shown in the Settings About panel.
+
 ## Features
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
