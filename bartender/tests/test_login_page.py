@@ -749,7 +749,6 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     data = app_module.load_data()
     data["settings"]["brewery_type"] = "homebrewer"
     data["settings"]["display_count"] = 2
-    data["settings"]["pos_sync_provider"] = "square"
     app_module.save_data(data)
 
     with client.session_transaction() as session:
@@ -763,15 +762,17 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     body = response.get_data(as_text=True)
     assert "App Version" in body
     assert f"v{app_module.APP_VERSION}" in body
-    assert "POS Sync Provider" in body
-    assert "Square" in body
     assert "Number of Displays" in body
     assert "Homebrewer installs default to 2 displays." in body
     assert "Basic settings save automatically." in body
     assert "Save Advanced Settings" in body
+    assert 'id="posSyncProvider"' not in body
+    assert "POS Sync Provider" not in body
     assert 'id="displayCount"' in body
     assert 'disabled' in body
     assert 'value="2"' in body
+    assert 'id="proProfileRefreshNotice"' in body
+    assert "Refresh this page after the change saves" in body
 
 
 def test_authenticated_layout_shows_logout_link(tmp_path):

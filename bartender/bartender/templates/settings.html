@@ -83,6 +83,14 @@ content %}
               tracking. Switch to Pro to unlock multiple displays, POS
               integration, and higher capacity.</small
             >
+            <p
+              id="proProfileRefreshNotice"
+              class="muted"
+              style="display: none; margin-top: 0.5rem"
+            >
+              Pro selected. Refresh this page after the change saves to show Pro
+              settings.
+            </p>
           </div>
           <div class="form-group">
             <label>Bar Logo URL (optional)</label>
@@ -584,6 +592,7 @@ content %}
         </div>
       </details>
 
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
       <details class="settings-collapsible">
         <summary>POS Sync</summary>
         <div class="settings-collapsible-body">
@@ -759,6 +768,7 @@ content %}
           </details>
         </div>
       </details>
+      {% endif %}
 
       <details class="settings-collapsible">
         <summary>Brewfather Integration</summary>
@@ -1167,14 +1177,16 @@ content %}
             >
           </div>
         </div>
-        {% set selected_pos_provider = namespace(name="Not configured") %} {%
-        for provider in pos_sync_provider_catalog or [] %} {% if provider.key ==
+        {% if (settings.brewery_type or 'homebrewer') == 'pro' %} {% set
+        selected_pos_provider = namespace(name="Not configured") %} {% for
+        provider in pos_sync_provider_catalog or [] %} {% if provider.key ==
         (settings.pos_sync_provider or '') %} {% set selected_pos_provider.name
         = provider.name %} {% endif %} {% endfor %}
         <div class="form-group">
           <label>POS Sync Provider</label>
           <div>{{ selected_pos_provider.name }}</div>
         </div>
+        {% endif %}
         <div class="form-group" style="margin-bottom: 0">
           <label>Storage Status</label>
           <p class="muted" style="margin-top: 0.25rem">
@@ -1187,48 +1199,51 @@ content %}
         </div>
       </div>
     </div>
-    {% if current_user_role == 'owner' %}
+    {% if current_user_role == 'owner' and (settings.brewery_type or
+    'homebrewer') == 'pro' %}
     <div class="card settings-card settings-about-card">
-      <div class="settings-collapsible-body">
-        <h2 style="margin-top: 0">Licensing</h2>
-        <div id="licenseStatus" class="stack-gap-sm">
-          Loading license status...
+      <details class="settings-collapsible">
+        <summary>Licensing</summary>
+        <div class="settings-collapsible-body">
+          <div id="licenseStatus" class="stack-gap-sm">
+            Loading license status...
+          </div>
+          <div class="form-group" style="margin-top: 0.75rem">
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="startLicenseTrial()"
+            >
+              Start 30-Day Pro Trial
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-danger"
+              onclick="clearLicense()"
+            >
+              Clear License
+            </button>
+          </div>
+          <div class="form-group">
+            <label for="licenseToken">Pro License Token</label>
+            <textarea
+              id="licenseToken"
+              class="form-control"
+              rows="4"
+              placeholder="Paste a signed license token"
+            ></textarea>
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              style="margin-top: 0.5rem"
+              onclick="activateLicense()"
+            >
+              Activate License
+            </button>
+            <span id="licenseMessage" class="save-msg"></span>
+          </div>
         </div>
-        <div class="form-group" style="margin-top: 0.75rem">
-          <button
-            type="button"
-            class="btn btn-sm btn-secondary"
-            onclick="startLicenseTrial()"
-          >
-            Start 30-Day Pro Trial
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm btn-danger"
-            onclick="clearLicense()"
-          >
-            Clear License
-          </button>
-        </div>
-        <div class="form-group">
-          <label for="licenseToken">Pro License Token</label>
-          <textarea
-            id="licenseToken"
-            class="form-control"
-            rows="4"
-            placeholder="Paste a signed license token"
-          ></textarea>
-          <button
-            type="button"
-            class="btn btn-sm btn-secondary"
-            style="margin-top: 0.5rem"
-            onclick="activateLicense()"
-          >
-            Activate License
-          </button>
-          <span id="licenseMessage" class="save-msg"></span>
-        </div>
-      </div>
+      </details>
     </div>
     {% endif %}
     <div class="card settings-card settings-external-card">
@@ -3528,6 +3543,11 @@ content %}
       "Pro",
       "Pro bar profile is active",
     );
+    const refreshNotice = document.getElementById("proProfileRefreshNotice");
+    if (refreshNotice) {
+      refreshNotice.style.display =
+        currentBreweryType() === "pro" ? "" : "none";
+    }
   }
 
   breweryTypeInputs.forEach((input) => {
