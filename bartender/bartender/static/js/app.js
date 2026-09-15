@@ -132,8 +132,9 @@ function initAppPrompts(releaseDate, seenReleaseDate) {
   }
 
   const lastSeenReleaseDate = String(seenReleaseDate || "").trim();
+  const isIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value);
   const hasUnseenUpdate =
-    !lastSeenReleaseDate || currentReleaseDate > lastSeenReleaseDate;
+    !isIsoDate(lastSeenReleaseDate) || currentReleaseDate > lastSeenReleaseDate;
   if (hasUnseenUpdate) {
     openModal("updateNoticeModal");
   }
