@@ -227,6 +227,29 @@ def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
     page = response.get_data(as_text=True)
     assert 'id="titlebarWhatsNewButton"' not in page
     assert 'id="updateNoticeModal"' in page
+    assert 'onclick="openWhatsNewFromMenu()"' in page
+
+
+def test_whats_new_reappears_when_release_date_is_newer_than_dismissal(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["setup_completed"] = True
+    data["team_users"][0]["release_seen_version"] = "2026-09-14"
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'window.BARTENDER_RELEASE_DATE = "2026-09-15"' in page
+    assert 'window.BARTENDER_SEEN_RELEASE_DATE = "2026-09-14"' in page
+    assert 'id="updateNoticeModal"' in page
+    assert 'onclick="openWhatsNewFromMenu()"' in page
 
 
 def test_whats_new_is_hidden_when_release_highlights_are_empty(tmp_path, monkeypatch):
@@ -246,7 +269,7 @@ def test_whats_new_is_hidden_when_release_highlights_are_empty(tmp_path, monkeyp
     assert response.status_code == 200
     page = response.get_data(as_text=True)
     assert 'id="updateNoticeModal"' not in page
-    assert "What's New" not in page
+    assert "What's New" in page
 
 
 def test_pro_profile_shows_title_bar_indicator(tmp_path):
@@ -299,10 +322,10 @@ def test_whats_new_dismissal_is_stored_per_user(tmp_path):
         session["user_role"] = "owner"
         session["user_name"] = "Owner"
 
-    response = client.post("/api/user/release-seen", json={"version": "dev"})
+    response = client.post("/api/user/release-seen", json={"date": "2026-09-15"})
     assert response.status_code == 200
     saved_users = {user["id"]: user for user in app_module.load_data()["team_users"]}
-    assert saved_users["owner"]["release_seen_version"] == "dev"
+    assert saved_users["owner"]["release_seen_version"] == "2026-09-15"
     assert saved_users["staff-1"]["release_seen_version"] == ""
 
     with client.session_transaction() as session:

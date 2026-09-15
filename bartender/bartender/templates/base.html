@@ -80,7 +80,7 @@
             <span class="nav-menu-label">Menu</span>
           </button>
           <div class="nav-menu-panel" role="menu">
-            {% if settings.setup_completed and current_user_name and release_highlights %}
+            {% if settings.setup_completed and current_user_name %}
             <div class="nav-menu-section nav-menu-updates-section">
               <div class="nav-menu-section-title">Updates</div>
               <button
@@ -347,11 +347,13 @@
       window.BARTENDER_INGRESS = {{ ingress | tojson }};
       window.BARTENDER_APP_VERSION = {{ app_version | tojson }};
       window.BARTENDER_SEEN_VERSION = {{ current_user_release_seen_version | tojson }};
+      window.BARTENDER_RELEASE_DATE = {{ release_highlights_date | tojson }};
+      window.BARTENDER_SEEN_RELEASE_DATE = {{ current_user_release_seen_version | tojson }};
       window.BARTENDER_ENVIRONMENT_MODE = {{ (settings.environment_mode or 'production') | tojson }};
       initTheme("{{ settings.theme }}", "{{ ingress }}");
       document.body.dataset.managePos =
         document.documentElement.dataset.managePos || "top-right";
-      initAppPrompts(window.BARTENDER_APP_VERSION, window.BARTENDER_SEEN_VERSION);
+      initAppPrompts(window.BARTENDER_RELEASE_DATE, window.BARTENDER_SEEN_RELEASE_DATE);
     </script>
     {% block scripts %}{% endblock %}
   </body>
