@@ -1,0 +1,11 @@
+{
+  "highlights": [
+    "Added Pro profiles with higher tap and keg capacity.",
+    "Added multiple display boards with per-display tap assignments for Pro profiles.",
+    "Added POS pour mode and POS Sync provider configuration for Pro profiles.",
+    "Added owner-managed 30-day Pro trials and signed license activation.",
+    "Restricted licensing controls to the owner and management UI.",
+    "Added read-only active CORS origin status in Settings > About.",
+    "Updated the cryptography dependency to address current security advisories."
+  ]
+}
