@@ -1420,6 +1420,10 @@ def _license_instance_key_id(public_key: str) -> str:
     return "sha256:" + hashlib.sha256(_license_b64decode(public_key)).hexdigest()
 
 
+def _license_instance_public_key_sha256(public_key: str) -> str:
+    return _license_b64encode(hashlib.sha256(_license_b64decode(public_key)).digest())
+
+
 def _license_sign_activation_request(
     private_key_value: str,
     app_id: str,
@@ -1470,18 +1474,53 @@ def _validate_license_token(token: str) -> dict:
     if not LICENSE_PUBLIC_KEY or Ed25519PublicKey is None:
         raise ValueError("License verification is not configured.")
     parts = str(token or "").strip().split(".")
-    if len(parts) != 2:
+    if len(parts) not in (2, 3):
         raise ValueError("Invalid license token format.")
-    payload_bytes = _license_b64decode(parts[0])
-    signature = _license_b64decode(parts[1])
+    if len(parts) == 3:
+        try:
+            header = json.loads(_license_b64decode(parts[0]).decode("utf-8"))
+        except (ValueError, TypeError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise ValueError("Invalid license token header.") from exc
+        if header.get("alg") != "EdDSA":
+            raise ValueError("Unsupported license token algorithm.")
+        if header.get("typ") != "license+jwt" or not str(header.get("kid", "")).strip():
+            raise ValueError("Invalid license token header claims.")
+        signed_message = f"{parts[0]}.{parts[1]}".encode("ascii")
+        payload_bytes = _license_b64decode(parts[1])
+        signature = _license_b64decode(parts[2])
+    else:
+        signed_message = _license_b64decode(parts[0])
+        payload_bytes = signed_message
+        signature = _license_b64decode(parts[1])
     try:
         public_key = Ed25519PublicKey.from_public_bytes(_license_b64decode(LICENSE_PUBLIC_KEY))
-        public_key.verify(signature, payload_bytes)
+        public_key.verify(signature, signed_message)
         payload = json.loads(payload_bytes.decode("utf-8"))
-    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
+    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError("Invalid license signature or payload.") from exc
     if payload.get("app_id") != LICENSE_APP_ID or payload.get("plan") != "pro":
         raise ValueError("License is not valid for this application.")
+    if len(parts) == 3:
+        required_claims = (
+            "version",
+            "license_id",
+            "aud",
+            "license_type",
+            "issued_at",
+            "expires_at",
+        )
+        if any(not payload.get(claim) for claim in required_claims):
+            raise ValueError("License token is missing required claims.")
+        if payload.get("version") != 1 or payload.get("aud") != LICENSE_APP_ID:
+            raise ValueError("License token is not valid for this application.")
+        if payload.get("license_type") != "pro":
+            raise ValueError("License token has an unsupported license type.")
+        binding = payload.get("instance_binding")
+        if not isinstance(binding, dict) or any(
+            not binding.get(claim)
+            for claim in ("instance_value", "instance_key_id", "instance_public_key_sha256")
+        ):
+            raise ValueError("License token is missing required instance binding.")
     return payload
 
 
@@ -3932,9 +3971,28 @@ def api_activate_license():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     local_instance_id = str(data["settings"].get("license_instance_id", "") or "").strip()
-    token_instance_id = str(payload.get("instance_id", "") or "").strip()
+    instance_binding = payload.get("instance_binding")
+    instance_binding = instance_binding if isinstance(instance_binding, dict) else {}
+    token_instance_id = str(
+        payload.get("instance_id")
+        or instance_binding.get("instance_value", "")
+        or ""
+    ).strip()
     if token_instance_id and (not local_instance_id or token_instance_id != local_instance_id):
         return jsonify({"error": "License is bound to a different BarTender instance."}), 400
+    token_key_id = str(
+        instance_binding.get("instance_key_id")
+        or payload.get("instance_key_id")
+        or ""
+    ).strip()
+    local_private_key = str(data["settings"].get("license_instance_private_key", "") or "").strip()
+    if token_key_id and local_private_key:
+        local_public_key = _license_instance_public_key(local_private_key)
+        if token_key_id != _license_instance_key_id(local_public_key):
+            return jsonify({"error": "License is bound to a different BarTender instance key."}), 400
+        token_public_key_hash = str(instance_binding.get("instance_public_key_sha256", "") or "").strip()
+        if token_public_key_hash and token_public_key_hash != _license_instance_public_key_sha256(local_public_key):
+            return jsonify({"error": "License is bound to a different BarTender instance public key."}), 400
     data["settings"].update({
         "license_type": "paid",
         "license_token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),
@@ -6649,6 +6707,7 @@ def _build_export_json_payload(data: dict) -> dict:
     if isinstance(export_settings, dict):
         export_settings.pop("brewfather_api_key", None)
         export_settings.pop("brewfather_user_id", None)
+        export_settings.pop("license_instance_private_key", None)
         export_settings["brewfather_credentials"] = redact_credentials(
             normalize_credentials(
                 data.get("settings", {}).get("brewfather_user_id"),
