@@ -129,6 +129,20 @@ conservative user-agent matching; BarTender does not use invasive browser finger
 IP addresses and user-agent strings are operational security data and should be handled
 according to the operator's privacy and retention requirements.
 
+## Licensing
+
+The Settings About panel includes an owner-only Licensing section. An owner can start
+one local 30-day Pro trial or paste a signed Pro license token issued by a separate
+licensing service. Paid tokens are verified with the Ed25519 public key configured by
+the add-on's `license_public_key` option; the private signing key never belongs in the
+add-on or this repository.
+
+The licensing state is provider-neutral and records the plan, license type, expiration,
+and feature claims locally. Existing `brewery_type` profile behavior remains compatible
+for current installations while individual Pro feature gates are migrated to the
+central licensing state. Expired or absent licensing state reports the Base plan without
+deleting application data.
+
 For Flutter web or another browser client hosted on a different origin, configure the
 add-on option `cors_allowed_origins` as a comma-, space-, or newline-separated list of
 trusted origins, such as `http://127.0.0.1:5055,https://mobile.example`. Leave it

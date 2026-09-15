@@ -98,6 +98,83 @@ def test_mobile_login_issues_token_for_user_pin(tmp_path):
     assert app_module.load_data()["mobile_tokens"]
 
 
+def test_owner_can_start_pro_trial(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post("/api/licensing/trial")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["plan"] == "Trial"
+    assert payload["active"] is True
+    assert payload["days_remaining"] == 30
+    assert app_module.load_data()["settings"]["license_type"] == "trial"
+
+
+def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
+    monkeypatch.setenv("LICENSE_PUBLIC_KEY", "invalid")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post("/api/licensing/activate", json={"token": "bad-token"})
+
+    assert response.status_code == 400
+    assert app_module.load_data()["settings"]["license_type"] == ""
+
+
+def test_manager_cannot_activate_license(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "manager-1"
+        session["user_role"] = "manager"
+        session["user_name"] = "Manager"
+
+    response = client.post("/api/licensing/activate", json={"token": "token"})
+
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "Only the owner can activate a license."
+
+
+def test_external_api_listener_does_not_expose_licensing(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.EXTERNAL_API_MODE = True
+    client = app_module.app.test_client()
+
+    response = client.post(
+        "/api/licensing/activate",
+        json={"token": "token"},
+        headers={"X-API-Token": "external-token"},
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "Licensing is available only through the management UI."
+
+
+def test_owner_can_clear_license_state(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+    client.post("/api/licensing/trial")
+
+    response = client.post("/api/licensing/clear")
+
+    assert response.status_code == 200
+    assert app_module.load_data()["settings"]["license_type"] == ""
+
+
 def test_login_page_does_not_render_whats_new_notice(tmp_path):
     app_module = _load_app_module(tmp_path)
     data = app_module.load_data()
@@ -701,7 +778,6 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     data = app_module.load_data()
     data["settings"]["brewery_type"] = "homebrewer"
     data["settings"]["display_count"] = 2
-    data["settings"]["pos_sync_provider"] = "square"
     app_module.save_data(data)
 
     with client.session_transaction() as session:
@@ -715,15 +791,39 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     body = response.get_data(as_text=True)
     assert "App Version" in body
     assert f"v{app_module.APP_VERSION}" in body
-    assert "POS Sync Provider" in body
-    assert "Square" in body
     assert "Number of Displays" in body
     assert "Homebrewer installs default to 2 displays." in body
     assert "Basic settings save automatically." in body
     assert "Save Advanced Settings" in body
+    assert 'id="posSyncProvider"' not in body
+    assert "POS Sync Provider" not in body
+    assert "Licensing" not in body
+    assert 'onclick="activateLicense()"' not in body
     assert 'id="displayCount"' in body
     assert 'disabled' in body
     assert 'value="2"' in body
+    assert 'id="proProfileRefreshNotice"' in body
+    assert "Refresh this page after the change saves" in body
+
+
+def test_settings_shows_active_cors_origins_as_read_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "https://mobile.example, http://localhost:5055")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Allowed CORS Origins" in body
+    assert "https://mobile.example" in body
+    assert "http://localhost:5055" in body
+    assert 'id="corsAllowedOrigins"' not in body
 
 
 def test_authenticated_layout_shows_logout_link(tmp_path):
