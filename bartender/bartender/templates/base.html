@@ -80,7 +80,7 @@
             <span class="nav-menu-label">Menu</span>
           </button>
           <div class="nav-menu-panel" role="menu">
-            {% if settings.setup_completed and current_user_name %}
+            {% if settings.setup_completed and current_user_name and release_highlights %}
             <div class="nav-menu-section nav-menu-updates-section">
               <div class="nav-menu-section-title">Updates</div>
               <button
@@ -302,7 +302,7 @@
         </form>
       </div>
     </div>
-    {% endif %} {% if settings.setup_completed and current_user_name %}
+    {% endif %} {% if settings.setup_completed and current_user_name and release_highlights %}
     <div class="modal" id="updateNoticeModal" data-overlay-close="true">
       <div class="modal-dialog modal-dialog-lg">
         <div class="modal-header">

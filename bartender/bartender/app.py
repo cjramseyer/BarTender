@@ -255,13 +255,27 @@ def _read_addon_version() -> str:
 
 
 APP_VERSION = _read_addon_version()
-RELEASE_HIGHLIGHTS = [
-    "First-time setup now guides initial bar name configuration.",
-    "Pour controls follow the new pour mode setting.",
-    "Bulk create now asks how many items to make.",
-    "Kegs can be marked as On Deck and surfaced in dashboards.",
-    "Dashboard analytics summarize recent pour activity.",
-]
+
+
+def _read_release_highlights() -> list[str]:
+    highlights_path = Path(__file__).resolve().parents[1] / "release-highlights.json"
+    try:
+        with open(highlights_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return []
+
+    raw_highlights = payload.get("highlights") if isinstance(payload, dict) else None
+    if not isinstance(raw_highlights, list):
+        return []
+    return [
+        str(highlight).strip()
+        for highlight in raw_highlights
+        if str(highlight).strip()
+    ]
+
+
+RELEASE_HIGHLIGHTS = _read_release_highlights()
 
 STANDARD_KEG_TYPE_CHOICES = [
     "Corny (5 gal)",
@@ -1041,12 +1055,16 @@ def _load_data_unlocked() -> dict:
             data["settings"].get("anonymous_telemetry_enabled"),
             False,
         )
-        data["settings"]["mobile_session_timeout_minutes"] = _normalize_mobile_session_timeout_minutes(
-            data["settings"].get("mobile_session_timeout_minutes")
-        )
-        data["settings"]["station_session_timeout_minutes"] = _normalize_station_session_timeout_minutes(
-            data["settings"].get("station_session_timeout_minutes")
-        )
+        if _normalize_brewery_type(data["settings"].get("brewery_type")) == "pro":
+            data["settings"]["mobile_session_timeout_minutes"] = _normalize_mobile_session_timeout_minutes(
+                data["settings"].get("mobile_session_timeout_minutes")
+            )
+            data["settings"]["station_session_timeout_minutes"] = _normalize_station_session_timeout_minutes(
+                data["settings"].get("station_session_timeout_minutes")
+            )
+        else:
+            data["settings"]["mobile_session_timeout_minutes"] = DEFAULT_MOBILE_SESSION_TIMEOUT_MINUTES
+            data["settings"]["station_session_timeout_minutes"] = DEFAULT_STATION_SESSION_TIMEOUT_MINUTES
         data["settings"]["license_type"] = str(data["settings"].get("license_type", "") or "").strip().lower()
         data["settings"]["license_token"] = str(data["settings"].get("license_token", "") or "").strip()
         data["settings"]["license_expires_at"] = str(data["settings"].get("license_expires_at", "") or "").strip()
