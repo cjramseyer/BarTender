@@ -154,16 +154,13 @@ def test_owner_can_download_pro_activation_request(tmp_path):
         payload["signature"]["value"]
         + "=" * (-len(payload["signature"]["value"]) % 4)
     )
-    unsigned_payload = dict(payload)
-    unsigned_payload.pop("signature")
-    canonical_payload = json.dumps(
-        unsigned_payload,
-        sort_keys=True,
-        separators=(",", ":"),
+    signing_message = (
+        f"{payload['app_id']}.{payload['instance_id']}."
+        f"{payload['instance_key_id']}.{payload['nonce']}"
     ).encode("utf-8")
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-    Ed25519PublicKey.from_public_bytes(public_key).verify(signature, canonical_payload)
+    Ed25519PublicKey.from_public_bytes(public_key).verify(signature, signing_message)
     assert "Harbor Taproom" not in response.get_data(as_text=True)
     stored = app_module.load_data()["settings"]
     assert stored["license_instance_id"] == payload["instance_id"]

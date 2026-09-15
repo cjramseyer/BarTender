@@ -153,7 +153,8 @@ Owners can manage licensing from the Settings About panel. The app supports a lo
 public key. Owners of Pro profiles can also download an activation request JSON for
 the Keystone license portal. The request contains a persistent installation ID, a
 nonce, an Ed25519 instance public key, an instance key ID, and an Ed25519 signature
-over the canonical request payload, along with a SHA-256 bar-name hash, requested
+over the exact UTF-8 message `app_id.instance_id.instance_key_id.nonce`, along with
+a SHA-256 bar-name hash, requested
 features, and app metadata. It never includes the plaintext bar name, private key,
 inventory, or credentials. Signed licenses that include an `instance_id` are
 accepted only by the matching installation. The Keystone private signing key belongs
