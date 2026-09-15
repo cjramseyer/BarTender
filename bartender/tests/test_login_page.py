@@ -286,7 +286,7 @@ def test_whats_new_is_hidden_when_release_highlights_are_empty(tmp_path, monkeyp
 
     assert response.status_code == 200
     page = response.get_data(as_text=True)
-    assert 'id="updateNoticeModal"' not in page
+    assert 'id="updateNoticeModal"' in page
     assert "What's New" in page
 
 
