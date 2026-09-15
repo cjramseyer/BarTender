@@ -229,6 +229,26 @@ def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
     assert 'id="updateNoticeModal"' in page
 
 
+def test_whats_new_is_hidden_when_release_highlights_are_empty(tmp_path, monkeypatch):
+    app_module = _load_app_module(tmp_path)
+    monkeypatch.setattr(app_module, "RELEASE_HIGHLIGHTS", [])
+    data = app_module.load_data()
+    data["settings"]["setup_completed"] = True
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="updateNoticeModal"' not in page
+    assert "What's New" not in page
+
+
 def test_pro_profile_shows_title_bar_indicator(tmp_path):
     app_module = _load_app_module(tmp_path)
     data = app_module.load_data()
