@@ -218,6 +218,16 @@ def test_manager_cannot_download_pro_activation_request(tmp_path):
     assert response.status_code == 403
 
 
+def test_license_instance_private_key_is_excluded_from_backups(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["license_instance_private_key"] = "private-key-material"
+
+    exported = app_module._build_export_json_payload(data)
+
+    assert "license_instance_private_key" not in exported["data"]["settings"]
+
+
 def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
     monkeypatch.setenv("LICENSE_PUBLIC_KEY", "invalid")
     app_module = _load_app_module(tmp_path)
@@ -231,6 +241,61 @@ def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
 
     assert response.status_code == 400
     assert app_module.load_data()["settings"]["license_type"] == ""
+
+
+def test_keystone_jwt_license_token_activates(tmp_path, monkeypatch):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    def encode(value):
+        return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+    signing_key = Ed25519PrivateKey.generate()
+    monkeypatch.setenv(
+        "LICENSE_PUBLIC_KEY",
+        encode(signing_key.public_key().public_bytes_raw()),
+    )
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    data["settings"]["license_instance_id"] = "testing"
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    request_payload = client.post("/api/licensing/activation-request").get_json()
+    header = encode(json.dumps({
+        "alg": "EdDSA",
+        "typ": "license+jwt",
+        "kid": "issuer-ed25519-01",
+    }, separators=(",", ":")).encode())
+    payload = encode(json.dumps({
+        "version": 1,
+        "license_id": "lic_test",
+        "app_id": "bartender",
+        "aud": "bartender",
+        "plan": "pro",
+        "license_type": "pro",
+        "features": ["pro_features"],
+        "issued_at": "2026-09-15T17:11:18.137Z",
+        "instance_binding": {
+            "instance_value": "testing",
+            "instance_key_id": request_payload["instance_key_id"],
+            "instance_public_key_sha256": app_module._license_instance_public_key_sha256(
+                request_payload["instance_public_key"]["value"]
+            ),
+        },
+        "expires_at": "2099-01-01T00:00:00Z",
+    }, separators=(",", ":")).encode())
+    signed_input = f"{header}.{payload}".encode("ascii")
+    token = f"{header}.{payload}.{encode(signing_key.sign(signed_input))}"
+
+    response = client.post("/api/licensing/activate", json={"token": token})
+
+    assert response.status_code == 200
+    assert response.get_json()["plan"] == "Pro"
 
 
 def test_license_for_different_instance_is_rejected(tmp_path, monkeypatch):

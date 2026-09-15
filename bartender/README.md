@@ -157,8 +157,11 @@ over the exact UTF-8 message `app_id.instance_id.instance_key_id.nonce`, along w
 a SHA-256 bar-name hash, requested
 features, and app metadata. It never includes the plaintext bar name, private key,
 inventory, or credentials. Signed licenses that include an `instance_id` are
-accepted only by the matching installation. The Keystone private signing key belongs
-in a separate licensing service, never in the add-on repository.
+accepted only by the matching installation. Keystone JWTs must also include the
+`license+jwt` type, issuer key ID, audience, license ID/type, issue and expiry times,
+and instance public-key hash. The local instance private key is excluded from JSON
+and ZIP backups. The Keystone private signing key belongs in a separate licensing
+service, never in the add-on repository.
 
 Browser clients hosted on another origin require the add-on option
 `cors_allowed_origins`. Set it to a comma-, space-, or newline-separated allowlist of
