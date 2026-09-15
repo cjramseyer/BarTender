@@ -148,6 +148,41 @@ def test_owner_can_download_pro_activation_request(tmp_path):
     assert stored["license_instance_private_key"]
 
 
+def test_pro_settings_show_configured_license_portal_link(tmp_path, monkeypatch):
+    monkeypatch.setenv("LICENSE_PORTAL_URL", "https://licenses.example.com/portal/")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    body = client.get("/settings").get_data(as_text=True)
+
+    assert 'href="https://licenses.example.com/portal"' in body
+    assert "Open License Portal" in body
+
+
+def test_invalid_license_portal_url_is_not_rendered(tmp_path, monkeypatch):
+    monkeypatch.setenv("LICENSE_PORTAL_URL", "javascript:alert(1)")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    body = client.get("/settings").get_data(as_text=True)
+
+    assert "Open License Portal" not in body
+
+
 def test_manager_cannot_download_pro_activation_request(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

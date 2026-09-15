@@ -1194,6 +1194,22 @@ content %}
           <div id="licenseStatus" class="stack-gap-sm">
             Loading license status...
           </div>
+          {% if license_portal_url %}
+          <div class="form-group">
+            <a
+              class="btn btn-sm btn-secondary"
+              href="{{ license_portal_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open License Portal
+            </a>
+            <small class="muted"
+              >The portal URL is managed in the Home Assistant add-on
+              Configuration tab.</small
+            >
+          </div>
+          {% endif %}
           <div class="form-group" style="margin-top: 0.75rem">
             <button
               type="button"

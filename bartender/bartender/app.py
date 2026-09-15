@@ -101,7 +101,18 @@ def _parse_cors_origins(value: str) -> frozenset[str]:
     )
 
 
+def _normalize_license_portal_url(value: str) -> str:
+    candidate = str(value or "").strip().rstrip("/")
+    parsed = urlsplit(candidate)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+    if parsed.username or parsed.password:
+        return ""
+    return candidate
+
+
 CORS_ALLOWED_ORIGINS = _parse_cors_origins(os.environ.get("CORS_ALLOWED_ORIGINS", ""))
+LICENSE_PORTAL_URL = _normalize_license_portal_url(os.environ.get("LICENSE_PORTAL_URL", ""))
 LICENSE_PUBLIC_KEY = str(os.environ.get("LICENSE_PUBLIC_KEY", "") or "").strip()
 LICENSE_APP_ID = "bartender"
 TRIAL_DAYS = 30
@@ -3072,6 +3083,7 @@ def inject_runtime_metadata():
         "app_version": APP_VERSION,
         "release_highlights": RELEASE_HIGHLIGHTS,
         "release_highlights_date": RELEASE_HIGHLIGHTS_DATE,
+        "license_portal_url": LICENSE_PORTAL_URL,
         "ingress": _effective_ingress_path(),
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),

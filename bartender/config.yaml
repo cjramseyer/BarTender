@@ -24,10 +24,12 @@ options:
   database_url: ""
   session_timeout_minutes: 240
   cors_allowed_origins: ""
+  license_portal_url: ""
   license_public_key: ""
 schema:
   storage_backend: list(internal|postgresql|mariadb)
   database_url: str
   session_timeout_minutes: int(5,43200)
   cors_allowed_origins: str
+  license_portal_url: str
   license_public_key: str

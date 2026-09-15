@@ -163,6 +163,11 @@ Browser clients hosted on another origin require the add-on option
 trusted origins, such as `http://127.0.0.1:5055,https://mobile.example`. Leave it
 empty when cross-origin browser access is not needed.
 
+The optional `license_portal_url` add-on option adds an owner-only convenience link
+to the Pro Licensing panel. It does not replace offline activation. The
+`license_public_key` option remains the security-critical value used to verify
+signed license tokens locally.
+
 ## Browser Support
 
 BarTender is intended for modern browsers. Supported baseline versions are Chrome 60+,

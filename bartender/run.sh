@@ -19,8 +19,9 @@ STORAGE_BACKEND="$(bashio::config 'storage_backend')"
 DATABASE_URL="$(bashio::config 'database_url')"
 SESSION_TIMEOUT_MINUTES="$(bashio::config 'session_timeout_minutes')"
 CORS_ALLOWED_ORIGINS="$(bashio::config 'cors_allowed_origins')"
+LICENSE_PORTAL_URL="$(bashio::config 'license_portal_url')"
 LICENSE_PUBLIC_KEY="$(bashio::config 'license_public_key')"
-export STORAGE_BACKEND DATABASE_URL SESSION_TIMEOUT_MINUTES CORS_ALLOWED_ORIGINS LICENSE_PUBLIC_KEY
+export STORAGE_BACKEND DATABASE_URL SESSION_TIMEOUT_MINUTES CORS_ALLOWED_ORIGINS LICENSE_PORTAL_URL LICENSE_PUBLIC_KEY
 
 if [ -z "${STORAGE_BACKEND}" ]; then
 	export STORAGE_BACKEND="internal"
