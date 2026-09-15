@@ -458,6 +458,9 @@ def test_station_registration_persists_for_future_logins_and_can_be_revoked(tmp_
 def test_session_timeout_settings_are_clamped_to_global_timeout(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
     with client.session_transaction() as session:
         session["user_id"] = "owner"
         session["user_role"] = "owner"
@@ -475,6 +478,32 @@ def test_session_timeout_settings_are_clamped_to_global_timeout(tmp_path):
     settings = app_module.load_data()["settings"]
     assert settings["mobile_session_timeout_minutes"] == 240
     assert settings["station_session_timeout_minutes"] == 5
+
+
+def test_homebrewer_hides_and_resets_pro_session_timeout_settings(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post(
+        "/api/settings",
+        json={
+            "mobile_session_timeout_minutes": 120,
+            "station_session_timeout_minutes": 90,
+        },
+    )
+
+    assert response.status_code == 200
+    settings = app_module.load_data()["settings"]
+    assert settings["mobile_session_timeout_minutes"] == 30
+    assert settings["station_session_timeout_minutes"] == 30
+
+    page = client.get("/settings").get_data(as_text=True)
+    assert 'id="mobileSessionTimeoutMinutes"' not in page
+    assert 'id="stationSessionTimeoutMinutes"' not in page
 
 
 def test_user_scan_credential_logs_in_and_can_be_revoked(tmp_path):
@@ -791,7 +820,7 @@ def test_settings_save_without_owner_pin_keeps_existing_owner_pin(tmp_path):
     assert app_module.load_data()["settings"]["owner_pin"] == "2468"
 
 
-def test_settings_shows_homebrewer_display_default_message(tmp_path):
+def test_settings_hides_display_count_for_homebrewer(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
 
@@ -811,17 +840,15 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     body = response.get_data(as_text=True)
     assert "App Version" in body
     assert f"v{app_module.APP_VERSION}" in body
-    assert "Number of Displays" in body
-    assert "Homebrewer installs default to 2 displays." in body
+    assert "Number of Displays" not in body
+    assert "Homebrewer installs default to 2 displays." not in body
     assert "Basic settings save automatically." in body
     assert "Save Advanced Settings" in body
     assert 'id="posSyncProvider"' not in body
     assert "POS Sync Provider" not in body
     assert "Licensing" not in body
     assert 'onclick="activateLicense()"' not in body
-    assert 'id="displayCount"' in body
-    assert 'disabled' in body
-    assert 'value="2"' in body
+    assert 'id="displayCount"' not in body
     assert 'id="proProfileRefreshNotice"' in body
     assert "Refresh this page after the change saves" in body
 

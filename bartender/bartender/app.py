@@ -1055,12 +1055,16 @@ def _load_data_unlocked() -> dict:
             data["settings"].get("anonymous_telemetry_enabled"),
             False,
         )
-        data["settings"]["mobile_session_timeout_minutes"] = _normalize_mobile_session_timeout_minutes(
-            data["settings"].get("mobile_session_timeout_minutes")
-        )
-        data["settings"]["station_session_timeout_minutes"] = _normalize_station_session_timeout_minutes(
-            data["settings"].get("station_session_timeout_minutes")
-        )
+        if _normalize_brewery_type(data["settings"].get("brewery_type")) == "pro":
+            data["settings"]["mobile_session_timeout_minutes"] = _normalize_mobile_session_timeout_minutes(
+                data["settings"].get("mobile_session_timeout_minutes")
+            )
+            data["settings"]["station_session_timeout_minutes"] = _normalize_station_session_timeout_minutes(
+                data["settings"].get("station_session_timeout_minutes")
+            )
+        else:
+            data["settings"]["mobile_session_timeout_minutes"] = DEFAULT_MOBILE_SESSION_TIMEOUT_MINUTES
+            data["settings"]["station_session_timeout_minutes"] = DEFAULT_STATION_SESSION_TIMEOUT_MINUTES
         data["settings"]["license_type"] = str(data["settings"].get("license_type", "") or "").strip().lower()
         data["settings"]["license_token"] = str(data["settings"].get("license_token", "") or "").strip()
         data["settings"]["license_expires_at"] = str(data["settings"].get("license_expires_at", "") or "").strip()

@@ -169,6 +169,7 @@ content %}
               updates.</small
             >
           </div>
+          {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
           <div class="form-group">
             <label for="mobileSessionTimeoutMinutes"
               >Mobile Session Timeout (minutes)</label
@@ -205,6 +206,7 @@ content %}
               exceed the global add-on timeout.</small
             >
           </div>
+          {% endif %}
           {% if qr_ready %}
           <div class="form-group">
             <label>Printable Menu QR Code</label>
@@ -332,19 +334,9 @@ content %}
               container.</small
             >
           </div>
+          {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
           <div class="form-group" id="proDisplaySettings">
             <label for="displayCount">Number of Displays</label>
-            {% if (settings.brewery_type or 'homebrewer') != 'pro' %}
-            <input
-              id="displayCount"
-              type="number"
-              min="1"
-              max="12"
-              class="form-control"
-              disabled
-              value="{{ settings.display_count or 2 }}"
-            />
-            {% else %}
             <input
               id="displayCount"
               type="number"
@@ -353,38 +345,17 @@ content %}
               class="form-control"
               value="{{ settings.display_count or 2 }}"
             />
-            {% endif %} {% if (settings.brewery_type or 'homebrewer') != 'pro'
-            %}
-            <small id="displayCountProNote" class="muted" hidden
-              >Choose how many display boards this installation should
-              serve.</small
-            >
-            <small id="displayCountHomebrewerNote" class="muted">
-              Homebrewer installs default to 2 displays. Switch Bar Profile to
-              Pro to enable multiple displays.
-            </small>
-            <div
-              id="displayTapAssignments"
-              class="stack-gap-sm"
-              style="margin-top: 0.75rem"
-              hidden
-            ></div>
-            {% else %}
             <small id="displayCountProNote" class="muted"
               >Choose how many display boards this installation should
               serve.</small
             >
-            <small id="displayCountHomebrewerNote" class="muted" hidden>
-              Homebrewer installs default to 2 displays. Switch Bar Profile to
-              Pro to enable multiple displays.
-            </small>
             <div
               id="displayTapAssignments"
               class="stack-gap-sm"
               style="margin-top: 0.75rem"
             ></div>
-            {% endif %}
           </div>
+          {% endif %}
           <div class="form-group">
             <label>Dashboard Manage Button Position</label>
             <div class="radio-group">
@@ -1747,9 +1718,6 @@ content %}
       "displayTapAssignments",
     );
     const proNote = document.getElementById("displayCountProNote");
-    const homebrewerNote = document.getElementById(
-      "displayCountHomebrewerNote",
-    );
 
     if (displayCountInput) {
       if (isPro) {
@@ -1766,9 +1734,6 @@ content %}
 
     if (proNote) {
       proNote.hidden = !isPro;
-    }
-    if (homebrewerNote) {
-      homebrewerNote.hidden = isPro;
     }
     if (displayTapAssignments) {
       if (!isPro) {
@@ -1816,18 +1781,6 @@ content %}
       environment_mode: getCheckedRadioValue(
         "environment_mode",
         DEFAULT_ENVIRONMENT_MODE,
-      ),
-      mobile_session_timeout_minutes: getClampedIntegerValue(
-        "mobileSessionTimeoutMinutes",
-        30,
-        5,
-        43200,
-      ),
-      station_session_timeout_minutes: getClampedIntegerValue(
-        "stationSessionTimeoutMinutes",
-        30,
-        5,
-        43200,
       ),
       display_title_on_tap: document.getElementById("displayTitleOnTap")
         ? document.getElementById("displayTitleOnTap").value.trim() ||
@@ -1882,6 +1835,18 @@ content %}
       collectSelectedDisplayTapAssignments().length
         ? collectSelectedDisplayTapAssignments()
         : currentDisplayTapAssignments,
+    );
+    payload.mobile_session_timeout_minutes = getClampedIntegerValue(
+      "mobileSessionTimeoutMinutes",
+      30,
+      5,
+      43200,
+    );
+    payload.station_session_timeout_minutes = getClampedIntegerValue(
+      "stationSessionTimeoutMinutes",
+      30,
+      5,
+      43200,
     );
     return payload;
   }
