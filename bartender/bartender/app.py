@@ -257,25 +257,27 @@ def _read_addon_version() -> str:
 APP_VERSION = _read_addon_version()
 
 
-def _read_release_highlights() -> list[str]:
+def _read_release_highlights_file() -> tuple[str, list[str]]:
     highlights_path = Path(__file__).resolve().parents[1] / "release-highlights.json"
     try:
         with open(highlights_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
     except (OSError, json.JSONDecodeError, TypeError):
-        return []
+        return "", []
 
+    release_date = str(payload.get("date", "")).strip() if isinstance(payload, dict) else ""
     raw_highlights = payload.get("highlights") if isinstance(payload, dict) else None
     if not isinstance(raw_highlights, list):
-        return []
-    return [
+        return release_date, []
+    highlights = [
         str(highlight).strip()
         for highlight in raw_highlights
         if str(highlight).strip()
     ]
+    return release_date, highlights
 
 
-RELEASE_HIGHLIGHTS = _read_release_highlights()
+RELEASE_HIGHLIGHTS_DATE, RELEASE_HIGHLIGHTS = _read_release_highlights_file()
 
 STANDARD_KEG_TYPE_CHOICES = [
     "Corny (5 gal)",
@@ -3019,6 +3021,7 @@ def inject_runtime_metadata():
     return {
         "app_version": APP_VERSION,
         "release_highlights": RELEASE_HIGHLIGHTS,
+        "release_highlights_date": RELEASE_HIGHLIGHTS_DATE,
         "ingress": _effective_ingress_path(),
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),
@@ -3820,9 +3823,10 @@ def api_clear_license():
 def api_mark_release_seen():
     current_user = _get_current_team_user()
     user_id = str(current_user.get("id", "") or "").strip()
-    version = str((request.get_json(silent=True) or {}).get("version", "") or "").strip()[:64]
-    if not user_id or not version:
-        return jsonify({"error": "User and release version are required."}), 400
+    body = request.get_json(silent=True) or {}
+    release_date = str(body.get("date", "") or "").strip()[:64]
+    if not user_id or not release_date:
+        return jsonify({"error": "User and release date are required."}), 400
 
     data = load_data()
     user = next(
@@ -3835,9 +3839,9 @@ def api_mark_release_seen():
     if user is None:
         return jsonify({"error": "User not found."}), 404
 
-    user["release_seen_version"] = version
+    user["release_seen_version"] = release_date
     save_data(data)
-    return jsonify({"ok": True, "version": version})
+    return jsonify({"ok": True, "date": release_date})
 
 
 @app.route("/api/storage/status", methods=["GET"])
