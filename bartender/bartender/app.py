@@ -3473,6 +3473,7 @@ def settings():
         display_port=DISPLAY_PORT,
         external_api_port=EXTERNAL_API_PORT,
         external_api_base_url=_external_api_listener_base_url(),
+        cors_allowed_origins=sorted(CORS_ALLOWED_ORIGINS),
         external_display_url=_external_display_url(data),
         external_menu_url=_external_menu_url(data),
         auto_external_display_url=_external_display_url(),

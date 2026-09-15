@@ -806,6 +806,26 @@ def test_settings_shows_homebrewer_display_default_message(tmp_path):
     assert "Refresh this page after the change saves" in body
 
 
+def test_settings_shows_active_cors_origins_as_read_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "https://mobile.example, http://localhost:5055")
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Allowed CORS Origins" in body
+    assert "https://mobile.example" in body
+    assert "http://localhost:5055" in body
+    assert 'id="corsAllowedOrigins"' not in body
+
+
 def test_authenticated_layout_shows_logout_link(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

@@ -1177,6 +1177,21 @@ content %}
             >
           </div>
         </div>
+        <div class="form-group">
+          <label>Allowed CORS Origins</label>
+          {% if cors_allowed_origins %}
+          <div class="stack-gap-sm">
+            {% for origin in cors_allowed_origins %}
+            <div>{{ origin }}</div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="muted">None configured</div>
+          {% endif %}
+          <small class="muted"
+            >Managed in the Home Assistant add-on Configuration tab.</small
+          >
+        </div>
         {% if (settings.brewery_type or 'homebrewer') == 'pro' %} {% set
         selected_pos_provider = namespace(name="Not configured") %} {% for
         provider in pos_sync_provider_catalog or [] %} {% if provider.key ==
