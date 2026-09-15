@@ -1420,16 +1420,18 @@ def _license_instance_key_id(public_key: str) -> str:
     return "sha256:" + hashlib.sha256(_license_b64decode(public_key)).hexdigest()
 
 
-def _license_sign_activation_request(private_key_value: str, payload: dict) -> str:
+def _license_sign_activation_request(
+    private_key_value: str,
+    app_id: str,
+    instance_id: str,
+    instance_key_id: str,
+    nonce: str,
+) -> str:
     if Ed25519PrivateKey is None:
         raise ValueError("License activation request generation is not configured.")
     private_key = Ed25519PrivateKey.from_private_bytes(_license_b64decode(private_key_value))
-    canonical_payload = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return _license_b64encode(private_key.sign(canonical_payload))
+    message = f"{app_id}.{instance_id}.{instance_key_id}.{nonce}".encode("utf-8")
+    return _license_b64encode(private_key.sign(message))
 
 
 def _license_status(settings: dict) -> dict:
@@ -3876,7 +3878,13 @@ def api_create_license_activation_request():
         "algorithm": "Ed25519",
         "encoding": "base64url",
         "key_id": instance_key_id,
-        "value": _license_sign_activation_request(private_key_value, request_payload),
+        "value": _license_sign_activation_request(
+            private_key_value,
+            request_payload["app_id"],
+            request_payload["instance_id"],
+            request_payload["instance_key_id"],
+            request_payload["nonce"],
+        ),
     }
     save_data(data)
     response = app.response_class(
