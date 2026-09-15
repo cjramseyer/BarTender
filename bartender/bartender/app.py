@@ -25,8 +25,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 try:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 except ImportError:  # pragma: no cover - dependency is installed in production
+    serialization = None
+    Ed25519PrivateKey = None
     Ed25519PublicKey = None
 
 from bartender.pos_sync.service import (
@@ -861,6 +864,8 @@ DEFAULT_DATA = {
         "license_token": "",
         "license_expires_at": "",
         "license_features": [],
+        "license_instance_id": "",
+        "license_instance_private_key": "",
         "trial_started_at": "",
         "trial_expires_at": "",
     },
@@ -1071,6 +1076,8 @@ def _load_data_unlocked() -> dict:
         data["settings"]["license_token"] = str(data["settings"].get("license_token", "") or "").strip()
         data["settings"]["license_expires_at"] = str(data["settings"].get("license_expires_at", "") or "").strip()
         data["settings"]["license_features"] = data["settings"].get("license_features", []) if isinstance(data["settings"].get("license_features", []), list) else []
+        data["settings"]["license_instance_id"] = str(data["settings"].get("license_instance_id", "") or "").strip()[:128]
+        data["settings"]["license_instance_private_key"] = str(data["settings"].get("license_instance_private_key", "") or "").strip()
         data["settings"]["trial_started_at"] = str(data["settings"].get("trial_started_at", "") or "").strip()
         data["settings"]["trial_expires_at"] = str(data["settings"].get("trial_expires_at", "") or "").strip()
         data["settings"].setdefault("anonymous_telemetry_installation_id", "")
@@ -1353,6 +1360,49 @@ def _license_b64decode(value: str) -> bytes:
 
 def _license_b64encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _license_normalize_bar_name(value: str) -> str:
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def _license_bar_name_hash(value: str) -> str:
+    normalized = _license_normalize_bar_name(value)
+    return "sha256:" + hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _ensure_license_instance_identity(data: dict) -> tuple[str, str]:
+    settings = data["settings"]
+    instance_id = str(settings.get("license_instance_id", "") or "").strip()
+    private_key_value = str(settings.get("license_instance_private_key", "") or "").strip()
+    if instance_id and private_key_value:
+        return instance_id, private_key_value
+    if Ed25519PrivateKey is None or serialization is None:
+        raise ValueError("License activation request generation is not configured.")
+
+    instance_id = instance_id or secrets.token_urlsafe(18)
+    private_key = Ed25519PrivateKey.generate()
+    private_key_value = _license_b64encode(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    settings["license_instance_id"] = instance_id
+    settings["license_instance_private_key"] = private_key_value
+    return instance_id, private_key_value
+
+
+def _license_instance_public_key(private_key_value: str) -> str:
+    if Ed25519PrivateKey is None or serialization is None:
+        raise ValueError("License activation request generation is not configured.")
+    private_key = Ed25519PrivateKey.from_private_bytes(_license_b64decode(private_key_value))
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return _license_b64encode(public_key)
 
 
 def _license_status(settings: dict) -> dict:
@@ -3756,6 +3806,52 @@ def api_licensing_status():
     return jsonify({"app_id": LICENSE_APP_ID, **_license_status(data["settings"])})
 
 
+@app.route("/api/licensing/activation-request", methods=["POST"])
+def api_create_license_activation_request():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Only the owner can create an activation request."}), 403
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({"error": "Activation requests are available only for Pro profiles."}), 403
+    try:
+        instance_id, private_key_value = _ensure_license_instance_identity(data)
+        public_key = _license_instance_public_key(private_key_value)
+    except (ValueError, TypeError, binascii.Error) as exc:
+        return jsonify({"error": str(exc)}), 503
+
+    request_payload = {
+        "schema_version": 1,
+        "app_id": LICENSE_APP_ID,
+        "request_type": "pro_activation",
+        "instance_id": instance_id,
+        "bar_name_hash": _license_bar_name_hash(data["settings"].get("bar_name", "")),
+        "instance_public_key": {
+            "algorithm": "Ed25519",
+            "encoding": "base64url",
+            "value": public_key,
+        },
+        "requested_plan": "pro",
+        "requested_features": [
+            "multiple_displays",
+            "pos_mode",
+            "pos_sync",
+            "extended_session_timeouts",
+        ],
+        "app_version": APP_VERSION,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    save_data(data)
+    response = app.response_class(
+        json.dumps(request_payload, indent=2) + "\n",
+        mimetype="application/json",
+    )
+    response.headers["Content-Disposition"] = (
+        'attachment; filename="bartender-activation-request.json"'
+    )
+    return response
+
+
 @app.route("/api/licensing/trial", methods=["POST"])
 def api_start_license_trial():
     data = load_data()
@@ -3790,6 +3886,10 @@ def api_activate_license():
         payload = _validate_license_token(token)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    local_instance_id = str(data["settings"].get("license_instance_id", "") or "").strip()
+    token_instance_id = str(payload.get("instance_id", "") or "").strip()
+    if token_instance_id and (not local_instance_id or token_instance_id != local_instance_id):
+        return jsonify({"error": "License is bound to a different BarTender instance."}), 400
     data["settings"].update({
         "license_type": "paid",
         "license_token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),

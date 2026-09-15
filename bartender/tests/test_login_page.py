@@ -1,6 +1,8 @@
 import os
+import json
 import sys
 import time
+import base64
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -116,6 +118,52 @@ def test_owner_can_start_pro_trial(tmp_path):
     assert app_module.load_data()["settings"]["license_type"] == "trial"
 
 
+def test_owner_can_download_pro_activation_request(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    data["settings"]["bar_name"] = "Harbor Taproom"
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.post("/api/licensing/activation-request")
+
+    assert response.status_code == 200
+    assert response.headers["Content-Disposition"].endswith(
+        'filename="bartender-activation-request.json"'
+    )
+    payload = response.get_json()
+    assert payload["app_id"] == "bartender"
+    assert payload["request_type"] == "pro_activation"
+    assert payload["instance_id"]
+    assert payload["bar_name_hash"].startswith("sha256:")
+    assert payload["instance_public_key"]["algorithm"] == "Ed25519"
+    assert "Harbor Taproom" not in response.get_data(as_text=True)
+    stored = app_module.load_data()["settings"]
+    assert stored["license_instance_id"] == payload["instance_id"]
+    assert stored["license_instance_private_key"]
+
+
+def test_manager_cannot_download_pro_activation_request(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "manager-1"
+        session["user_role"] = "manager"
+        session["user_name"] = "Manager"
+
+    response = client.post("/api/licensing/activation-request")
+
+    assert response.status_code == 403
+
+
 def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
     monkeypatch.setenv("LICENSE_PUBLIC_KEY", "invalid")
     app_module = _load_app_module(tmp_path)
@@ -129,6 +177,43 @@ def test_invalid_license_token_does_not_activate_pro(tmp_path, monkeypatch):
 
     assert response.status_code == 400
     assert app_module.load_data()["settings"]["license_type"] == ""
+
+
+def test_license_for_different_instance_is_rejected(tmp_path, monkeypatch):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    def encode(value):
+        return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+    signing_key = Ed25519PrivateKey.generate()
+    public_key = signing_key.public_key().public_bytes_raw()
+    monkeypatch.setenv("LICENSE_PUBLIC_KEY", encode(public_key))
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    data["settings"]["license_instance_id"] = "local-instance"
+    app_module.save_data(data)
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    payload = json.dumps(
+        {
+            "app_id": "bartender",
+            "plan": "pro",
+            "instance_id": "other-instance",
+            "expires_at": "2099-01-01T00:00:00+00:00",
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    token = f"{encode(payload)}.{encode(signing_key.sign(payload))}"
+
+    response = client.post("/api/licensing/activate", json={"token": token})
+
+    assert response.status_code == 400
+    assert "different BarTender instance" in response.get_json()["error"]
 
 
 def test_manager_cannot_activate_license(tmp_path):

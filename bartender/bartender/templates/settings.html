@@ -1198,6 +1198,13 @@ content %}
             <button
               type="button"
               class="btn btn-sm btn-secondary"
+              onclick="downloadLicenseActivationRequest()"
+            >
+              Generate Activation Request
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
               onclick="startLicenseTrial()"
             >
               Start 30-Day Pro Trial
@@ -3011,6 +3018,34 @@ content %}
     } catch (error) {
       if (message)
         message.textContent = error.message || "Unable to start trial.";
+    }
+  }
+
+  async function downloadLicenseActivationRequest() {
+    const message = document.getElementById("licenseMessage");
+    try {
+      const response = await fetch(`${INGRESS}/api/licensing/activation-request`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Unable to generate activation request.");
+      }
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "bartender-activation-request.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+      if (message) message.textContent = "✓ Activation request downloaded.";
+    } catch (error) {
+      if (message) {
+        message.textContent =
+          error.message || "Unable to generate activation request.";
+      }
     }
   }
 
