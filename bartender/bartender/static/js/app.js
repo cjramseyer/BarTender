@@ -117,21 +117,23 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-function initAppPrompts(appVersion, seenVersion) {
+function initAppPrompts(releaseDate, seenReleaseDate) {
   const setupModal = document.getElementById("setupWizardModal");
   const updateModal = document.getElementById("updateNoticeModal");
-  const currentVersion = String(appVersion || "").trim();
+  const currentReleaseDate = String(releaseDate || "").trim();
 
   if (setupModal) {
     openModal("setupWizardModal");
     return;
   }
 
-  if (!updateModal || !currentVersion) {
+  if (!updateModal || !currentReleaseDate) {
     return;
   }
 
-  const hasUnseenUpdate = String(seenVersion || "").trim() !== currentVersion;
+  const lastSeenReleaseDate = String(seenReleaseDate || "").trim();
+  const hasUnseenUpdate =
+    !lastSeenReleaseDate || currentReleaseDate > lastSeenReleaseDate;
   if (hasUnseenUpdate) {
     openModal("updateNoticeModal");
   }
@@ -193,20 +195,20 @@ async function submitSetupWizard(event) {
 }
 
 async function dismissUpdateNotice() {
-  const appVersion = String(window.BARTENDER_APP_VERSION || "").trim();
+  const releaseDate = String(window.BARTENDER_RELEASE_DATE || "").trim();
   const ingress = window.BARTENDER_INGRESS || "";
   closeModal("updateNoticeModal");
 
-  if (appVersion) {
+  if (releaseDate) {
     const response = await fetch(`${ingress}/api/user/release-seen`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ version: appVersion }),
+      body: JSON.stringify({ date: releaseDate }),
     });
     if (!response.ok) {
       console.error("Unable to save What's New dismissal", response.status);
       return;
     }
-    window.BARTENDER_SEEN_VERSION = appVersion;
+    window.BARTENDER_SEEN_RELEASE_DATE = releaseDate;
   }
 }
