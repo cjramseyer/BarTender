@@ -140,8 +140,30 @@ def test_owner_can_download_pro_activation_request(tmp_path):
     assert payload["app_id"] == "bartender"
     assert payload["request_type"] == "pro_activation"
     assert payload["instance_id"]
+    assert payload["nonce"]
+    assert payload["instance_key_id"].startswith("sha256:")
     assert payload["bar_name_hash"].startswith("sha256:")
     assert payload["instance_public_key"]["algorithm"] == "Ed25519"
+    assert payload["signature"]["algorithm"] == "Ed25519"
+    assert payload["signature"]["key_id"] == payload["instance_key_id"]
+    public_key = base64.urlsafe_b64decode(
+        payload["instance_public_key"]["value"]
+        + "=" * (-len(payload["instance_public_key"]["value"]) % 4)
+    )
+    signature = base64.urlsafe_b64decode(
+        payload["signature"]["value"]
+        + "=" * (-len(payload["signature"]["value"]) % 4)
+    )
+    unsigned_payload = dict(payload)
+    unsigned_payload.pop("signature")
+    canonical_payload = json.dumps(
+        unsigned_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    Ed25519PublicKey.from_public_bytes(public_key).verify(signature, canonical_payload)
     assert "Harbor Taproom" not in response.get_data(as_text=True)
     stored = app_module.load_data()["settings"]
     assert stored["license_instance_id"] == payload["instance_id"]

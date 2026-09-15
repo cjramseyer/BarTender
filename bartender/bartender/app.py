@@ -1416,6 +1416,22 @@ def _license_instance_public_key(private_key_value: str) -> str:
     return _license_b64encode(public_key)
 
 
+def _license_instance_key_id(public_key: str) -> str:
+    return "sha256:" + hashlib.sha256(_license_b64decode(public_key)).hexdigest()
+
+
+def _license_sign_activation_request(private_key_value: str, payload: dict) -> str:
+    if Ed25519PrivateKey is None:
+        raise ValueError("License activation request generation is not configured.")
+    private_key = Ed25519PrivateKey.from_private_bytes(_license_b64decode(private_key_value))
+    canonical_payload = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return _license_b64encode(private_key.sign(canonical_payload))
+
+
 def _license_status(settings: dict) -> dict:
     now = datetime.now(timezone.utc)
     license_type = str(settings.get("license_type", "") or "").strip().lower()
@@ -3829,6 +3845,7 @@ def api_create_license_activation_request():
     try:
         instance_id, private_key_value = _ensure_license_instance_identity(data)
         public_key = _license_instance_public_key(private_key_value)
+        instance_key_id = _license_instance_key_id(public_key)
     except (ValueError, TypeError, binascii.Error) as exc:
         return jsonify({"error": str(exc)}), 503
 
@@ -3836,7 +3853,9 @@ def api_create_license_activation_request():
         "schema_version": 1,
         "app_id": LICENSE_APP_ID,
         "request_type": "pro_activation",
+        "nonce": _license_b64encode(secrets.token_bytes(32)),
         "instance_id": instance_id,
+        "instance_key_id": instance_key_id,
         "bar_name_hash": _license_bar_name_hash(data["settings"].get("bar_name", "")),
         "instance_public_key": {
             "algorithm": "Ed25519",
@@ -3852,6 +3871,12 @@ def api_create_license_activation_request():
         ],
         "app_version": APP_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    request_payload["signature"] = {
+        "algorithm": "Ed25519",
+        "encoding": "base64url",
+        "key_id": instance_key_id,
+        "value": _license_sign_activation_request(private_key_value, request_payload),
     }
     save_data(data)
     response = app.response_class(

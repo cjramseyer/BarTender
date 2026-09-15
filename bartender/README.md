@@ -151,12 +151,13 @@ user-agent and IP information for access management.
 Owners can manage licensing from the Settings About panel. The app supports a local
 30-day Pro trial and signed Pro license tokens verified with the configured Ed25519
 public key. Owners of Pro profiles can also download an activation request JSON for
-the Keystone license portal. The request contains a persistent installation ID, an
-Ed25519 instance public key, a SHA-256 bar-name hash, requested features, and app
-metadata; it never includes the plaintext bar name, private key, inventory, or
-credentials. Signed licenses that include an `instance_id` are accepted only by the
-matching installation. The Keystone private signing key belongs in a separate
-licensing service, never in the add-on repository.
+the Keystone license portal. The request contains a persistent installation ID, a
+nonce, an Ed25519 instance public key, an instance key ID, and an Ed25519 signature
+over the canonical request payload, along with a SHA-256 bar-name hash, requested
+features, and app metadata. It never includes the plaintext bar name, private key,
+inventory, or credentials. Signed licenses that include an `instance_id` are
+accepted only by the matching installation. The Keystone private signing key belongs
+in a separate licensing service, never in the add-on repository.
 
 Browser clients hosted on another origin require the add-on option
 `cors_allowed_origins`. Set it to a comma-, space-, or newline-separated allowlist of
