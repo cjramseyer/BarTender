@@ -252,6 +252,24 @@ def test_whats_new_reappears_when_release_date_is_newer_than_dismissal(tmp_path)
     assert 'onclick="openWhatsNewFromMenu()"' in page
 
 
+def test_whats_new_reappears_for_legacy_version_dismissal(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"]["setup_completed"] = True
+    data["team_users"][0]["release_seen_version"] = "dev"
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'id="updateNoticeModal"' in response.get_data(as_text=True)
+
+
 def test_whats_new_is_hidden_when_release_highlights_are_empty(tmp_path, monkeypatch):
     app_module = _load_app_module(tmp_path)
     monkeypatch.setattr(app_module, "RELEASE_HIGHLIGHTS", [])
