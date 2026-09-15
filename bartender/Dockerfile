@@ -10,6 +10,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 COPY bartender/ bartender/
+COPY release-highlights.json release-highlights.json
 COPY requirements.txt requirements.txt
 
 RUN pip3 install --no-cache-dir -r requirements.txt
