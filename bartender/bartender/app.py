@@ -6202,6 +6202,18 @@ def api_fill_keg(keg_id: int):
                 return jsonify(validation_error), 409
             keg["filled_date"] = body.get("filled_date") or _today_utc_date()
             keg["percent_full"] = _clamp_percent_full(body.get("percent_full"), 100)
+            capacity = _extract_keg_capacity(keg)
+            if "current_volume" in body:
+                keg["current_volume"] = _coerce_float(body.get("current_volume"), None)
+                if keg["current_volume"] is None or keg["current_volume"] < 0:
+                    return jsonify({"error": "Current volume must be zero or greater."}), 400
+            elif capacity is not None:
+                keg["current_volume"] = capacity[0]
+
+            if "volume_unit" in body:
+                keg["volume_unit"] = _normalize_volume_unit(body.get("volume_unit"))
+            elif capacity is not None:
+                keg["volume_unit"] = capacity[1]
             keg["on_deck"] = False
             keg["updated_at"] = datetime.now(timezone.utc).isoformat()
             _record_team_audit(
@@ -6209,7 +6221,7 @@ def api_fill_keg(keg_id: int):
                 current_user,
                 "keg_filled",
                 f"keg:{keg_id}",
-                {key: keg.get(key) for key in ("name", "beer_name", "status", "percent_full", "filled_date")},
+                {key: keg.get(key) for key in ("name", "beer_name", "status", "percent_full", "current_volume", "volume_unit", "filled_date")},
             )
             save_data(data)
             return jsonify(keg)
