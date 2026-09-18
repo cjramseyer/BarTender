@@ -132,8 +132,9 @@ according to the operator's privacy and retention requirements.
 ## Licensing
 
 The Settings About panel includes an owner-only Licensing section. An owner can start
-one local 30-day Pro trial or paste a signed Pro license token issued by a separate
-licensing service. Paid tokens are verified with the Ed25519 public key configured by
+one local 30-day Pro trial or paste a signed Pro or extended Pro trial license issued
+by a separate licensing service. Signed trials provide the Pro feature set until the
+expiration date contained in the license. Tokens are verified with the Ed25519 public key configured by
 the add-on's `license_public_key` option; the private signing key never belongs in the
 add-on or this repository.
 
