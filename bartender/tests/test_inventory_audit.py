@@ -108,3 +108,54 @@ def test_inventory_mutations_are_recorded_in_the_audit_trail(tmp_path):
         "tap_deleted",
         "taps_bulk_created",
     } <= actions
+
+
+def test_fill_keg_defaults_volume_to_capacity_and_accepts_overrides(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["beers"] = [{"id": 1, "name": "House IPA", "packaging": "kegged"}]
+    data["kegs"] = [
+        {"id": 1, "name": "Keg One", "status": "empty", "size": "Corny (5 gal)"},
+        {"id": 2, "name": "Keg Two", "status": "empty", "size": "Corny (5 gal)"},
+    ]
+    app_module.save_data(data)
+
+    default_response = client.post("/api/kegs/1/fill", json={"beer_id": 1})
+    assert default_response.status_code == 200
+    default_keg = default_response.get_json()
+    assert default_keg["current_volume"] == 5
+    assert default_keg["volume_unit"] == "gal"
+    assert default_keg["percent_full"] == 100
+
+    override_response = client.post(
+        "/api/kegs/2/fill",
+        json={
+            "beer_id": 1,
+            "current_volume": 4.25,
+            "volume_unit": "gal",
+            "percent_full": 85,
+        },
+    )
+    assert override_response.status_code == 200
+    overridden_keg = override_response.get_json()
+    assert overridden_keg["current_volume"] == 4.25
+    assert overridden_keg["volume_unit"] == "gal"
+    assert overridden_keg["percent_full"] == 85
+
+
+def test_fill_keg_dialog_shows_editable_volume_and_percent_fields(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/kegs")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'id="fillKegCurrentVolume"' in body
+    assert 'id="fillKegVolumeUnit"' in body
+    assert 'id="fillKegPercentFull"' in body

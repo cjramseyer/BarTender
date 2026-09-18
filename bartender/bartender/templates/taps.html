@@ -99,9 +99,9 @@
       {% endif %}
     </div>
     <div class="tap-card-footer">
-      {% if keg and keg.current_volume is not none and keg.current_volume > 0
-      and keg.status not in ('cleaning', 'retired') %} {% if (settings.pour_mode
-      or 'manual') == 'manual' %} {% set pour_options = settings.pour_options if
+      {% set can_pour = keg and keg.current_volume is not none and
+      keg.current_volume > 0 and keg.status not in ('cleaning', 'retired') %}
+      {% if (settings.pour_mode or 'manual') == 'manual' %} {% set pour_options = settings.pour_options if
       settings.pour_options is defined else [] %} {% set default_pour_preset =
       settings.default_pour_preset if settings.default_pour_preset is defined
       else '' %}
@@ -125,6 +125,7 @@
           class="btn btn-sm btn-secondary js-pour-tap-btn"
           data-tap-id="{{ tap.id }}"
           type="button"
+          {% if not can_pour %}disabled aria-disabled="true"{% endif %}
         >
           Pour
         </button>
@@ -132,7 +133,7 @@
         <span class="muted">Configure pour options in Settings.</span>
         {% endif %}
       </div>
-      {% endif %} {% endif %}
+      {% endif %}
       <div class="tap-action-row">
         <button
           class="btn btn-sm btn-secondary js-edit-tap-btn"
@@ -389,6 +390,41 @@
   const INGRESS = "{{ ingress }}";
   const TAPS = JSON.parse(`{{ taps | tojson }}`);
   const KEGS = JSON.parse(`{{ kegs | tojson }}`);
+  const TAP_POUR_SELECTIONS_KEY = "bartender:tap-pour-selections";
+
+  function preserveOtherTapPourSelections(pouredTapId) {
+    const selections = {};
+    document.querySelectorAll('select[id^="tapPourPreset-"]').forEach((select) => {
+      const tapId = Number.parseInt(select.id.replace("tapPourPreset-", ""), 10);
+      if (tapId !== pouredTapId) {
+        selections[select.id] = select.value;
+      }
+    });
+
+    try {
+      sessionStorage.setItem(TAP_POUR_SELECTIONS_KEY, JSON.stringify(selections));
+    } catch (err) {
+      // Continue with the reload when browser storage is unavailable.
+    }
+  }
+
+  function restoreOtherTapPourSelections() {
+    try {
+      const selections = JSON.parse(
+        sessionStorage.getItem(TAP_POUR_SELECTIONS_KEY) || "{}",
+      );
+      Object.entries(selections).forEach(([selectId, value]) => {
+        const select = document.getElementById(selectId);
+        if (select && Array.from(select.options).some((option) => option.value === value)) {
+          select.value = value;
+        }
+      });
+    } catch (err) {
+      // Keep server-rendered defaults when stored selections are unavailable.
+    } finally {
+      sessionStorage.removeItem(TAP_POUR_SELECTIONS_KEY);
+    }
+  }
 
   function wireTapCardEventListeners() {
     document.querySelectorAll(".js-keg-level-fill").forEach((fillEl) => {
@@ -457,6 +493,7 @@
       return;
     }
 
+    preserveOtherTapPourSelections(tapId);
     location.reload();
   }
 
@@ -692,6 +729,7 @@
     location.reload();
   }
 
+  restoreOtherTapPourSelections();
   wireTapCardEventListeners();
 
   const params = new URLSearchParams(window.location.search);

@@ -403,6 +403,41 @@
         <label>Filled Date</label>
         <input type="date" id="fillKegDate" class="form-control" />
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="fillKegCurrentVolume">Current Volume</label>
+          <input
+            type="number"
+            id="fillKegCurrentVolume"
+            class="form-control"
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label for="fillKegVolumeUnit">Volume Unit</label>
+          <select id="fillKegVolumeUnit" class="form-control">
+            <option value="oz">oz</option>
+            <option value="gal">gal</option>
+            <option value="ml">ml</option>
+            <option value="l">L</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="fillKegPercentFull">Percent Full (0-100)</label>
+        <input
+          type="number"
+          id="fillKegPercentFull"
+          class="form-control"
+          min="0"
+          max="100"
+          step="1"
+          value="100"
+          required
+        />
+      </div>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="closeModal('fillKegModal')">
           Cancel
@@ -512,6 +547,36 @@
       return String(choices[0] || "").trim();
     }
     return "1/6 bbl (5.2 gal)";
+  }
+
+  function getKegCapacity(keg) {
+    const sizeLabel = keg?.size === "Custom" ? keg.custom_size : keg?.size;
+    const text = String(sizeLabel || "").trim();
+    if (!text) return null;
+
+    const parenthesized = text.match(/\(([^)]*)\)/);
+    const capacityText = parenthesized ? parenthesized[1] : text;
+    const matches = Array.from(
+      capacityText.matchAll(
+        /(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*(gal|gallons?|oz|ounces?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)/gi,
+      ),
+    );
+    if (!matches.length) return null;
+
+    const [, amountToken, rawUnit] = matches[matches.length - 1];
+    const fraction = amountToken.match(/^(\d+)\s*\/\s*(\d+)$/);
+    const amount = fraction
+      ? Number(fraction[1]) / Number(fraction[2])
+      : Number(amountToken);
+    const unitToken = rawUnit.toLowerCase();
+    const unit = unitToken.startsWith("gal")
+      ? "gal"
+      : unitToken.startsWith("oz") || unitToken.startsWith("ounce")
+        ? "oz"
+        : unitToken === "ml" || unitToken.startsWith("millilit")
+          ? "ml"
+          : "l";
+    return Number.isFinite(amount) && amount > 0 ? { amount, unit } : null;
   }
 
   function beerOptionLabel(beer) {
@@ -1069,11 +1134,18 @@
   }
 
   function openFillKeg(kegId, existingFilledDate, currentBeerId) {
+    const keg = KEGS.find((item) => String(item.id) === String(kegId));
+    const capacity = getKegCapacity(keg);
     document.getElementById("fillKegId").value = kegId;
     document.getElementById("fillExistingDate").value = existingFilledDate || "";
     document.getElementById("fillKegDate").value = todayInputDate();
     document.getElementById("fillKegBeer").value =
       currentBeerId || (BEERS.length ? String(BEERS[0].id) : "");
+    document.getElementById("fillKegCurrentVolume").value =
+      capacity?.amount ?? keg?.current_volume ?? "";
+    document.getElementById("fillKegVolumeUnit").value =
+      capacity?.unit || keg?.volume_unit || DEFAULT_VOLUME_UNIT;
+    document.getElementById("fillKegPercentFull").value = 100;
     openModal("fillKegModal");
   }
 
@@ -1092,7 +1164,14 @@
     const requestBody = {
       beer_id: beerId,
       filled_date: document.getElementById("fillKegDate").value,
-      percent_full: 100,
+      current_volume: parseFloat(
+        document.getElementById("fillKegCurrentVolume").value,
+      ),
+      volume_unit: document.getElementById("fillKegVolumeUnit").value,
+      percent_full: parseInt(
+        document.getElementById("fillKegPercentFull").value,
+        10,
+      ),
     };
 
     let response = await fetch(`${INGRESS}/api/kegs/${kegId}/fill`, {
