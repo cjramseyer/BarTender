@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -83,6 +84,35 @@ def test_taps_page_copy_uses_un_used_wording(tmp_path):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "Only full / un-used kegs shown." in body
+
+
+def test_unused_tap_shows_pour_controls_with_disabled_button(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    _seed_taps_and_kegs(app_module)
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/taps")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'id="tapPourPreset-2"' in body
+    assigned_button = re.search(
+        r'<button[^>]*class="[^"]*js-pour-tap-btn[^"]*"[^>]*data-tap-id="1"[^>]*>',
+        body,
+    )
+    unused_button = re.search(
+        r'<button[^>]*class="[^"]*js-pour-tap-btn[^"]*"[^>]*data-tap-id="2"[^>]*>',
+        body,
+    )
+    assert assigned_button is not None
+    assert "disabled" not in assigned_button.group(0)
+    assert unused_button is not None
+    assert "disabled" in unused_button.group(0)
 
 
 def test_api_add_tap_rejects_keg_already_connected(tmp_path):

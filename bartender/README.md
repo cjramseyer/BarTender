@@ -149,8 +149,10 @@ metadata are retained for up to 90 days after termination and include limited
 user-agent and IP information for access management.
 
 Owners can manage licensing from the Settings About panel. The app supports a local
-30-day Pro trial and signed Pro license tokens verified with the configured Ed25519
-public key. Owners of Pro profiles can also download an activation request JSON for
+30-day Pro trial, signed extended Pro trial licenses, and signed Pro licenses verified
+with the configured Ed25519 public key. Signed trials use the expiration date issued
+in the license and provide the same features as Pro until that date. Owners of Pro
+profiles can also download an activation request JSON for
 the Keystone license portal. The request contains a persistent installation ID, a
 nonce, an Ed25519 instance public key, an instance key ID, and an Ed25519 signature
 over the exact UTF-8 message `app_id.instance_id.instance_key_id.nonce`, along with

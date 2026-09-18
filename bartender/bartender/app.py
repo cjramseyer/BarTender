@@ -1513,7 +1513,7 @@ def _validate_license_token(token: str) -> dict:
             raise ValueError("License token is missing required claims.")
         if payload.get("version") != 1 or payload.get("aud") != LICENSE_APP_ID:
             raise ValueError("License token is not valid for this application.")
-        if payload.get("license_type") != "pro":
+        if payload.get("license_type") not in ("pro", "trial"):
             raise ValueError("License token has an unsupported license type.")
         binding = payload.get("instance_binding")
         if not isinstance(binding, dict) or any(
@@ -3993,8 +3993,11 @@ def api_activate_license():
         token_public_key_hash = str(instance_binding.get("instance_public_key_sha256", "") or "").strip()
         if token_public_key_hash and token_public_key_hash != _license_instance_public_key_sha256(local_public_key):
             return jsonify({"error": "License is bound to a different BarTender instance public key."}), 400
+    activated_license_type = (
+        "trial" if payload.get("license_type") == "trial" else "paid"
+    )
     data["settings"].update({
-        "license_type": "paid",
+        "license_type": activated_license_type,
         "license_token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),
         "license_expires_at": str(payload.get("expires_at", "")),
         "license_features": payload.get("features", []) if isinstance(payload.get("features", []), list) else [],
@@ -6202,6 +6205,18 @@ def api_fill_keg(keg_id: int):
                 return jsonify(validation_error), 409
             keg["filled_date"] = body.get("filled_date") or _today_utc_date()
             keg["percent_full"] = _clamp_percent_full(body.get("percent_full"), 100)
+            capacity = _extract_keg_capacity(keg)
+            if "current_volume" in body:
+                keg["current_volume"] = _coerce_float(body.get("current_volume"), None)
+                if keg["current_volume"] is None or keg["current_volume"] < 0:
+                    return jsonify({"error": "Current volume must be zero or greater."}), 400
+            elif capacity is not None:
+                keg["current_volume"] = capacity[0]
+
+            if "volume_unit" in body:
+                keg["volume_unit"] = _normalize_volume_unit(body.get("volume_unit"))
+            elif capacity is not None:
+                keg["volume_unit"] = capacity[1]
             keg["on_deck"] = False
             keg["updated_at"] = datetime.now(timezone.utc).isoformat()
             _record_team_audit(
@@ -6209,7 +6224,7 @@ def api_fill_keg(keg_id: int):
                 current_user,
                 "keg_filled",
                 f"keg:{keg_id}",
-                {key: keg.get(key) for key in ("name", "beer_name", "status", "percent_full", "filled_date")},
+                {key: keg.get(key) for key in ("name", "beer_name", "status", "percent_full", "current_volume", "volume_unit", "filled_date")},
             )
             save_data(data)
             return jsonify(keg)

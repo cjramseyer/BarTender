@@ -1068,6 +1068,8 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   gap: 1rem;
 }
 .keg-card {
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1099,6 +1101,7 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 }
 .keg-card-footer {
   display: flex;
+  margin-top: auto;
   gap: 0.5rem;
   padding: 0.6rem 1rem;
   border-top: 1px solid var(--border);
@@ -1248,6 +1251,8 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   gap: 1rem;
 }
 .tap-card {
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1289,6 +1294,7 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 .tap-card-footer {
   display: flex;
   flex-direction: column;
+  margin-top: auto;
   gap: 0.5rem;
   padding: 0.6rem 1rem;
   border-top: 1px solid var(--border);
@@ -1304,6 +1310,24 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
 .tap-pour-row .form-control {
   flex: 1;
   min-width: 0;
+}
+
+.tap-pour-row .js-pour-tap-btn {
+  align-self: stretch;
+  min-height: 4.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tap-pour-row .js-pour-tap-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.tap-action-row {
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
 }
 
 .tap-pour-row .dashboard-pour-select {
