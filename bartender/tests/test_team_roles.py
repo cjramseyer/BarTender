@@ -923,6 +923,46 @@ def test_homebrewer_default_displays_split_taps_and_bar_stock(tmp_path):
     assert "Tap #1" not in html2
 
 
+def test_display_uses_compact_desktop_tap_grid(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    display = client.get("/display?display=1").get_data(as_text=True)
+
+    assert "grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));" in display
+
+
+def test_display_shows_beer_name_in_tap_card_header(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["taps"] = [{"id": 1, "number": 1, "label": "Patio Tap", "keg_id": 1}]
+    data["kegs"] = [{
+        "id": 1,
+        "name": "Keg 1",
+        "beer_name": "North Ridge IPA",
+        "status": "in_use",
+        "percent_full": 80,
+    }]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    display = client.get("/display?display=1").get_data(as_text=True)
+
+    assert 'class="tap-beer-name"' in display
+    assert 'title="North Ridge IPA"' in display
+    assert '<p class="keg-on-tap">' not in display
+
+
 def test_pro_display_bar_stock_assignment_controls_visible_boards(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

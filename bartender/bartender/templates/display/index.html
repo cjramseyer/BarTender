@@ -144,7 +144,7 @@
       /* Taps */
       .taps-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
         gap: 1rem;
         margin-bottom: 2.5rem;
       }
@@ -162,16 +162,22 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 0.5rem;
       }
       .tap-number {
         font-weight: 700;
         font-size: 1rem;
+        flex: 0 0 auto;
       }
-      .tap-label-badge {
+      .tap-beer-name {
         background: rgba(255, 255, 255, 0.12);
         padding: 0.15rem 0.5rem;
         border-radius: 4px;
         font-size: 0.8rem;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .tap-card-body {
         padding: 0.85rem 1rem;
@@ -179,10 +185,6 @@
       .tap-card-body p {
         font-size: 0.88rem;
         margin-bottom: 0.3rem;
-      }
-      .keg-on-tap {
-        font-size: 1.05rem !important;
-        font-weight: 600;
       }
       .keg-level {
         display: flex;
@@ -458,13 +460,13 @@
         <div class="tap-card">
           <div class="tap-card-header">
             <span class="tap-number">Tap #{{ tap.number }}</span>
-            {% if tap.label %}<span class="tap-label-badge"
-              >{{ tap.label }}</span
+            {% set display_name = keg.beer_name or keg.name if keg else tap.label %}
+            {% if display_name %}<span class="tap-beer-name" title="{{ display_name }}"
+              >{{ display_name }}</span
             >{% endif %}
           </div>
           <div class="tap-card-body">
             {% if keg %}
-            <p class="keg-on-tap">{{ keg.name }}</p>
             <div
               class="keg-level"
               role="img"
