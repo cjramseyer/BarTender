@@ -459,7 +459,7 @@ def test_homebrewer_limits_taps_and_kegs(tmp_path):
         "team_audit": [],
     })
 
-    for i in range(12):
+    for i in range(16):
         response = client.post(
             "/api/taps",
             json={"number": i + 1},
@@ -469,11 +469,11 @@ def test_homebrewer_limits_taps_and_kegs(tmp_path):
 
     response = client.post(
         "/api/taps",
-        json={"number": 13},
+        json={"number": 17},
         headers=owner_headers,
     )
     assert response.status_code == 409
-    assert "12" in response.get_json()["error"]
+    assert "16" in response.get_json()["error"]
 
     for i in range(20):
         response = client.post(

@@ -2727,7 +2727,7 @@ def _normalize_brewery_type(value) -> str:
 
 def _homebrewer_limit_for(collection: str) -> int:
     if collection == "taps":
-        return 12
+        return 16
     if collection == "kegs":
         return 20
     return 0
