@@ -361,6 +361,7 @@ def test_pro_display_count_and_tap_assignments_save(tmp_path):
             "brewery_type": "pro",
             "display_count": 2,
             "display_tap_assignments": [[1, 2], [3, 4]],
+            "display_bar_stock_assignments": [True, False],
         },
         headers=owner_headers,
     )
@@ -369,7 +370,9 @@ def test_pro_display_count_and_tap_assignments_save(tmp_path):
     payload = response.get_json()
     assert payload["display_count"] == 2
     assert payload["display_tap_assignments"] == [[1, 2], [3, 4]]
+    assert payload["display_bar_stock_assignments"] == [True, False]
     assert app_module.load_data()["settings"]["display_tap_assignments"] == [[1, 2], [3, 4]]
+    assert app_module.load_data()["settings"]["display_bar_stock_assignments"] == [True, False]
 
 
 def test_owner_can_reset_pro_display_configuration_to_defaults(tmp_path):
@@ -393,9 +396,11 @@ def test_owner_can_reset_pro_display_configuration_to_defaults(tmp_path):
     assert response.status_code == 200
     assert response.get_json()["display_count"] == 2
     assert response.get_json()["display_tap_assignments"] == [[1, 2, 3], []]
+    assert response.get_json()["display_bar_stock_assignments"] == [False, True]
     saved = app_module.load_data()["settings"]
     assert saved["display_count"] == 2
     assert saved["display_tap_assignments"] == [[1, 2, 3], []]
+    assert saved["display_bar_stock_assignments"] == [False, True]
 
 
 def test_pos_pour_mode_is_forbidden_for_homebrewer_settings(tmp_path):
@@ -918,7 +923,7 @@ def test_homebrewer_default_displays_split_taps_and_bar_stock(tmp_path):
     assert "Tap #1" not in html2
 
 
-def test_pro_default_display_two_shows_bar_stock(tmp_path):
+def test_pro_display_bar_stock_assignment_controls_visible_boards(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
 
@@ -927,6 +932,7 @@ def test_pro_default_display_two_shows_bar_stock(tmp_path):
         "brewery_type": "pro",
         "display_count": 2,
         "display_tap_assignments": [[1], []],
+        "display_bar_stock_assignments": [True, False],
         "bar_stock_enabled": True,
     })
     data["taps"] = [{"id": 1, "number": 1, "label": "Main Tap", "keg_id": 1}]
@@ -941,8 +947,31 @@ def test_pro_default_display_two_shows_bar_stock(tmp_path):
 
     display_one = client.get("/display?display=1").get_data(as_text=True)
     assert "House IPA Keg" in display_one
-    assert "Bourbon" not in display_one
+    assert "Bourbon" in display_one
 
     display_two = client.get("/display?display=2").get_data(as_text=True)
     assert "House IPA Keg" not in display_two
-    assert "Bourbon" in display_two
+    assert "Bourbon" not in display_two
+    assert "On Draft" not in display_two
+
+
+def test_single_pro_display_defaults_bar_stock_to_display_one(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 1,
+        "display_bar_stock_assignments": [],
+        "bar_stock_enabled": True,
+    })
+    data["bar_stock"] = [{"id": 1, "name": "Bourbon", "category": "Spirits", "quantity": 3, "unit": "bottles"}]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    display = client.get("/display?display=1").get_data(as_text=True)
+    assert "Bourbon" in display

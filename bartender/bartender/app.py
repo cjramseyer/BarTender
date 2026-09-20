@@ -857,6 +857,7 @@ DEFAULT_DATA = {
         "display_full_width": False,
         "display_count": 2,
         "display_tap_assignments": [],
+        "display_bar_stock_assignments": [],
         "pour_options": [
             {"name": "Pint", "amount": 16, "unit": "oz"},
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
@@ -1016,6 +1017,11 @@ def _load_data_unlocked() -> dict:
         data["settings"]["display_tap_assignments"] = _normalize_display_tap_assignments(
             data["settings"].get("display_tap_assignments"),
             data["settings"].get("display_count", 2),
+        )
+        data["settings"]["display_bar_stock_assignments"] = _normalize_display_bar_stock_assignments(
+            data["settings"].get("display_bar_stock_assignments"),
+            data["settings"].get("display_count", 2),
+            data["settings"].get("brewery_type"),
         )
         data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
             data["settings"].get("audit_retention_days")
@@ -1350,6 +1356,19 @@ def _normalize_display_tap_assignments(value, display_count: int = 2) -> list[li
     return normalized
 
 
+def _normalize_display_bar_stock_assignments(
+    value,
+    display_count: int = 2,
+    brewery_type: str | None = None,
+) -> list[bool]:
+    count = max(1, _coerce_int(display_count, 2) or 2)
+    raw = value if isinstance(value, list) else []
+    normalized = [_coerce_bool(raw[index], False) if index < len(raw) else False for index in range(count)]
+    if not any(normalized) and _normalize_brewery_type(brewery_type) == "pro":
+        normalized[min(1, count - 1)] = True
+    return normalized
+
+
 def _assign_existing_taps_to_first_display(data: dict) -> bool:
     settings = data.get("settings", {})
     display_count = _normalize_display_count(
@@ -1393,6 +1412,7 @@ def _reset_display_configuration_to_defaults(data: dict) -> dict:
     configuration = {
         "display_count": 2,
         "display_tap_assignments": [tap_numbers, []],
+        "display_bar_stock_assignments": [False, True],
     }
     data["settings"].update(configuration)
     return configuration
@@ -1902,6 +1922,11 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
     settings["display_tap_assignments"] = _normalize_display_tap_assignments(
         settings.get("display_tap_assignments"),
         settings.get("display_count", 2),
+    )
+    settings["display_bar_stock_assignments"] = _normalize_display_bar_stock_assignments(
+        settings.get("display_bar_stock_assignments"),
+        settings.get("display_count", 2),
+        settings.get("brewery_type"),
     )
     settings["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
         settings.get("analytics_low_keg_threshold_percent")
@@ -3745,6 +3770,11 @@ def display_view():
         data.get("settings", {}).get("display_tap_assignments"),
         display_count,
     )
+    bar_stock_assignments = _normalize_display_bar_stock_assignments(
+        data.get("settings", {}).get("display_bar_stock_assignments"),
+        display_count,
+        brewery_type,
+    )
     selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
 
     taps = data["taps"]
@@ -3767,7 +3797,8 @@ def display_view():
             taps = [tap for tap in data["taps"] if _coerce_int(tap.get("number"), None) in selected_taps]
         else:
             taps = []
-        show_bar_stock = show_bar_stock and selected_display_index == 2
+        show_taps = bool(selected_taps)
+        show_bar_stock = show_bar_stock and bar_stock_assignments[selected_display_index - 1]
 
     return render_template(
         "display/index.html",
@@ -4239,6 +4270,7 @@ def api_save_settings():
         "display_full_width",
         "display_count",
         "display_tap_assignments",
+        "display_bar_stock_assignments",
         "pour_options",
         "default_pour_preset",
         "analytics_low_keg_threshold_percent",
