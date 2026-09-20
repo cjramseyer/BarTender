@@ -49,6 +49,65 @@ def test_mqtt_messages_publish_retained_snapshots_and_event():
     }
 
 
+def test_mqtt_connection_publishes_snapshots(monkeypatch):
+    from bartender import mqtt as mqtt_module
+
+    published = []
+
+    class FakePublishResult:
+        def wait_for_publish(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, client_id):
+            assert client_id == "bartender-publisher"
+
+        def username_pw_set(self, username, password):
+            assert username == "bartender"
+            assert password == "secret"
+
+        def tls_set(self):
+            return None
+
+        def connect(self, host, port, keepalive):
+            assert host == "mqtt.example.test"
+            assert port == 8883
+            assert keepalive == 10
+
+        def loop_start(self):
+            return None
+
+        def publish(self, topic, payload, qos, retain):
+            published.append((topic, qos, retain))
+            return FakePublishResult()
+
+        def loop_stop(self):
+            return None
+
+        def disconnect(self):
+            return None
+
+    class FakeMqtt:
+        Client = FakeClient
+
+    monkeypatch.setattr(mqtt_module, "mqtt", FakeMqtt)
+    success, message = mqtt_module.test_connection({
+        "settings": {
+            "mqtt_host": "mqtt.example.test",
+            "mqtt_port": 8883,
+            "mqtt_topic_prefix": "bar/main",
+            "mqtt_username": "bartender",
+            "mqtt_password": "secret",
+            "mqtt_tls": True,
+        },
+    })
+
+    assert success is True
+    assert message == "Connected and published MQTT snapshots."
+    assert ("bar/main/status", 1, True) in published
+    assert ("bar/main/events/state-updated", 1, False) in published
+
+
 def test_owner_can_save_mqtt_settings_without_exposing_password(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
@@ -98,3 +157,18 @@ def test_owner_settings_page_shows_mqtt_panel(tmp_path):
     assert "<summary>MQTT</summary>" in body
     assert 'id="mqttHost"' in body
     assert 'id="mqttTopicPrefix"' in body
+    assert 'class="settings-inline-field settings-mqtt-field"' in body
+    assert "Test MQTT Connection" in body
+
+
+def test_mqtt_test_endpoint_requires_owner_and_returns_probe_result(tmp_path, monkeypatch):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    monkeypatch.setattr(app_module, "test_mqtt_connection", lambda data: (True, "Probe published."))
+
+    forbidden = client.post("/api/settings/mqtt/test", headers={"X-BarTender-Role": "manager"})
+    assert forbidden.status_code == 403
+
+    response = client.post("/api/settings/mqtt/test", headers={"X-BarTender-Role": "owner"})
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True, "message": "Probe published."}

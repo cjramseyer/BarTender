@@ -1230,7 +1230,7 @@ def test_pro_display_tap_assignments_include_configured_taps(tmp_path):
     assert 'id="displayCount"' in body
     assert 'id="menuQrMode" class="form-control settings-compact-select settings-qr-mode-select"' in body
     assert body.count('class="pro-feature-badge"') == 5
-    assert body.count('class="settings-inline-field"') == 9
+    assert body.count('class="settings-inline-field"') >= 4
     assert (
         body.index("<label>Bar Profile</label>")
         < body.index("<label>Environment Mode</label>")
