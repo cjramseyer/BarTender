@@ -58,6 +58,7 @@ from bartender.pos_sync.brewfather import (
     utc_now as brewfather_now,
 )
 from bartender.storage import create_state_store
+from bartender.mqtt import publish_state_async
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -843,6 +844,13 @@ DEFAULT_DATA = {
         "external_api_allowlist": "",
         "external_api_rate_limit_enabled": True,
         "external_api_rate_limit_per_minute": DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE,
+        "mqtt_enabled": False,
+        "mqtt_host": "",
+        "mqtt_port": 1883,
+        "mqtt_topic_prefix": "bartender",
+        "mqtt_username": "",
+        "mqtt_password": "",
+        "mqtt_tls": False,
         "api_reference_enabled": True,
         "pour_mode": "manual",
         "environment_mode": "production",
@@ -857,6 +865,7 @@ DEFAULT_DATA = {
         "display_full_width": False,
         "display_count": 2,
         "display_tap_assignments": [],
+        "display_bar_stock_assignments": [],
         "pour_options": [
             {"name": "Pint", "amount": 16, "unit": "oz"},
             {"name": "Half Pint", "amount": 8, "unit": "oz"},
@@ -1017,6 +1026,11 @@ def _load_data_unlocked() -> dict:
             data["settings"].get("display_tap_assignments"),
             data["settings"].get("display_count", 2),
         )
+        data["settings"]["display_bar_stock_assignments"] = _normalize_display_bar_stock_assignments(
+            data["settings"].get("display_bar_stock_assignments"),
+            data["settings"].get("display_count", 2),
+            data["settings"].get("brewery_type"),
+        )
         data["settings"]["audit_retention_days"] = _normalize_audit_retention_days(
             data["settings"].get("audit_retention_days")
         )
@@ -1071,6 +1085,13 @@ def _load_data_unlocked() -> dict:
         data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
             data["settings"].get("external_api_rate_limit_per_minute")
         )
+        data["settings"]["mqtt_enabled"] = _coerce_bool(data["settings"].get("mqtt_enabled"), False)
+        data["settings"]["mqtt_host"] = str(data["settings"].get("mqtt_host", "") or "").strip()[:253]
+        data["settings"]["mqtt_port"] = max(1, min(65535, _coerce_int(data["settings"].get("mqtt_port"), 1883) or 1883))
+        data["settings"]["mqtt_topic_prefix"] = str(data["settings"].get("mqtt_topic_prefix", "bartender") or "bartender").strip().strip("/")[:128] or "bartender"
+        data["settings"]["mqtt_username"] = str(data["settings"].get("mqtt_username", "") or "").strip()[:256]
+        data["settings"]["mqtt_password"] = str(data["settings"].get("mqtt_password", "") or "")[:512]
+        data["settings"]["mqtt_tls"] = _coerce_bool(data["settings"].get("mqtt_tls"), False)
         data["settings"]["anonymous_telemetry_enabled"] = _coerce_bool(
             data["settings"].get("anonymous_telemetry_enabled"),
             False,
@@ -1219,6 +1240,7 @@ def save_data(data: dict) -> None:
             file_handle.flush()
             os.fsync(file_handle.fileno())
         os.replace(temporary_file, DATA_FILE)
+    publish_state_async(data)
 
 
 # ---------------------------------------------------------------------------
@@ -1350,6 +1372,19 @@ def _normalize_display_tap_assignments(value, display_count: int = 2) -> list[li
     return normalized
 
 
+def _normalize_display_bar_stock_assignments(
+    value,
+    display_count: int = 2,
+    brewery_type: str | None = None,
+) -> list[bool]:
+    count = max(1, _coerce_int(display_count, 2) or 2)
+    raw = value if isinstance(value, list) else []
+    normalized = [_coerce_bool(raw[index], False) if index < len(raw) else False for index in range(count)]
+    if not any(normalized) and _normalize_brewery_type(brewery_type) == "pro":
+        normalized[min(1, count - 1)] = True
+    return normalized
+
+
 def _assign_existing_taps_to_first_display(data: dict) -> bool:
     settings = data.get("settings", {})
     display_count = _normalize_display_count(
@@ -1393,6 +1428,7 @@ def _reset_display_configuration_to_defaults(data: dict) -> dict:
     configuration = {
         "display_count": 2,
         "display_tap_assignments": [tap_numbers, []],
+        "display_bar_stock_assignments": [False, True],
     }
     data["settings"].update(configuration)
     return configuration
@@ -1765,6 +1801,7 @@ def _brewfather_settings_response(settings: dict) -> dict:
         "brewfather_last_counts": settings["brewfather_last_counts"],
         "brewfather_credentials": redact_credentials(_brewfather_credentials(settings)),
     })
+    response["mqtt_password"] = ""
     return response
 
 
@@ -1902,6 +1939,11 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
     settings["display_tap_assignments"] = _normalize_display_tap_assignments(
         settings.get("display_tap_assignments"),
         settings.get("display_count", 2),
+    )
+    settings["display_bar_stock_assignments"] = _normalize_display_bar_stock_assignments(
+        settings.get("display_bar_stock_assignments"),
+        settings.get("display_count", 2),
+        settings.get("brewery_type"),
     )
     settings["analytics_low_keg_threshold_percent"] = _normalize_low_keg_threshold(
         settings.get("analytics_low_keg_threshold_percent")
@@ -3675,6 +3717,7 @@ def settings():
     ingress_path = _effective_ingress_path()
     template_settings = json.loads(json.dumps(data["settings"]))
     template_settings["brewfather_api_key"] = ""
+    template_settings["mqtt_password"] = ""
     template_settings["brewfather_credentials"] = redact_credentials(_brewfather_credentials(data["settings"]))
     return render_template(
         "settings.html",
@@ -3745,6 +3788,11 @@ def display_view():
         data.get("settings", {}).get("display_tap_assignments"),
         display_count,
     )
+    bar_stock_assignments = _normalize_display_bar_stock_assignments(
+        data.get("settings", {}).get("display_bar_stock_assignments"),
+        display_count,
+        brewery_type,
+    )
     selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
 
     taps = data["taps"]
@@ -3767,7 +3815,8 @@ def display_view():
             taps = [tap for tap in data["taps"] if _coerce_int(tap.get("number"), None) in selected_taps]
         else:
             taps = []
-        show_bar_stock = show_bar_stock and selected_display_index == 2
+        show_taps = bool(selected_taps)
+        show_bar_stock = show_bar_stock and bar_stock_assignments[selected_display_index - 1]
 
     return render_template(
         "display/index.html",
@@ -4188,6 +4237,13 @@ def api_save_settings():
         "mobile_session_timeout_minutes",
         "station_session_timeout_minutes",
         "anonymous_telemetry_enabled",
+        "mqtt_enabled",
+        "mqtt_host",
+        "mqtt_port",
+        "mqtt_topic_prefix",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_tls",
     }
     if current_user.get("role") != "owner" and not is_setup_bootstrap:
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -4239,12 +4295,20 @@ def api_save_settings():
         "display_full_width",
         "display_count",
         "display_tap_assignments",
+        "display_bar_stock_assignments",
         "pour_options",
         "default_pour_preset",
         "analytics_low_keg_threshold_percent",
         "analytics_days_left_method",
         "analytics_days_left_window_days",
         "anonymous_telemetry_enabled",
+        "mqtt_enabled",
+        "mqtt_host",
+        "mqtt_port",
+        "mqtt_topic_prefix",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_tls",
     }
     for key in allowed:
         if key in body:
@@ -6829,6 +6893,8 @@ def _build_export_json_payload(data: dict) -> dict:
     if isinstance(export_settings, dict):
         export_settings.pop("brewfather_api_key", None)
         export_settings.pop("brewfather_user_id", None)
+        export_settings.pop("mqtt_username", None)
+        export_settings.pop("mqtt_password", None)
         export_settings.pop("license_instance_private_key", None)
         export_settings["brewfather_credentials"] = redact_credentials(
             normalize_credentials(

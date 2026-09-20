@@ -24,6 +24,7 @@ DEFAULT_DATA = {
         "bar_name": "My Bar",
         "bar_logo_url": "",
         "bar_stock_enabled": True,
+        "display_bar_stock_assignments": [],
     },
     "beers": [],
     "bar_stock": [],
@@ -96,6 +97,15 @@ def _normalize_display_tap_assignments(value, display_count: int = 2) -> list[li
     return normalized
 
 
+def _normalize_display_bar_stock_assignments(value, display_count: int = 2, brewery_type: str | None = None) -> list[bool]:
+    count = max(1, _coerce_int(display_count, 2) or 2)
+    raw = value if isinstance(value, list) else []
+    normalized = [_coerce_bool(raw[index], False) if index < len(raw) else False for index in range(count)]
+    if not any(normalized) and _normalize_brewery_type(brewery_type) == "pro":
+        normalized[min(1, count - 1)] = True
+    return normalized
+
+
 def load_data() -> dict:
     if DATA_FILE.exists():
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -158,6 +168,11 @@ def index():
         data.get("settings", {}).get("display_tap_assignments"),
         display_count,
     )
+    bar_stock_assignments = _normalize_display_bar_stock_assignments(
+        data.get("settings", {}).get("display_bar_stock_assignments"),
+        display_count,
+        brewery_type,
+    )
     selected_taps = set(assignments[selected_display_index - 1]) if selected_display_index <= len(assignments) else set()
 
     taps = data.get("taps", [])
@@ -180,7 +195,8 @@ def index():
             taps = [tap for tap in taps if _coerce_int(tap.get("number"), None) in selected_taps]
         else:
             taps = []
-        show_bar_stock = show_bar_stock and selected_display_index == 2
+        show_taps = bool(selected_taps)
+        show_bar_stock = show_bar_stock and bar_stock_assignments[selected_display_index - 1]
 
     return render_template(
         "display/index.html",

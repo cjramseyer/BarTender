@@ -217,7 +217,7 @@ content %}
           <div class="form-group">
             <div class="settings-inline-field">
               <label for="menuQrMode">Printable Menu QR Code</label>
-              <select id="menuQrMode" class="form-control settings-compact-select">
+              <select id="menuQrMode" class="form-control settings-compact-select settings-qr-mode-select">
                 {% if (settings.menu_qr_mode or 'both') == 'off' %}
                 <option value="off" selected>Off</option>
                 {% else %}
@@ -1011,6 +1011,47 @@ content %}
         </div>
       </details>
 
+      {% if current_user_role == 'owner' %}
+      <details class="settings-collapsible">
+        <summary>MQTT</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              <input type="checkbox" id="mqttEnabled" {% if settings.mqtt_enabled %}checked{% endif %} />
+              Enable MQTT publishing
+            </label>
+            <small class="muted">Publishes retained status, tap, keg, bar stock, and display snapshots. MQTT commands are not accepted.</small>
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttHost">MQTT Host</label>
+            <input id="mqttHost" class="form-control" type="text" value="{{ settings.mqtt_host or '' }}" placeholder="e.g. core-mosquitto" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttPort">MQTT Port</label>
+            <input id="mqttPort" class="form-control" type="number" min="1" max="65535" value="{{ settings.mqtt_port or 1883 }}" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttTopicPrefix">Topic Prefix</label>
+            <input id="mqttTopicPrefix" class="form-control" type="text" value="{{ settings.mqtt_topic_prefix or 'bartender' }}" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttUsername">Username</label>
+            <input id="mqttUsername" class="form-control" type="text" value="{{ settings.mqtt_username or '' }}" autocomplete="off" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttPassword">Password</label>
+            <input id="mqttPassword" class="form-control" type="password" value="" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              <input type="checkbox" id="mqttTls" {% if settings.mqtt_tls %}checked{% endif %} />
+              Use TLS
+            </label>
+          </div>
+        </div>
+      </details>
+      {% endif %}
+
       <details class="settings-collapsible">
         <summary>Analytics</summary>
         <div class="settings-collapsible-body">
@@ -1619,9 +1660,15 @@ content %}
   const INITIAL_DISPLAY_TAP_ASSIGNMENTS = JSON.parse(
     `{{ (settings.display_tap_assignments or []) | tojson }}`,
   );
+  const INITIAL_DISPLAY_BAR_STOCK_ASSIGNMENTS = JSON.parse(
+    `{{ (settings.display_bar_stock_assignments or []) | tojson }}`,
+  );
 
   let currentDisplayTapAssignments = normalizeDisplayTapAssignments(
     INITIAL_DISPLAY_TAP_ASSIGNMENTS,
+  );
+  let currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
+    INITIAL_DISPLAY_BAR_STOCK_ASSIGNMENTS,
   );
   let saveMsgTimeoutId = null;
   let autoSaveTimeoutId = null;
@@ -1696,6 +1743,17 @@ content %}
     );
   }
 
+  function normalizeDisplayBarStockAssignments(assignments = []) {
+    if (!Array.isArray(assignments)) return [];
+    return assignments.map((assigned) => Boolean(assigned));
+  }
+
+  function collectDisplayBarStockAssignments() {
+    return Array.from(
+      document.querySelectorAll(".display-bar-stock-assignment"),
+    ).map((checkbox) => checkbox.checked);
+  }
+
   function currentBreweryType() {
     return getCheckedRadioValue("brewery_type", "homebrewer");
   }
@@ -1713,6 +1771,9 @@ content %}
     const normalizedAssignments = collectSelectedDisplayTapAssignments().length
       ? normalizeDisplayTapAssignments(collectSelectedDisplayTapAssignments())
       : currentDisplayTapAssignments;
+    const normalizedBarStockAssignments = collectDisplayBarStockAssignments().length
+      ? normalizeDisplayBarStockAssignments(collectDisplayBarStockAssignments())
+      : currentDisplayBarStockAssignments;
     const tapList = Array.isArray(TAPS) ? TAPS : [];
     const tapNumbers = tapList
       .map((tap) => Number.parseInt(tap.number, 10))
@@ -1732,12 +1793,18 @@ content %}
       .map((selectedNumbers, index) => {
         const selectedCount = selectedNumbers.length;
         const displayUrl = `${AUTO_EXTERNAL_DISPLAY_URL}?display=${index + 1}`;
+        const barStockId = `displayBarStockAssignment-${index + 1}`;
+        const barStockChecked = normalizedBarStockAssignments[index] ? "checked" : "";
         return `
           <details class="settings-collapsible display-tap-assignment" ${selectedCount ? "open" : ""}>
             <summary>
               <a class="display-config-link" href="${displayUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Display ${index + 1}${selectedCount ? ` (${selectedCount} selected)` : ""}</a>
             </summary>
             <div class="settings-collapsible-body">
+              <label class="radio-label" for="${barStockId}">
+                <input id="${barStockId}" class="display-bar-stock-assignment" type="checkbox" ${barStockChecked} />
+                Show bar stock
+              </label>
               <div class="display-tap-checkbox-list">
                 ${
                   tapNumbers.length
@@ -1766,11 +1833,14 @@ content %}
       .join("");
 
     container
-      .querySelectorAll(".display-tap-assignment-checkbox")
+      .querySelectorAll(".display-tap-assignment-checkbox, .display-bar-stock-assignment")
       .forEach((checkbox) => {
         checkbox.addEventListener("change", () => {
           currentDisplayTapAssignments = normalizeDisplayTapAssignments(
             collectSelectedDisplayTapAssignments(),
+          );
+          currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
+            collectDisplayBarStockAssignments(),
           );
           scheduleAutoSave(100);
         });
@@ -1805,6 +1875,9 @@ content %}
       if (!isPro) {
         currentDisplayTapAssignments = normalizeDisplayTapAssignments(
           collectSelectedDisplayTapAssignments(),
+        );
+        currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
+          collectDisplayBarStockAssignments(),
         );
         displayTapAssignments.hidden = true;
         displayTapAssignments.innerHTML = "";
@@ -1893,6 +1966,7 @@ content %}
     if (payload.brewery_type !== "pro") {
       payload.display_count = 2;
       payload.display_tap_assignments = [];
+      payload.display_bar_stock_assignments = [];
       return payload;
     }
 
@@ -1901,6 +1975,11 @@ content %}
       collectSelectedDisplayTapAssignments().length
         ? collectSelectedDisplayTapAssignments()
         : currentDisplayTapAssignments,
+    );
+    payload.display_bar_stock_assignments = normalizeDisplayBarStockAssignments(
+      collectDisplayBarStockAssignments().length
+        ? collectDisplayBarStockAssignments()
+        : currentDisplayBarStockAssignments,
     );
     payload.mobile_session_timeout_minutes = getClampedIntegerValue(
       "mobileSessionTimeoutMinutes",
@@ -1955,6 +2034,24 @@ content %}
     )
       ? document.getElementById("posSyncProviderConfigJson").value
       : "";
+    payload.mqtt_enabled = document.getElementById("mqttEnabled")
+      ? document.getElementById("mqttEnabled").checked
+      : false;
+    payload.mqtt_host = document.getElementById("mqttHost")
+      ? document.getElementById("mqttHost").value.trim()
+      : "";
+    payload.mqtt_port = getClampedIntegerValue("mqttPort", 1883, 1, 65535);
+    payload.mqtt_topic_prefix = document.getElementById("mqttTopicPrefix")
+      ? document.getElementById("mqttTopicPrefix").value.trim()
+      : "bartender";
+    payload.mqtt_username = document.getElementById("mqttUsername")
+      ? document.getElementById("mqttUsername").value.trim()
+      : "";
+    const mqttPassword = document.getElementById("mqttPassword");
+    if (mqttPassword && mqttPassword.value) payload.mqtt_password = mqttPassword.value;
+    payload.mqtt_tls = document.getElementById("mqttTls")
+      ? document.getElementById("mqttTls").checked
+      : false;
     payload.brewfather_enabled = document.getElementById("brewfatherEnabled")
       ? document.getElementById("brewfatherEnabled").checked
       : false;
@@ -2118,6 +2215,9 @@ content %}
     }
     currentDisplayTapAssignments = normalizeDisplayTapAssignments(
       savedSettings.display_tap_assignments || currentDisplayTapAssignments,
+    );
+    currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
+      savedSettings.display_bar_stock_assignments || currentDisplayBarStockAssignments,
     );
     syncDisplaySettingsAvailability();
 
@@ -3218,6 +3318,7 @@ content %}
   }
 
   function createKegTypeChoiceRow(value = "") {
+    const choice = parseKegTypeChoice(value);
     const row = document.createElement("div");
     row.className = "form-row keg-type-choice-row";
     row.innerHTML = `
@@ -3225,16 +3326,75 @@ content %}
         <label>Keg Type</label>
         <input
           type="text"
-          class="form-control keg-type-choice-value"
-          value="${String(value || "").replace(/"/g, "&quot;")}"
-          placeholder="e.g. 1/6 bbl (5.2 gal)"
+          class="form-control keg-type-choice-name"
+          value="${choice.name.replace(/"/g, "&quot;")}"
+          placeholder="e.g. Corny"
         />
+      </div>
+      <div class="form-group">
+        <label>Volume</label>
+        <input
+          type="number"
+          class="form-control keg-type-choice-volume"
+          min="0.01"
+          step="0.01"
+          value="${choice.volume}"
+          placeholder="e.g. 5"
+        />
+      </div>
+      <div class="form-group">
+        <label>Unit</label>
+        <select class="form-control keg-type-choice-unit">
+          <option value="gal">gal</option>
+          <option value="oz">oz</option>
+          <option value="ml">ml</option>
+          <option value="l">L</option>
+        </select>
       </div>
       <div class="form-group" style="align-self: end">
         <button type="button" class="btn btn-danger btn-sm" onclick="removeKegTypeChoiceRow(this)">Remove</button>
       </div>
     `;
+    row.querySelector(".keg-type-choice-unit").value = choice.unit;
     return row;
+  }
+
+  function parseKegTypeChoice(value) {
+    const raw = String(value || "").trim();
+    const matches = Array.from(
+      raw.matchAll(
+        /(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*(gal|gallons?|oz|ounces?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)/gi,
+      ),
+    );
+    if (!matches.length) return { name: raw, volume: "", unit: "gal" };
+
+    const match = matches[matches.length - 1];
+    let name = raw.slice(0, match.index).replace(/[\s,]+$/, "").trim();
+    name = name.replace(/\(\s*$/, "").trim();
+    if (name.includes("(") && !name.endsWith(")")) name += ")";
+    const unitToken = match[2].toLowerCase();
+    const unit = unitToken.startsWith("gal")
+      ? "gal"
+      : unitToken.startsWith("oz") || unitToken.startsWith("ounce")
+        ? "oz"
+        : unitToken === "ml" || unitToken.startsWith("millilit")
+          ? "ml"
+          : "l";
+    return { name: name || raw, volume: match[1], unit };
+  }
+
+  function formatKegTypeChoice(name, volume, unit) {
+    const normalizedName = String(name || "").trim();
+    const normalizedVolume = String(volume || "").trim();
+    if (!normalizedName || !normalizedVolume || !unit) return normalizedName;
+    const capacity = `${normalizedVolume} ${unit}`;
+    if (normalizedName.toLowerCase() === capacity.toLowerCase()) {
+      return normalizedName;
+    }
+    if (/\([^)]*\)$/.test(normalizedName)) {
+      return normalizedName.replace(/\)$/, `, ${capacity})`);
+    }
+    return `${normalizedName} (${capacity})`;
   }
 
   function addPourOptionRow(option = null, opts = {}) {
@@ -3364,6 +3524,9 @@ content %}
       currentDisplayTapAssignments = normalizeDisplayTapAssignments(
         body.display_tap_assignments || [],
       );
+      currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
+        body.display_bar_stock_assignments || [],
+      );
       const assignments = document.getElementById("displayTapAssignments");
       if (assignments) assignments.innerHTML = "";
       renderDisplayTapAssignments();
@@ -3475,7 +3638,11 @@ content %}
     const choices = [];
     const seen = new Set();
     rows.forEach((row) => {
-      const value = row.querySelector(".keg-type-choice-value").value.trim();
+      const value = formatKegTypeChoice(
+        row.querySelector(".keg-type-choice-name").value,
+        row.querySelector(".keg-type-choice-volume").value,
+        row.querySelector(".keg-type-choice-unit").value,
+      );
       if (!value) return;
       const key = value.toLowerCase();
       if (seen.has(key)) return;

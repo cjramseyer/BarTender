@@ -1223,13 +1223,14 @@ def test_pro_display_tap_assignments_include_configured_taps(tmp_path):
     assert 'class="settings-collapsible display-tap-assignment"' in body
     assert 'Display ${index + 1}${selectedCount ? ` (${selectedCount} selected)` : ""}' in body
     assert 'class="display-tap-assignment-checkbox" type="checkbox"' in body
+    assert 'class="display-bar-stock-assignment" type="checkbox"' in body
     assert "display-tap-assignment-select" not in body
     assert 'class="display-config-link"' in body
     assert "href=\"${displayUrl}\"" in body
     assert 'id="displayCount"' in body
-    assert 'id="menuQrMode" class="form-control settings-compact-select"' in body
+    assert 'id="menuQrMode" class="form-control settings-compact-select settings-qr-mode-select"' in body
     assert body.count('class="pro-feature-badge"') == 5
-    assert body.count('class="settings-inline-field"') == 4
+    assert body.count('class="settings-inline-field"') == 9
     assert (
         body.index("<label>Bar Profile</label>")
         < body.index("<label>Environment Mode</label>")
@@ -1248,6 +1249,12 @@ def test_pro_display_tap_assignments_include_configured_taps(tmp_path):
     assert "Default configuration: Display 1 shows all taps; Display 2" in body
     assert "Reset Displays to Defaults" in body
     assert "function resetDisplayConfigurationToDefaults()" in body
+    assert "display_bar_stock_assignments" in body
+    assert 'class="form-control keg-type-choice-name"' in body
+    assert 'class="form-control keg-type-choice-volume"' in body
+    assert 'class="form-control keg-type-choice-unit"' in body
+    assert "function parseKegTypeChoice(value)" in body
+    assert "function formatKegTypeChoice(name, volume, unit)" in body
 
 
 def test_settings_shows_active_cors_origins_as_read_only(tmp_path, monkeypatch):

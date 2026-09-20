@@ -175,6 +175,16 @@ to the Pro Licensing panel. It does not replace offline activation. The
 `license_public_key` option remains the security-critical value used to verify
 signed license tokens locally.
 
+## MQTT
+
+Owners can configure optional publish-only MQTT integration in **Settings > MQTT**.
+Configure the broker host, port, topic prefix, credentials, and TLS. When enabled,
+BarTender publishes retained snapshots to `<prefix>/status`, `<prefix>/taps`,
+`<prefix>/kegs`, `<prefix>/bar-stock`, and `<prefix>/displays`, plus non-retained
+change notifications to `<prefix>/events/state-updated`. MQTT broker failures never
+block normal BarTender writes. The app does not accept MQTT commands and never
+publishes credentials, session tokens, or license tokens.
+
 ## Browser Support
 
 BarTender is intended for modern browsers. Supported baseline versions are Chrome 60+,
