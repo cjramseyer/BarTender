@@ -25,9 +25,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 try:
+    from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 except ImportError:  # pragma: no cover - dependency is installed in production
+    InvalidSignature = ValueError
     serialization = None
     Ed25519PrivateKey = None
     Ed25519PublicKey = None
@@ -1373,6 +1375,27 @@ def _license_b64encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
 
+def _load_license_public_key(value: str):
+    if Ed25519PublicKey is None or serialization is None:
+        raise ValueError("License verification is not configured.")
+    normalized = str(value or "").strip()
+    try:
+        if normalized.startswith("-----BEGIN PUBLIC KEY-----"):
+            public_key = serialization.load_pem_public_key(normalized.encode("ascii"))
+        else:
+            decoded = _license_b64decode(normalized)
+            public_key = (
+                Ed25519PublicKey.from_public_bytes(decoded)
+                if len(decoded) == 32
+                else serialization.load_der_public_key(decoded)
+            )
+    except (ValueError, TypeError, binascii.Error) as exc:
+        raise ValueError("License verification key is invalid.") from exc
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise ValueError("License verification key is not Ed25519.")
+    return public_key
+
+
 def _license_normalize_bar_name(value: str) -> str:
     return " ".join(str(value or "").strip().casefold().split())
 
@@ -1492,12 +1515,15 @@ def _validate_license_token(token: str) -> dict:
         signed_message = _license_b64decode(parts[0])
         payload_bytes = signed_message
         signature = _license_b64decode(parts[1])
+    public_key = _load_license_public_key(LICENSE_PUBLIC_KEY)
     try:
-        public_key = Ed25519PublicKey.from_public_bytes(_license_b64decode(LICENSE_PUBLIC_KEY))
         public_key.verify(signature, signed_message)
+    except InvalidSignature as exc:
+        raise ValueError("Invalid license signature.") from exc
+    try:
         payload = json.loads(payload_bytes.decode("utf-8"))
-    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise ValueError("Invalid license signature or payload.") from exc
+    except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ValueError("Invalid license payload.") from exc
     if payload.get("app_id") != LICENSE_APP_ID or payload.get("plan") != "pro":
         raise ValueError("License is not valid for this application.")
     if len(parts) == 3:
