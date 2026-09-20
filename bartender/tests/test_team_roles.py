@@ -459,7 +459,7 @@ def test_homebrewer_limits_taps_and_kegs(tmp_path):
         "team_audit": [],
     })
 
-    for i in range(12):
+    for i in range(16):
         response = client.post(
             "/api/taps",
             json={"number": i + 1},
@@ -469,11 +469,11 @@ def test_homebrewer_limits_taps_and_kegs(tmp_path):
 
     response = client.post(
         "/api/taps",
-        json={"number": 13},
+        json={"number": 17},
         headers=owner_headers,
     )
     assert response.status_code == 409
-    assert "12" in response.get_json()["error"]
+    assert "16" in response.get_json()["error"]
 
     for i in range(20):
         response = client.post(
@@ -921,6 +921,46 @@ def test_homebrewer_default_displays_split_taps_and_bar_stock(tmp_path):
     assert "Bourbon" in html2
     assert "House IPA Keg" not in html2
     assert "Tap #1" not in html2
+
+
+def test_display_uses_compact_desktop_tap_grid(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    display = client.get("/display?display=1").get_data(as_text=True)
+
+    assert "grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));" in display
+
+
+def test_display_shows_beer_name_in_tap_card_header(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["taps"] = [{"id": 1, "number": 1, "label": "Patio Tap", "keg_id": 1}]
+    data["kegs"] = [{
+        "id": 1,
+        "name": "Keg 1",
+        "beer_name": "North Ridge IPA",
+        "status": "in_use",
+        "percent_full": 80,
+    }]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    display = client.get("/display?display=1").get_data(as_text=True)
+
+    assert 'class="tap-beer-name"' in display
+    assert 'title="North Ridge IPA"' in display
+    assert '<p class="keg-on-tap">' not in display
 
 
 def test_pro_display_bar_stock_assignment_controls_visible_boards(tmp_path):
