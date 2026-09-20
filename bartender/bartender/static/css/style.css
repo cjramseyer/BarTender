@@ -628,6 +628,9 @@ h2 {
 .settings-compact-select {
   width: min(100%, 16rem);
 }
+.settings-qr-mode-select {
+  width: min(100%, 20rem);
+}
 textarea.form-control {
   resize: vertical;
 }

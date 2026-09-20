@@ -144,6 +144,16 @@ for current installations while individual Pro feature gates are migrated to the
 central licensing state. Expired or absent licensing state reports the Base plan without
 deleting application data.
 
+## MQTT
+
+Owners can configure optional publish-only MQTT integration in **Settings > MQTT**.
+Set the broker host, port, topic prefix, credentials, and TLS. BarTender publishes
+retained snapshots to `<prefix>/status`, `<prefix>/taps`, `<prefix>/kegs`,
+`<prefix>/bar-stock`, and `<prefix>/displays`, plus non-retained change notifications
+to `<prefix>/events/state-updated`. Broker failures never block app writes. MQTT
+commands are not accepted, and credentials, session tokens, and license tokens are
+never published.
+
 For Flutter web or another browser client hosted on a different origin, configure the
 add-on option `cors_allowed_origins` as a comma-, space-, or newline-separated list of
 trusted origins, such as `http://127.0.0.1:5055,https://mobile.example`. Leave it
