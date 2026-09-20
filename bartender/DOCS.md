@@ -5,7 +5,7 @@ Manage your home bar with a web UI built into Home Assistant.
 ## Installation and Startup
 
 1. In Home Assistant, go to **Settings -> Add-ons -> Add-on Store**.
-2. Add repository URL: `https://github.com/cjramseyer/BarTender`.
+2. Add repository URL: `https://github.com/cjramseyer/ha-addons`.
 3. Install **BarTender**.
 4. Start the add-on.
 5. Open the BarTender sidebar panel.

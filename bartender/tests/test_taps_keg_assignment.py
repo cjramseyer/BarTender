@@ -115,6 +115,64 @@ def test_unused_tap_shows_pour_controls_with_disabled_button(tmp_path):
     assert "disabled" in unused_button.group(0)
 
 
+def test_clean_tap_marks_disconnected_tap_available(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    _seed_taps_and_kegs(app_module)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["taps"][0]["keg_id"] = None
+    data["taps"][0]["ever_assigned_keg"] = True
+    app_module.save_data(data)
+
+    response = client.post("/api/taps/1/clean")
+
+    assert response.status_code == 200
+    tap = response.get_json()
+    assert tap["ever_assigned_keg"] is False
+    assert tap["last_cleaned_date"] == app_module._today_utc_date()
+    assert app_module.load_data()["team_audit"][-1]["action"] == "tap_cleaned"
+
+
+def test_taps_page_shows_clean_action_for_tap_needing_cleaning(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    _seed_taps_and_kegs(app_module)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["taps"][0]["keg_id"] = None
+    data["taps"][0]["ever_assigned_keg"] = True
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    body = client.get("/taps").get_data(as_text=True)
+
+    assert 'class="btn btn-sm btn-secondary js-clean-tap-btn"' in body
+    assert "Clean Tap" in body
+
+
+def test_dashboard_uses_needs_cleaning_wording_for_disconnected_tap(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    _seed_taps_and_kegs(app_module)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["taps"][0]["keg_id"] = None
+    data["taps"][0]["ever_assigned_keg"] = True
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    body = client.get("/").get_data(as_text=True)
+
+    assert re.search(r"Needs\s+cleaning", body)
+    assert not re.search(r"Need\s+cleaning", body)
+
+
 def test_api_add_tap_rejects_keg_already_connected(tmp_path):
     app_module = _load_app_module(tmp_path)
     _seed_taps_and_kegs(app_module)
