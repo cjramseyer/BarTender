@@ -58,6 +58,7 @@ from bartender.pos_sync.brewfather import (
     utc_now as brewfather_now,
 )
 from bartender.storage import create_state_store
+from bartender.mqtt import publish_state_async
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -843,6 +844,13 @@ DEFAULT_DATA = {
         "external_api_allowlist": "",
         "external_api_rate_limit_enabled": True,
         "external_api_rate_limit_per_minute": DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE,
+        "mqtt_enabled": False,
+        "mqtt_host": "",
+        "mqtt_port": 1883,
+        "mqtt_topic_prefix": "bartender",
+        "mqtt_username": "",
+        "mqtt_password": "",
+        "mqtt_tls": False,
         "api_reference_enabled": True,
         "pour_mode": "manual",
         "environment_mode": "production",
@@ -1077,6 +1085,13 @@ def _load_data_unlocked() -> dict:
         data["settings"]["external_api_rate_limit_per_minute"] = _normalize_external_api_rate_limit_per_minute(
             data["settings"].get("external_api_rate_limit_per_minute")
         )
+        data["settings"]["mqtt_enabled"] = _coerce_bool(data["settings"].get("mqtt_enabled"), False)
+        data["settings"]["mqtt_host"] = str(data["settings"].get("mqtt_host", "") or "").strip()[:253]
+        data["settings"]["mqtt_port"] = max(1, min(65535, _coerce_int(data["settings"].get("mqtt_port"), 1883) or 1883))
+        data["settings"]["mqtt_topic_prefix"] = str(data["settings"].get("mqtt_topic_prefix", "bartender") or "bartender").strip().strip("/")[:128] or "bartender"
+        data["settings"]["mqtt_username"] = str(data["settings"].get("mqtt_username", "") or "").strip()[:256]
+        data["settings"]["mqtt_password"] = str(data["settings"].get("mqtt_password", "") or "")[:512]
+        data["settings"]["mqtt_tls"] = _coerce_bool(data["settings"].get("mqtt_tls"), False)
         data["settings"]["anonymous_telemetry_enabled"] = _coerce_bool(
             data["settings"].get("anonymous_telemetry_enabled"),
             False,
@@ -1225,6 +1240,7 @@ def save_data(data: dict) -> None:
             file_handle.flush()
             os.fsync(file_handle.fileno())
         os.replace(temporary_file, DATA_FILE)
+    publish_state_async(data)
 
 
 # ---------------------------------------------------------------------------
@@ -1785,6 +1801,7 @@ def _brewfather_settings_response(settings: dict) -> dict:
         "brewfather_last_counts": settings["brewfather_last_counts"],
         "brewfather_credentials": redact_credentials(_brewfather_credentials(settings)),
     })
+    response["mqtt_password"] = ""
     return response
 
 
@@ -3700,6 +3717,7 @@ def settings():
     ingress_path = _effective_ingress_path()
     template_settings = json.loads(json.dumps(data["settings"]))
     template_settings["brewfather_api_key"] = ""
+    template_settings["mqtt_password"] = ""
     template_settings["brewfather_credentials"] = redact_credentials(_brewfather_credentials(data["settings"]))
     return render_template(
         "settings.html",
@@ -4219,6 +4237,13 @@ def api_save_settings():
         "mobile_session_timeout_minutes",
         "station_session_timeout_minutes",
         "anonymous_telemetry_enabled",
+        "mqtt_enabled",
+        "mqtt_host",
+        "mqtt_port",
+        "mqtt_topic_prefix",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_tls",
     }
     if current_user.get("role") != "owner" and not is_setup_bootstrap:
         restricted_keys_found = [key for key in restricted_owner_only_keys if key in body]
@@ -4277,6 +4302,13 @@ def api_save_settings():
         "analytics_days_left_method",
         "analytics_days_left_window_days",
         "anonymous_telemetry_enabled",
+        "mqtt_enabled",
+        "mqtt_host",
+        "mqtt_port",
+        "mqtt_topic_prefix",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_tls",
     }
     for key in allowed:
         if key in body:
@@ -6861,6 +6893,8 @@ def _build_export_json_payload(data: dict) -> dict:
     if isinstance(export_settings, dict):
         export_settings.pop("brewfather_api_key", None)
         export_settings.pop("brewfather_user_id", None)
+        export_settings.pop("mqtt_username", None)
+        export_settings.pop("mqtt_password", None)
         export_settings.pop("license_instance_private_key", None)
         export_settings["brewfather_credentials"] = redact_credentials(
             normalize_credentials(

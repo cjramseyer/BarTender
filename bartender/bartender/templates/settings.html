@@ -1011,6 +1011,47 @@ content %}
         </div>
       </details>
 
+      {% if current_user_role == 'owner' %}
+      <details class="settings-collapsible">
+        <summary>MQTT</summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group">
+            <label class="radio-label">
+              <input type="checkbox" id="mqttEnabled" {% if settings.mqtt_enabled %}checked{% endif %} />
+              Enable MQTT publishing
+            </label>
+            <small class="muted">Publishes retained status, tap, keg, bar stock, and display snapshots. MQTT commands are not accepted.</small>
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttHost">MQTT Host</label>
+            <input id="mqttHost" class="form-control" type="text" value="{{ settings.mqtt_host or '' }}" placeholder="e.g. core-mosquitto" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttPort">MQTT Port</label>
+            <input id="mqttPort" class="form-control" type="number" min="1" max="65535" value="{{ settings.mqtt_port or 1883 }}" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttTopicPrefix">Topic Prefix</label>
+            <input id="mqttTopicPrefix" class="form-control" type="text" value="{{ settings.mqtt_topic_prefix or 'bartender' }}" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttUsername">Username</label>
+            <input id="mqttUsername" class="form-control" type="text" value="{{ settings.mqtt_username or '' }}" autocomplete="off" />
+          </div>
+          <div class="settings-inline-field">
+            <label for="mqttPassword">Password</label>
+            <input id="mqttPassword" class="form-control" type="password" value="" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label class="radio-label">
+              <input type="checkbox" id="mqttTls" {% if settings.mqtt_tls %}checked{% endif %} />
+              Use TLS
+            </label>
+          </div>
+        </div>
+      </details>
+      {% endif %}
+
       <details class="settings-collapsible">
         <summary>Analytics</summary>
         <div class="settings-collapsible-body">
@@ -1993,6 +2034,24 @@ content %}
     )
       ? document.getElementById("posSyncProviderConfigJson").value
       : "";
+    payload.mqtt_enabled = document.getElementById("mqttEnabled")
+      ? document.getElementById("mqttEnabled").checked
+      : false;
+    payload.mqtt_host = document.getElementById("mqttHost")
+      ? document.getElementById("mqttHost").value.trim()
+      : "";
+    payload.mqtt_port = getClampedIntegerValue("mqttPort", 1883, 1, 65535);
+    payload.mqtt_topic_prefix = document.getElementById("mqttTopicPrefix")
+      ? document.getElementById("mqttTopicPrefix").value.trim()
+      : "bartender";
+    payload.mqtt_username = document.getElementById("mqttUsername")
+      ? document.getElementById("mqttUsername").value.trim()
+      : "";
+    const mqttPassword = document.getElementById("mqttPassword");
+    if (mqttPassword && mqttPassword.value) payload.mqtt_password = mqttPassword.value;
+    payload.mqtt_tls = document.getElementById("mqttTls")
+      ? document.getElementById("mqttTls").checked
+      : false;
     payload.brewfather_enabled = document.getElementById("brewfatherEnabled")
       ? document.getElementById("brewfatherEnabled").checked
       : false;
