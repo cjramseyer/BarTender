@@ -1699,25 +1699,28 @@ content %}
     container.innerHTML = assignments
       .map((selectedNumbers, index) => {
         const selectId = `displayTapAssignment-${index + 1}`;
+        const selectedCount = selectedNumbers.length;
         return `
-          <div class="form-group">
-            <label for="${selectId}">Display ${index + 1} taps</label>
-            <select id="${selectId}" class="form-control display-tap-assignment-select" multiple size="${Math.min(8, Math.max(4, tapNumbers.length || 4))}">
-              ${
-                tapNumbers.length
-                  ? tapNumbers
-                      .map((tapNumber) => {
-                        const selected = selectedNumbers.includes(tapNumber)
-                          ? "selected"
-                          : "";
-                        return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
-                      })
-                      .join("")
-                  : '<option value="">No taps available</option>'
-              }
-            </select>
-            <small class="muted">Choose which taps should appear on this display.</small>
-          </div>
+          <details class="settings-collapsible display-tap-assignment" ${selectedCount ? "open" : ""}>
+            <summary>Display ${index + 1} taps${selectedCount ? ` (${selectedCount} selected)` : ""}</summary>
+            <div class="settings-collapsible-body">
+              <select id="${selectId}" class="form-control display-tap-assignment-select" multiple size="${Math.min(8, Math.max(4, tapNumbers.length || 4))}">
+                ${
+                  tapNumbers.length
+                    ? tapNumbers
+                        .map((tapNumber) => {
+                          const selected = selectedNumbers.includes(tapNumber)
+                            ? "selected"
+                            : "";
+                          return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
+                        })
+                        .join("")
+                    : '<option value="">No taps available</option>'
+                }
+              </select>
+              <small class="muted">Choose which taps should appear on this display.</small>
+            </div>
+          </details>
         `;
       })
       .join("");

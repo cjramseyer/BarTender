@@ -1161,6 +1161,37 @@ def test_settings_hides_display_count_for_homebrewer(tmp_path):
     assert "Refresh this page after the change saves" in body
 
 
+def test_pro_display_tap_assignments_include_configured_taps(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 2,
+        "display_tap_assignments": [[1, 2], []],
+    })
+    data["taps"] = [
+        {"id": number, "number": number, "label": f"Tap {number}"}
+        for number in range(1, 5)
+    ]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'const TAPS = JSON.parse(`' in body
+    assert '"label": "Tap 1"' in body
+    assert '"label": "Tap 4"' in body
+    assert 'class="settings-collapsible display-tap-assignment"' in body
+    assert 'Display ${index + 1} taps${selectedCount ? ` (${selectedCount} selected)` : ""}' in body
+
+
 def test_settings_shows_active_cors_origins_as_read_only(tmp_path, monkeypatch):
     monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "https://mobile.example, http://localhost:5055")
     app_module = _load_app_module(tmp_path)

@@ -3630,6 +3630,7 @@ def settings():
     return render_template(
         "settings.html",
         settings=template_settings,
+        taps=data.get("taps", []),
         pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
         pos_sync_provider_catalog=get_pos_provider_catalog(data["settings"]),
         team_users=[_public_team_user(user) for user in data.get("team_users", [])],
