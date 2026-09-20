@@ -104,6 +104,13 @@ def test_mobile_login_issues_token_for_user_pin(tmp_path):
 def test_owner_can_start_pro_trial(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"]["brewery_type"] = "pro"
+    data["taps"] = [
+        {"id": 1, "number": 1, "label": "Tap 1"},
+        {"id": 2, "number": 2, "label": "Tap 2"},
+    ]
+    app_module.save_data(data)
     with client.session_transaction() as session:
         session["user_id"] = "owner"
         session["user_role"] = "owner"
@@ -116,7 +123,26 @@ def test_owner_can_start_pro_trial(tmp_path):
     assert payload["plan"] == "Trial"
     assert payload["active"] is True
     assert payload["days_remaining"] == 30
-    assert app_module.load_data()["settings"]["license_type"] == "trial"
+    settings = app_module.load_data()["settings"]
+    assert settings["license_type"] == "trial"
+    assert settings["display_tap_assignments"] == [[1, 2], []]
+
+
+def test_activation_display_defaults_preserve_existing_assignments(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 2,
+        "display_tap_assignments": [[2], [1]],
+    })
+    data["taps"] = [
+        {"id": 1, "number": 1, "label": "Tap 1"},
+        {"id": 2, "number": 2, "label": "Tap 2"},
+    ]
+
+    assert app_module._assign_existing_taps_to_first_display(data) is False
+    assert data["settings"]["display_tap_assignments"] == [[2], [1]]
 
 
 def test_owner_can_download_pro_activation_request(tmp_path):
@@ -260,6 +286,10 @@ def test_keystone_jwt_license_token_activates(tmp_path, monkeypatch):
     data = app_module.load_data()
     data["settings"]["brewery_type"] = "pro"
     data["settings"]["license_instance_id"] = "testing"
+    data["taps"] = [
+        {"id": 1, "number": 1, "label": "Tap 1"},
+        {"id": 2, "number": 2, "label": "Tap 2"},
+    ]
     app_module.save_data(data)
     with client.session_transaction() as session:
         session["user_id"] = "owner"
@@ -297,6 +327,7 @@ def test_keystone_jwt_license_token_activates(tmp_path, monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json()["plan"] == "Pro"
+    assert app_module.load_data()["settings"]["display_tap_assignments"] == [[1, 2], []]
 
 
 def test_keystone_jwt_can_issue_extended_pro_trial(tmp_path, monkeypatch):
@@ -1157,8 +1188,66 @@ def test_settings_hides_display_count_for_homebrewer(tmp_path):
     assert "Licensing" not in body
     assert 'onclick="activateLicense()"' not in body
     assert 'id="displayCount"' not in body
+    assert 'class="pro-feature-badge"' not in body
     assert 'id="proProfileRefreshNotice"' in body
     assert "Refresh this page after the change saves" in body
+
+
+def test_pro_display_tap_assignments_include_configured_taps(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 2,
+        "display_tap_assignments": [[1, 2], []],
+    })
+    data["taps"] = [
+        {"id": number, "number": number, "label": f"Tap {number}"}
+        for number in range(1, 5)
+    ]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/settings")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'const TAPS = JSON.parse(`' in body
+    assert '"label": "Tap 1"' in body
+    assert '"label": "Tap 4"' in body
+    assert 'class="settings-collapsible display-tap-assignment"' in body
+    assert 'Display ${index + 1}${selectedCount ? ` (${selectedCount} selected)` : ""}' in body
+    assert 'class="display-tap-assignment-checkbox" type="checkbox"' in body
+    assert "display-tap-assignment-select" not in body
+    assert 'class="display-config-link"' in body
+    assert "href=\"${displayUrl}\"" in body
+    assert 'id="displayCount"' in body
+    assert 'id="menuQrMode" class="form-control settings-compact-select"' in body
+    assert body.count('class="pro-feature-badge"') == 5
+    assert body.count('class="settings-inline-field"') == 4
+    assert (
+        body.index("<label>Bar Profile</label>")
+        < body.index("<label>Environment Mode</label>")
+        < body.index("<label>Bar Logo URL (optional)</label>")
+    )
+    assert (
+        body.index("<summary>Appearance</summary>")
+        < body.index("<summary>Displays <span class=\"pro-feature-badge\">Pro</span></summary>")
+        < body.index("<summary>Keg Settings</summary>")
+    )
+    assert "function formatLicenseExpiration(value)" in body
+    assert "formatLicenseExpiration(body.expires_at)" in body
+    assert 'id="startLicenseTrialButton"' in body
+    assert "Start Pro Trial (30-days)" in body
+    assert 'trialButton.hidden = Boolean(body.active)' in body
+    assert "Default configuration: Display 1 shows all taps; Display 2" in body
+    assert "Reset Displays to Defaults" in body
+    assert "function resetDisplayConfigurationToDefaults()" in body
 
 
 def test_settings_shows_active_cors_origins_as_read_only(tmp_path, monkeypatch):
@@ -1211,6 +1300,41 @@ def test_authenticated_layout_shows_logout_link(tmp_path):
     assert "nav-avatar-button" in body
     assert "Owner" in body
     assert "Log out" in body
+
+
+def test_view_display_submenu_lists_local_urls_for_each_pro_display(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 3,
+        "setup_completed": True,
+    })
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert '<summary>View Display</summary>' in body
+    assert (
+        body.index("What's New")
+        < body.index("Open in New Window")
+        < body.index("<summary>View Display</summary>")
+        < body.index("<summary>Options</summary>")
+    )
+    for display_index in range(1, 4):
+        assert f">Display {display_index}" in body
+        assert (
+            f'href="http://localhost:{app_module.DISPLAY_PORT}/?display={display_index}"'
+            in body
+        )
 
 
 def test_authenticated_layout_uses_request_ingress_for_logout_link(tmp_path):

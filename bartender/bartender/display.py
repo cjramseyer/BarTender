@@ -180,6 +180,7 @@ def index():
             taps = [tap for tap in taps if _coerce_int(tap.get("number"), None) in selected_taps]
         else:
             taps = []
+        show_bar_stock = show_bar_stock and selected_display_index == 2
 
     return render_template(
         "display/index.html",

@@ -1350,6 +1350,54 @@ def _normalize_display_tap_assignments(value, display_count: int = 2) -> list[li
     return normalized
 
 
+def _assign_existing_taps_to_first_display(data: dict) -> bool:
+    settings = data.get("settings", {})
+    display_count = _normalize_display_count(
+        settings.get("display_count"),
+        settings.get("brewery_type"),
+    )
+    assignments = _normalize_display_tap_assignments(
+        settings.get("display_tap_assignments"),
+        display_count,
+    )
+    if any(assignments):
+        return False
+
+    tap_numbers = sorted(
+        {
+            number
+            for tap in data.get("taps", [])
+            if isinstance(tap, dict)
+            for number in [_coerce_int(tap.get("number"), None)]
+            if number is not None and number > 0
+        }
+    )
+    if not tap_numbers:
+        return False
+
+    assignments[0] = tap_numbers
+    settings["display_tap_assignments"] = assignments
+    return True
+
+
+def _reset_display_configuration_to_defaults(data: dict) -> dict:
+    tap_numbers = sorted(
+        {
+            number
+            for tap in data.get("taps", [])
+            if isinstance(tap, dict)
+            for number in [_coerce_int(tap.get("number"), None)]
+            if number is not None and number > 0
+        }
+    )
+    configuration = {
+        "display_count": 2,
+        "display_tap_assignments": [tap_numbers, []],
+    }
+    data["settings"].update(configuration)
+    return configuration
+
+
 def _normalize_pour_mode(value, brewery_type: str | None = None) -> str:
     mode = str(value or "manual").strip().lower()
     normalized_type = _normalize_brewery_type(brewery_type)
@@ -3168,6 +3216,7 @@ def inject_runtime_metadata():
         "release_highlights_date": RELEASE_HIGHLIGHTS_DATE,
         "license_portal_url": LICENSE_PORTAL_URL,
         "ingress": _effective_ingress_path(),
+        "local_display_url": _external_display_url(),
         "current_user_name": str(session.get("user_name", "") or "").strip(),
         "current_user_role": _normalize_team_role(session.get("user_role")),
         "current_user_release_seen_version": _current_user_release_seen_version(),
@@ -3630,6 +3679,7 @@ def settings():
     return render_template(
         "settings.html",
         settings=template_settings,
+        taps=data.get("taps", []),
         pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
         pos_sync_provider_catalog=get_pos_provider_catalog(data["settings"]),
         team_users=[_public_team_user(user) for user in data.get("team_users", [])],
@@ -3717,6 +3767,7 @@ def display_view():
             taps = [tap for tap in data["taps"] if _coerce_int(tap.get("number"), None) in selected_taps]
         else:
             taps = []
+        show_bar_stock = show_bar_stock and selected_display_index == 2
 
     return render_template(
         "display/index.html",
@@ -3980,7 +4031,11 @@ def api_start_license_trial():
         "trial_expires_at": expires_at.isoformat(),
         "license_features": ["pro"],
     })
-    _record_team_audit(data, current_user, "license_trial_started", LICENSE_APP_ID, {"expires_at": expires_at.isoformat()})
+    display_assignments_initialized = _assign_existing_taps_to_first_display(data)
+    _record_team_audit(data, current_user, "license_trial_started", LICENSE_APP_ID, {
+        "expires_at": expires_at.isoformat(),
+        "display_assignments_initialized": display_assignments_initialized,
+    })
     save_data(data)
     return jsonify(_license_status(data["settings"]))
 
@@ -4028,7 +4083,11 @@ def api_activate_license():
         "license_expires_at": str(payload.get("expires_at", "")),
         "license_features": payload.get("features", []) if isinstance(payload.get("features", []), list) else [],
     })
-    _record_team_audit(data, current_user, "license_activated", LICENSE_APP_ID, {"expires_at": data["settings"]["license_expires_at"]})
+    display_assignments_initialized = _assign_existing_taps_to_first_display(data)
+    _record_team_audit(data, current_user, "license_activated", LICENSE_APP_ID, {
+        "expires_at": data["settings"]["license_expires_at"],
+        "display_assignments_initialized": display_assignments_initialized,
+    })
     save_data(data)
     return jsonify(_license_status(data["settings"]))
 
@@ -4609,6 +4668,27 @@ def api_reset_settings_to_defaults():
     )
     save_data(data)
     return jsonify(data["settings"])
+
+
+@app.route("/api/settings/displays/reset", methods=["POST"])
+def api_reset_display_configuration_to_defaults():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({"error": "Display configuration is available only for Pro profiles."}), 409
+
+    configuration = _reset_display_configuration_to_defaults(data)
+    _record_team_audit(
+        data,
+        current_user,
+        "display_configuration_reset",
+        "settings:displays",
+        {"display_count": configuration["display_count"], "display_1_taps": configuration["display_tap_assignments"][0]},
+    )
+    save_data(data)
+    return jsonify({"ok": True, **configuration})
 
 
 @app.route("/api/analytics/reset", methods=["POST"])
@@ -5691,6 +5771,7 @@ KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
 API_REFERENCE_ENDPOINTS = [
     ("GET", "/api/settings", "Get current settings"),
     ("POST", "/api/settings", "Update settings"),
+    ("POST", "/api/settings/displays/reset", "Reset Pro display configuration to defaults"),
     ("GET", "/api/storage/status", "Get credential-safe storage status"),
     ("GET", "/api/stock", "List all bar stock items"),
     ("POST", "/api/stock", "Add a stock item"),

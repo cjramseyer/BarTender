@@ -372,6 +372,32 @@ def test_pro_display_count_and_tap_assignments_save(tmp_path):
     assert app_module.load_data()["settings"]["display_tap_assignments"] == [[1, 2], [3, 4]]
 
 
+def test_owner_can_reset_pro_display_configuration_to_defaults(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+    headers = {"X-BarTender-User-Id": "owner", "X-BarTender-Role": "owner"}
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 4,
+        "display_tap_assignments": [[4], [3], [2], [1]],
+    })
+    data["taps"] = [
+        {"id": number, "number": number, "label": f"Tap {number}"}
+        for number in (3, 1, 2)
+    ]
+    app_module.save_data(data)
+
+    response = client.post("/api/settings/displays/reset", headers=headers)
+
+    assert response.status_code == 200
+    assert response.get_json()["display_count"] == 2
+    assert response.get_json()["display_tap_assignments"] == [[1, 2, 3], []]
+    saved = app_module.load_data()["settings"]
+    assert saved["display_count"] == 2
+    assert saved["display_tap_assignments"] == [[1, 2, 3], []]
+
+
 def test_pos_pour_mode_is_forbidden_for_homebrewer_settings(tmp_path):
     app_module = _load_app_module(tmp_path)
 
@@ -890,3 +916,33 @@ def test_homebrewer_default_displays_split_taps_and_bar_stock(tmp_path):
     assert "Bourbon" in html2
     assert "House IPA Keg" not in html2
     assert "Tap #1" not in html2
+
+
+def test_pro_default_display_two_shows_bar_stock(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    client = app_module.app.test_client()
+
+    data = app_module.load_data()
+    data["settings"].update({
+        "brewery_type": "pro",
+        "display_count": 2,
+        "display_tap_assignments": [[1], []],
+        "bar_stock_enabled": True,
+    })
+    data["taps"] = [{"id": 1, "number": 1, "label": "Main Tap", "keg_id": 1}]
+    data["kegs"] = [{"id": 1, "name": "House IPA Keg", "status": "in_use", "percent_full": 80}]
+    data["bar_stock"] = [{"id": 1, "name": "Bourbon", "category": "Spirits", "quantity": 3, "unit": "bottles"}]
+    app_module.save_data(data)
+
+    with client.session_transaction() as session:
+        session["user_id"] = "owner"
+        session["user_role"] = "owner"
+        session["user_name"] = "Owner"
+
+    display_one = client.get("/display?display=1").get_data(as_text=True)
+    assert "House IPA Keg" in display_one
+    assert "Bourbon" not in display_one
+
+    display_two = client.get("/display?display=2").get_data(as_text=True)
+    assert "House IPA Keg" not in display_two
+    assert "Bourbon" in display_two
