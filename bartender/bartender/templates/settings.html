@@ -1022,23 +1022,23 @@ content %}
             </label>
             <small class="muted">Publishes retained status, tap, keg, bar stock, and display snapshots. MQTT commands are not accepted.</small>
           </div>
-          <div class="settings-inline-field">
+          <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttHost">MQTT Host</label>
             <input id="mqttHost" class="form-control" type="text" value="{{ settings.mqtt_host or '' }}" placeholder="e.g. core-mosquitto" />
           </div>
-          <div class="settings-inline-field">
+          <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttPort">MQTT Port</label>
             <input id="mqttPort" class="form-control" type="number" min="1" max="65535" value="{{ settings.mqtt_port or 1883 }}" />
           </div>
-          <div class="settings-inline-field">
+          <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttTopicPrefix">Topic Prefix</label>
             <input id="mqttTopicPrefix" class="form-control" type="text" value="{{ settings.mqtt_topic_prefix or 'bartender' }}" />
           </div>
-          <div class="settings-inline-field">
+          <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttUsername">Username</label>
             <input id="mqttUsername" class="form-control" type="text" value="{{ settings.mqtt_username or '' }}" autocomplete="off" />
           </div>
-          <div class="settings-inline-field">
+          <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttPassword">Password</label>
             <input id="mqttPassword" class="form-control" type="password" value="" autocomplete="new-password" />
           </div>
@@ -1047,6 +1047,12 @@ content %}
               <input type="checkbox" id="mqttTls" {% if settings.mqtt_tls %}checked{% endif %} />
               Use TLS
             </label>
+          </div>
+          <div class="form-actions" style="margin-top: 0.5rem">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="testMqttConnection()">
+              Test MQTT Connection
+            </button>
+            <span id="mqttTestMsg" class="save-msg"></span>
           </div>
         </div>
       </details>
@@ -3496,6 +3502,25 @@ content %}
       if (msg) {
         msg.textContent = "Unable to reset keg types. Try again.";
       }
+    }
+  }
+
+  async function testMqttConnection() {
+    const message = document.getElementById("mqttTestMsg");
+    if (message) message.textContent = "";
+    try {
+      const response = await fetch(`${INGRESS}/api/settings/mqtt/test`, {
+        method: "POST",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || body.message || "MQTT test failed.");
+      }
+      if (message) {
+        message.textContent = `✓ ${body.message || "MQTT connection succeeded."}`;
+      }
+    } catch (error) {
+      if (message) message.textContent = error.message || "MQTT test failed.";
     }
   }
 

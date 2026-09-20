@@ -625,6 +625,9 @@ h2 {
 .settings-inline-field .form-control {
   min-width: 0;
 }
+.settings-mqtt-field {
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
+}
 .settings-compact-select {
   width: min(100%, 16rem);
 }

@@ -68,7 +68,16 @@ def publish_state_async(data: dict[str, Any]) -> None:
     ).start()
 
 
-def _publish_state(data: dict[str, Any]) -> None:
+def test_connection(data: dict[str, Any]) -> tuple[bool, str]:
+    settings = data.get("settings", {}) if isinstance(data.get("settings"), dict) else {}
+    if mqtt is None:
+        return False, "MQTT support is not installed."
+    if not str(settings.get("mqtt_host", "") or "").strip():
+        return False, "MQTT host is required."
+    return _publish_state(data)
+
+
+def _publish_state(data: dict[str, Any]) -> tuple[bool, str]:
     settings = data["settings"]
     client = mqtt.Client(client_id="bartender-publisher")
     username = str(settings.get("mqtt_username", "") or "").strip()
@@ -89,10 +98,11 @@ def _publish_state(data: dict[str, Any]) -> None:
             client.publish(topic, message, qos=1, retain=retain).wait_for_publish()
     except Exception:
         # MQTT is an optional integration and must never interrupt app writes.
-        return
+        return False, "Unable to connect to the MQTT broker or publish a test message."
     finally:
         try:
             client.loop_stop()
             client.disconnect()
         except Exception:
             pass
+    return True, "Connected and published MQTT snapshots."

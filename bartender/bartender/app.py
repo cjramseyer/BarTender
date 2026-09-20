@@ -58,7 +58,7 @@ from bartender.pos_sync.brewfather import (
     utc_now as brewfather_now,
 )
 from bartender.storage import create_state_store
-from bartender.mqtt import publish_state_async
+from bartender.mqtt import publish_state_async, test_connection as test_mqtt_connection
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -4734,6 +4734,16 @@ def api_reset_settings_to_defaults():
     return jsonify(data["settings"])
 
 
+@app.route("/api/settings/mqtt/test", methods=["POST"])
+def api_test_mqtt_connection():
+    data = load_data()
+    current_user = _get_current_team_user()
+    if current_user.get("role") != "owner":
+        return jsonify({"error": "Insufficient permissions"}), 403
+    success, message = test_mqtt_connection(data)
+    return jsonify({"ok": success, "message": message}), 200 if success else 400
+
+
 @app.route("/api/settings/displays/reset", methods=["POST"])
 def api_reset_display_configuration_to_defaults():
     data = load_data()
@@ -5835,6 +5845,7 @@ KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
 API_REFERENCE_ENDPOINTS = [
     ("GET", "/api/settings", "Get current settings"),
     ("POST", "/api/settings", "Update settings"),
+    ("POST", "/api/settings/mqtt/test", "Test MQTT connectivity and publishing"),
     ("POST", "/api/settings/displays/reset", "Reset Pro display configuration to defaults"),
     ("GET", "/api/storage/status", "Get credential-safe storage status"),
     ("GET", "/api/stock", "List all bar stock items"),
@@ -5857,6 +5868,7 @@ API_REFERENCE_ENDPOINTS = [
     ("POST", "/api/taps", "Add a tap"),
     ("POST", "/api/taps/bulk", "Bulk add taps"),
     ("PUT", "/api/taps/<id>", "Update a tap"),
+    ("POST", "/api/taps/<id>/clean", "Mark a disconnected tap clean"),
     ("POST", "/api/taps/<id>/pour", "Record a pour for the assigned keg"),
     ("DELETE", "/api/taps/<id>", "Delete a tap"),
     ("POST", "/api/team/users", "Issue, rotate, revoke, or configure a user scan credential"),
@@ -6777,6 +6789,35 @@ def api_delete_tap(tap_id: int):
         )
     save_data(data)
     return jsonify({"ok": True})
+
+
+@app.route("/api/taps/<int:tap_id>/clean", methods=["POST"])
+def api_clean_tap(tap_id: int):
+    data = load_data()
+    current_user = _get_current_team_user()
+    for tap in data["taps"]:
+        if tap["id"] != tap_id:
+            continue
+        if tap.get("keg_id") is not None or not _coerce_bool(tap.get("ever_assigned_keg"), False):
+            return jsonify({
+                "error": "Only disconnected taps that need cleaning can be marked clean.",
+                "code": "CLEAN_ACTION_REQUIRES_DISCONNECTED_TAP",
+            }), 409
+
+        tap["ever_assigned_keg"] = False
+        tap["last_cleaned_date"] = _today_utc_date()
+        tap["updated_at"] = datetime.now(timezone.utc).isoformat()
+        _record_team_audit(
+            data,
+            current_user,
+            "tap_cleaned",
+            f"tap:{tap_id}",
+            {key: tap.get(key) for key in ("number", "label", "last_cleaned_date")},
+        )
+        save_data(data)
+        return jsonify(tap)
+
+    return jsonify({"error": "Not found"}), 404
 
 
 # ---------------------------------------------------------------------------

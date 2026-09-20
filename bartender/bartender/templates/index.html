@@ -97,7 +97,7 @@ content %}
           volume_token = '%g' | format(keg.current_volume) %}{{ volume_token }}
           {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</span
         >
-        {% endif %} {% endif %} {% else %} {% set tap_state_label = 'Need
+        {% endif %} {% endif %} {% else %} {% set tap_state_label = 'Needs
         cleaning' if tap.ever_assigned_keg else 'Available' %} {% set
         tap_state_badge = 'cleaning' if tap.ever_assigned_keg else 'empty' %}
         <span class="badge badge-{{ tap_state_badge }}"

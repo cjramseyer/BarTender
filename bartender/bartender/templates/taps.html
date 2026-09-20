@@ -135,6 +135,15 @@
       </div>
       {% endif %}
       <div class="tap-action-row">
+        {% if not keg and tap.ever_assigned_keg %}
+        <button
+          class="btn btn-sm btn-secondary js-clean-tap-btn"
+          data-tap-id="{{ tap.id }}"
+          type="button"
+        >
+          Clean Tap
+        </button>
+        {% endif %}
         <button
           class="btn btn-sm btn-secondary js-edit-tap-btn"
           data-tap-id="{{ tap.id }}"
@@ -453,6 +462,13 @@
       });
     });
 
+    document.querySelectorAll(".js-clean-tap-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tapId = Number.parseInt(btn.dataset.tapId || "", 10);
+        if (tapId > 0) cleanTap(tapId);
+      });
+    });
+
     document.querySelectorAll(".js-delete-tap-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const tapId = Number.parseInt(btn.dataset.tapId || "", 10);
@@ -726,6 +742,19 @@
   async function deleteTap(id) {
     if (!confirm("Delete this tap?")) return;
     await fetch(`${INGRESS}/api/taps/${id}`, { method: "DELETE" });
+    location.reload();
+  }
+
+  async function cleanTap(id) {
+    if (!confirm("Mark this tap as cleaned?")) return;
+    const response = await fetch(`${INGRESS}/api/taps/${id}/clean`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body.error || "Unable to mark tap clean.");
+      return;
+    }
     location.reload();
   }
 
