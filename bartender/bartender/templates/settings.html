@@ -93,44 +93,6 @@ content %}
             </p>
           </div>
           <div class="form-group">
-            <label>Bar Logo URL (optional)</label>
-            <input
-              type="url"
-              id="barLogoUrl"
-              class="form-control"
-              value="{{ settings.bar_logo_url or '' }}"
-              placeholder="https://example.com/logo.png"
-            />
-            <div
-              style="
-                display: flex;
-                gap: 0.5rem;
-                flex-wrap: wrap;
-                margin-top: 0.45rem;
-              "
-            >
-              <input
-                type="file"
-                id="barLogoFile"
-                class="form-control"
-                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
-              />
-              <button
-                type="button"
-                class="btn btn-sm btn-secondary"
-                onclick="uploadBarLogo()"
-              >
-                Upload Logo
-              </button>
-            </div>
-            <span id="barLogoUploadMsg" class="save-msg"></span>
-            <small class="muted"
-              >Use a URL or upload an image file (PNG, JPG, GIF, WEBP, SVG; max
-              2 MB). Shown next to your bar name on dashboard and menu/display
-              pages.</small
-            >
-          </div>
-          <div class="form-group">
             <label>Environment Mode</label>
             <div class="radio-group">
               <label class="radio-label">
@@ -169,38 +131,82 @@ content %}
               updates.</small
             >
           </div>
+          <div class="form-group">
+            <label>Bar Logo URL (optional)</label>
+            <input
+              type="url"
+              id="barLogoUrl"
+              class="form-control"
+              value="{{ settings.bar_logo_url or '' }}"
+              placeholder="https://example.com/logo.png"
+            />
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.45rem;
+              "
+            >
+              <input
+                type="file"
+                id="barLogoFile"
+                class="form-control"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              />
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="uploadBarLogo()"
+              >
+                Upload Logo
+              </button>
+            </div>
+            <span id="barLogoUploadMsg" class="save-msg"></span>
+            <small class="muted"
+              >Use a URL or upload an image file (PNG, JPG, GIF, WEBP, SVG; max
+              2 MB). Shown next to your bar name on dashboard and menu/display
+              pages.</small
+            >
+          </div>
           {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
           <div class="form-group">
-            <label for="mobileSessionTimeoutMinutes"
-              >Mobile Session Timeout (minutes)</label
-            >
-            <input
-              type="number"
-              id="mobileSessionTimeoutMinutes"
-              class="form-control"
-              min="5"
-              max="43200"
-              step="1"
-              value="{{ settings.mobile_session_timeout_minutes or 30 }}"
-            />
+            <div class="settings-inline-field">
+              <label for="mobileSessionTimeoutMinutes"
+                >Mobile Session Timeout (minutes)
+                <span class="pro-feature-badge">Pro</span></label
+              >
+              <input
+                type="number"
+                id="mobileSessionTimeoutMinutes"
+                class="form-control"
+                min="5"
+                max="43200"
+                step="1"
+                value="{{ settings.mobile_session_timeout_minutes or 30 }}"
+              />
+            </div>
             <small class="muted"
               >Mobile sessions use this shorter idle timeout. The value cannot
               exceed the global add-on timeout.</small
             >
           </div>
           <div class="form-group">
-            <label for="stationSessionTimeoutMinutes"
-              >Station Session Timeout (minutes)</label
-            >
-            <input
-              type="number"
-              id="stationSessionTimeoutMinutes"
-              class="form-control"
-              min="5"
-              max="43200"
-              step="1"
-              value="{{ settings.station_session_timeout_minutes or 30 }}"
-            />
+            <div class="settings-inline-field">
+              <label for="stationSessionTimeoutMinutes"
+                >Station Session Timeout (minutes)
+                <span class="pro-feature-badge">Pro</span></label
+              >
+              <input
+                type="number"
+                id="stationSessionTimeoutMinutes"
+                class="form-control"
+                min="5"
+                max="43200"
+                step="1"
+                value="{{ settings.station_session_timeout_minutes or 30 }}"
+              />
+            </div>
             <small class="muted"
               >Pour-station sessions use this idle timeout. The value cannot
               exceed the global add-on timeout.</small
@@ -209,27 +215,29 @@ content %}
           {% endif %}
           {% if qr_ready %}
           <div class="form-group">
-            <label>Printable Menu QR Code</label>
-            <select id="menuQrMode" class="form-control">
-              {% if (settings.menu_qr_mode or 'both') == 'off' %}
-              <option value="off" selected>Off</option>
-              {% else %}
-              <option value="off">Off</option>
-              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'display'
-              %}
-              <option value="display" selected>Display only</option>
-              {% else %}
-              <option value="display">Display only</option>
-              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print' %}
-              <option value="print" selected>Print only</option>
-              {% else %}
-              <option value="print">Print only</option>
-              {% endif %} {% if (settings.menu_qr_mode or 'both') == 'both' %}
-              <option value="both" selected>Display and print</option>
-              {% else %}
-              <option value="both">Display and print</option>
-              {% endif %}
-            </select>
+            <div class="settings-inline-field">
+              <label for="menuQrMode">Printable Menu QR Code</label>
+              <select id="menuQrMode" class="form-control settings-compact-select">
+                {% if (settings.menu_qr_mode or 'both') == 'off' %}
+                <option value="off" selected>Off</option>
+                {% else %}
+                <option value="off">Off</option>
+                {% endif %} {% if (settings.menu_qr_mode or 'both') == 'display'
+                %}
+                <option value="display" selected>Display only</option>
+                {% else %}
+                <option value="display">Display only</option>
+                {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print' %}
+                <option value="print" selected>Print only</option>
+                {% else %}
+                <option value="print">Print only</option>
+                {% endif %} {% if (settings.menu_qr_mode or 'both') == 'both' %}
+                <option value="both" selected>Display and print</option>
+                {% else %}
+                <option value="both">Display and print</option>
+                {% endif %}
+              </select>
+            </div>
             <small class="muted">
               Controls where the QR code appears on the printable menu page.
             </small>
@@ -334,28 +342,6 @@ content %}
               container.</small
             >
           </div>
-          {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
-          <div class="form-group" id="proDisplaySettings">
-            <label for="displayCount">Number of Displays</label>
-            <input
-              id="displayCount"
-              type="number"
-              min="1"
-              max="12"
-              class="form-control"
-              value="{{ settings.display_count or 2 }}"
-            />
-            <small id="displayCountProNote" class="muted"
-              >Choose how many display boards this installation should
-              serve.</small
-            >
-            <div
-              id="displayTapAssignments"
-              class="stack-gap-sm"
-              style="margin-top: 0.75rem"
-            ></div>
-          </div>
-          {% endif %}
           <div class="form-group">
             <label>Dashboard Manage Button Position</label>
             <div class="radio-group">
@@ -439,6 +425,50 @@ content %}
         </div>
       </details>
 
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+      <details class="settings-collapsible">
+        <summary>Displays <span class="pro-feature-badge">Pro</span></summary>
+        <div class="settings-collapsible-body">
+          <div class="form-group" id="proDisplaySettings">
+            <div class="settings-inline-field">
+              <label for="displayCount">Number of Displays</label>
+              <input
+                id="displayCount"
+                type="number"
+                min="1"
+                max="12"
+                class="form-control"
+                value="{{ settings.display_count or 2 }}"
+              />
+            </div>
+            <small id="displayCountProNote" class="muted"
+              >Choose how many display boards this installation should
+              serve.</small
+            >
+            <small class="muted"
+              >Default configuration: Display 1 shows all taps; Display 2
+              shows bar stock.</small
+            >
+            <div
+              id="displayTapAssignments"
+              class="stack-gap-sm"
+              style="margin-top: 0.75rem"
+            ></div>
+            <div class="form-actions" style="margin-top: 0.75rem">
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                onclick="resetDisplayConfigurationToDefaults()"
+              >
+                Reset Displays to Defaults
+              </button>
+              <span id="displayResetMsg" class="save-msg"></span>
+            </div>
+          </div>
+        </div>
+      </details>
+      {% endif %}
+
       <details class="settings-collapsible">
         <summary>Keg Settings</summary>
         <div class="settings-collapsible-body">
@@ -518,7 +548,7 @@ content %}
           {% if (settings.brewery_type or 'homebrewer') == 'pro' and
           (settings.pour_mode or 'manual') == 'pos' %}
           <div class="form-group">
-            <label>Common POS System</label>
+            <label>Common POS System <span class="pro-feature-badge">Pro</span></label>
             <select id="posSystem" class="form-control">
               <option value="">Select an option</option>
               {% for option in ["Square", "Toast", "Clover", "Lightspeed",
@@ -565,7 +595,7 @@ content %}
 
       {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
       <details class="settings-collapsible">
-        <summary>POS Sync</summary>
+        <summary>POS Sync <span class="pro-feature-badge">Pro</span></summary>
         <div class="settings-collapsible-body">
           <div class="form-group">
             <label class="radio-label">
@@ -1189,7 +1219,7 @@ content %}
     'homebrewer') == 'pro' %}
     <div class="card settings-card settings-about-card">
       <details class="settings-collapsible">
-        <summary>Licensing</summary>
+        <summary>Licensing <span class="pro-feature-badge">Pro</span></summary>
         <div class="settings-collapsible-body">
           <div id="licenseStatus" class="stack-gap-sm">
             Loading license status...
@@ -1219,11 +1249,12 @@ content %}
               Generate Activation Request
             </button>
             <button
+              id="startLicenseTrialButton"
               type="button"
               class="btn btn-sm btn-secondary"
               onclick="startLicenseTrial()"
             >
-              Start 30-Day Pro Trial
+              Start Pro Trial (30-days)
             </button>
             <button
               type="button"
@@ -1260,8 +1291,7 @@ content %}
         <summary>📺 External URLs</summary>
         <div class="settings-collapsible-body">
           <p class="muted">
-            Use these external links for read-only access (served from port {{
-            display_port }}).
+            Use these external links for read-only access.
           </p>
           <p class="muted" style="margin-top: 0.5rem">
             QR Status: {% if qr_ready %}
@@ -1656,10 +1686,12 @@ content %}
   }
 
   function collectSelectedDisplayTapAssignments() {
-    const selects = document.querySelectorAll(".display-tap-assignment-select");
-    return Array.from(selects).map((select) =>
-      Array.from(select.selectedOptions)
-        .map((option) => Number.parseInt(option.value, 10))
+    const assignments = document.querySelectorAll(".display-tap-assignment");
+    return Array.from(assignments).map((assignment) =>
+      Array.from(
+        assignment.querySelectorAll(".display-tap-assignment-checkbox:checked"),
+      )
+        .map((checkbox) => Number.parseInt(checkbox.value, 10))
         .filter((value) => Number.isFinite(value) && value > 0),
     );
   }
@@ -1698,26 +1730,34 @@ content %}
 
     container.innerHTML = assignments
       .map((selectedNumbers, index) => {
-        const selectId = `displayTapAssignment-${index + 1}`;
         const selectedCount = selectedNumbers.length;
+        const displayUrl = `${AUTO_EXTERNAL_DISPLAY_URL}?display=${index + 1}`;
         return `
           <details class="settings-collapsible display-tap-assignment" ${selectedCount ? "open" : ""}>
-            <summary>Display ${index + 1} taps${selectedCount ? ` (${selectedCount} selected)` : ""}</summary>
+            <summary>
+              <a class="display-config-link" href="${displayUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Display ${index + 1}${selectedCount ? ` (${selectedCount} selected)` : ""}</a>
+            </summary>
             <div class="settings-collapsible-body">
-              <select id="${selectId}" class="form-control display-tap-assignment-select" multiple size="${Math.min(8, Math.max(4, tapNumbers.length || 4))}">
+              <div class="display-tap-checkbox-list">
                 ${
                   tapNumbers.length
                     ? tapNumbers
                         .map((tapNumber) => {
-                          const selected = selectedNumbers.includes(tapNumber)
-                            ? "selected"
+                          const checkboxId = `displayTapAssignment-${index + 1}-${tapNumber}`;
+                          const checked = selectedNumbers.includes(tapNumber)
+                            ? "checked"
                             : "";
-                          return `<option value="${tapNumber}" ${selected}>Tap ${tapNumber}</option>`;
+                          return `
+                            <label class="radio-label" for="${checkboxId}">
+                              <input id="${checkboxId}" class="display-tap-assignment-checkbox" type="checkbox" value="${tapNumber}" ${checked} />
+                              Tap ${tapNumber}
+                            </label>
+                          `;
                         })
                         .join("")
-                    : '<option value="">No taps available</option>'
+                    : '<span class="muted">No taps available</span>'
                 }
-              </select>
+              </div>
               <small class="muted">Choose which taps should appear on this display.</small>
             </div>
           </details>
@@ -1726,9 +1766,9 @@ content %}
       .join("");
 
     container
-      .querySelectorAll(".display-tap-assignment-select")
-      .forEach((select) => {
-        select.addEventListener("change", () => {
+      .querySelectorAll(".display-tap-assignment-checkbox")
+      .forEach((checkbox) => {
+        checkbox.addEventListener("change", () => {
           currentDisplayTapAssignments = normalizeDisplayTapAssignments(
             collectSelectedDisplayTapAssignments(),
           );
@@ -3005,6 +3045,15 @@ content %}
     }
   }
 
+  function formatLicenseExpiration(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || "");
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  }
+
   async function loadLicenseStatus() {
     const container = document.getElementById("licenseStatus");
     if (!container) return;
@@ -3013,10 +3062,12 @@ content %}
       const body = await response.json().catch(() => ({}));
       if (!response.ok)
         throw new Error(body.error || "Unable to load license status.");
+      const trialButton = document.getElementById("startLicenseTrialButton");
+      if (trialButton) trialButton.hidden = Boolean(body.active);
       container.innerHTML = `
         <p><strong>Plan:</strong> ${escapeBrewfatherText(body.plan || "Base")}</p>
         <p><strong>Status:</strong> ${body.active ? "Active" : "Not activated"}</p>
-        ${body.expires_at ? `<p><strong>Expires:</strong> ${escapeBrewfatherText(body.expires_at)}</p>` : ""}
+        ${body.expires_at ? `<p><strong>Expires:</strong> ${escapeBrewfatherText(formatLicenseExpiration(body.expires_at))}</p>` : ""}
         ${body.active ? `<p><strong>Days remaining:</strong> ${body.days_remaining}</p>` : ""}
       `;
     } catch (error) {
@@ -3284,6 +3335,46 @@ content %}
       console.error("Unable to reset keg types", err);
       if (msg) {
         msg.textContent = "Unable to reset keg types. Try again.";
+      }
+    }
+  }
+
+  async function resetDisplayConfigurationToDefaults() {
+    const message = document.getElementById("displayResetMsg");
+    if (message) message.textContent = "";
+
+    const confirmed = window.confirm(
+      "Reset displays to the default configuration? Display 1 will show all taps and Display 2 will show bar stock.",
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`${INGRESS}/api/settings/displays/reset`, {
+        method: "POST",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to reset display configuration.");
+      }
+
+      const displayCountInput = document.getElementById("displayCount");
+      if (displayCountInput) {
+        displayCountInput.value = String(body.display_count || 2);
+      }
+      currentDisplayTapAssignments = normalizeDisplayTapAssignments(
+        body.display_tap_assignments || [],
+      );
+      const assignments = document.getElementById("displayTapAssignments");
+      if (assignments) assignments.innerHTML = "";
+      renderDisplayTapAssignments();
+      updateExternalReadonlyLinks();
+
+      if (message) message.textContent = "✓ Displays reset to defaults.";
+    } catch (error) {
+      console.error("Unable to reset display configuration", error);
+      if (message) {
+        message.textContent =
+          error.message || "Unable to reset display configuration.";
       }
     }
   }

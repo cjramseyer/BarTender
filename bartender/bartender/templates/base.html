@@ -93,6 +93,31 @@
               </button>
             </div>
             {% endif %}
+            <a
+              class="nav-menu-item"
+              href="{{ ingress }}/"
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              >Open in New Window</a
+            >
+            {% set active_display_count = (settings.display_count or 2) if
+            (settings.brewery_type or 'homebrewer') == 'pro' else 2 %}
+            <details class="nav-menu-submenu nav-menu-display-submenu">
+              <summary>View Display</summary>
+              <div class="nav-menu-submenu-body">
+                {% for display_index in range(1, active_display_count + 1) %}
+                <a
+                  class="nav-menu-item"
+                  href="{{ local_display_url }}?display={{ display_index }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  >Display {{ display_index }}</a
+                >
+                {% endfor %}
+              </div>
+            </details>
             <details class="nav-menu-submenu">
               <summary>Options</summary>
               <div class="nav-menu-submenu-body">
@@ -115,22 +140,6 @@
                     <span>API Reference</span>
                   </label>
                 </div>
-                <a
-                  class="nav-menu-item"
-                  href="{{ ingress }}/display"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  role="menuitem"
-                  >View Display</a
-                >
-                <a
-                  class="nav-menu-item"
-                  href="{{ ingress }}/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  role="menuitem"
-                  >Open in New Window</a
-                >
                 <a
                   class="nav-menu-item"
                   href="{{ ingress }}/menu"
