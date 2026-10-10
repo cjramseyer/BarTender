@@ -1228,8 +1228,9 @@ def test_pro_display_tap_assignments_include_configured_taps(tmp_path):
     assert 'class="display-config-link"' in body
     assert "href=\"${displayUrl}\"" in body
     assert 'id="displayCount"' in body
-    assert 'id="menuQrMode" class="form-control settings-compact-select settings-qr-mode-select"' in body
-    assert body.count('class="pro-feature-badge"') == 5
+    normalized_body = " ".join(body.split())
+    assert 'id="menuQrMode" class="form-control settings-compact-select settings-qr-mode-select"' in normalized_body
+    assert body.count('class="pro-feature-badge"') == 6
     assert body.count('class="settings-inline-field"') >= 4
     assert (
         body.index("<label>Bar Profile</label>")

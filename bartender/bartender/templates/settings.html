@@ -212,12 +212,14 @@ content %}
               exceed the global add-on timeout.</small
             >
           </div>
-          {% endif %}
-          {% if qr_ready %}
+          {% endif %} {% if qr_ready %}
           <div class="form-group">
             <div class="settings-inline-field">
               <label for="menuQrMode">Printable Menu QR Code</label>
-              <select id="menuQrMode" class="form-control settings-compact-select settings-qr-mode-select">
+              <select
+                id="menuQrMode"
+                class="form-control settings-compact-select settings-qr-mode-select"
+              >
                 {% if (settings.menu_qr_mode or 'both') == 'off' %}
                 <option value="off" selected>Off</option>
                 {% else %}
@@ -227,7 +229,8 @@ content %}
                 <option value="display" selected>Display only</option>
                 {% else %}
                 <option value="display">Display only</option>
-                {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print' %}
+                {% endif %} {% if (settings.menu_qr_mode or 'both') == 'print'
+                %}
                 <option value="print" selected>Print only</option>
                 {% else %}
                 <option value="print">Print only</option>
@@ -426,6 +429,73 @@ content %}
       </details>
 
       {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+      <details class="settings-collapsible" id="inlineDevicesSettings">
+        <summary>
+          Inline Devices <span class="pro-feature-badge">Pro</span>
+        </summary>
+        <div class="settings-collapsible-body">
+          <p class="muted">
+            Register each flow-meter controller to this BarTender instance and
+            assign it to one tap. Devices send authenticated, idempotent pour
+            events to the external API listener on port {{ external_api_port }}.
+            Keep that listener on a trusted network.
+          </p>
+          <p class="muted">
+            Events are accepted only while Pour Mode is set to Inline Device.
+            Registrations remain stored when switching modes, but device pours
+            are rejected until Inline Device mode is active again.
+          </p>
+          <p>
+            <a
+              class="btn btn-sm btn-secondary"
+              href="{{ ingress }}/static/firmware/inline_device_esp32.ino"
+              download
+              >Download ESP32 firmware template</a
+            >
+          </p>
+          <p class="muted">
+            After registering, copy the value labeled Bearer token into the
+            downloaded sketch's <code>DEVICE_TOKEN</code> constant, replacing
+            <code>PASTE_DEVICE_TOKEN_HERE</code>.
+          </p>
+          <div class="form-group">
+            <label for="inlineDeviceName">Device Name</label>
+            <input
+              type="text"
+              id="inlineDeviceName"
+              class="form-control"
+              maxlength="80"
+              placeholder="Cold room tap 1"
+            />
+          </div>
+          <div class="form-group">
+            <label for="inlineDeviceTap">Linked Tap</label>
+            <select id="inlineDeviceTap" class="form-control">
+              <option value="">Select a tap</option>
+              {% for tap in taps %}
+              <option value="{{ tap.id }}">
+                {{ tap.label or ('Tap ' ~ (tap.number|string)) }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            onclick="registerInlineDevice()"
+          >
+            Register Device
+          </button>
+          <span id="inlineDeviceMessage" class="save-msg" role="status"></span>
+          <div id="inlineDeviceProvisioning" class="form-group" hidden></div>
+          <div
+            id="inlineDevicesList"
+            class="stack-gap-sm"
+            style="margin-top: 0.75rem"
+          ></div>
+        </div>
+      </details>
+      {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
       <details class="settings-collapsible">
         <summary>Displays <span class="pro-feature-badge">Pro</span></summary>
         <div class="settings-collapsible-body">
@@ -446,8 +516,8 @@ content %}
               serve.</small
             >
             <small class="muted"
-              >Default configuration: Display 1 shows all taps; Display 2
-              shows bar stock.</small
+              >Default configuration: Display 1 shows all taps; Display 2 shows
+              bar stock.</small
             >
             <div
               id="displayTapAssignments"
@@ -532,23 +602,26 @@ content %}
               <option value="pos" selected>POS (API)</option>
               {% else %}
               <option value="pos">POS (API)</option>
-              {% endif %} {% endif %} {% if (settings.pour_mode or 'manual') ==
-              'inline_device' %}
+              {% endif %} {% endif %} {% if (settings.brewery_type or
+              'homebrewer') == 'pro' %} {% if (settings.pour_mode or 'manual')
+              == 'inline_device' %}
               <option value="inline_device" selected>Inline Device</option>
               {% else %}
               <option value="inline_device">Inline Device</option>
-              {% endif %}
+              {% endif %} {% endif %}
             </select>
             <small class="muted"
-              >POS mode is only available for Pro setups. Inline Device is
-              available for both modes. Non-manual modes hide the pour button in
-              the UI.</small
+              >POS and Inline Device modes require a Pro profile. Non-manual
+              modes hide the pour button in the UI.</small
             >
           </div>
           {% if (settings.brewery_type or 'homebrewer') == 'pro' and
           (settings.pour_mode or 'manual') == 'pos' %}
           <div class="form-group">
-            <label>Common POS System <span class="pro-feature-badge">Pro</span></label>
+            <label
+              >Common POS System
+              <span class="pro-feature-badge">Pro</span></label
+            >
             <select id="posSystem" class="form-control">
               <option value="">Select an option</option>
               {% for option in ["Square", "Toast", "Clover", "Lightspeed",
@@ -1017,39 +1090,94 @@ content %}
         <div class="settings-collapsible-body">
           <div class="form-group">
             <label class="radio-label">
-              <input type="checkbox" id="mqttEnabled" {% if settings.mqtt_enabled %}checked{% endif %} />
+              <input
+                type="checkbox"
+                id="mqttEnabled"
+                {%
+                if
+                settings.mqtt_enabled
+                %}checked{%
+                endif
+                %}
+              />
               Enable MQTT publishing
             </label>
-            <small class="muted">Publishes retained status, tap, keg, bar stock, and display snapshots. MQTT commands are not accepted.</small>
+            <small class="muted"
+              >Publishes retained status, tap, keg, bar stock, and display
+              snapshots. MQTT commands are not accepted.</small
+            >
           </div>
           <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttHost">MQTT Host</label>
-            <input id="mqttHost" class="form-control" type="text" value="{{ settings.mqtt_host or '' }}" placeholder="e.g. core-mosquitto" />
+            <input
+              id="mqttHost"
+              class="form-control"
+              type="text"
+              value="{{ settings.mqtt_host or '' }}"
+              placeholder="e.g. core-mosquitto"
+            />
           </div>
           <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttPort">MQTT Port</label>
-            <input id="mqttPort" class="form-control" type="number" min="1" max="65535" value="{{ settings.mqtt_port or 1883 }}" />
+            <input
+              id="mqttPort"
+              class="form-control"
+              type="number"
+              min="1"
+              max="65535"
+              value="{{ settings.mqtt_port or 1883 }}"
+            />
           </div>
           <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttTopicPrefix">Topic Prefix</label>
-            <input id="mqttTopicPrefix" class="form-control" type="text" value="{{ settings.mqtt_topic_prefix or 'bartender' }}" />
+            <input
+              id="mqttTopicPrefix"
+              class="form-control"
+              type="text"
+              value="{{ settings.mqtt_topic_prefix or 'bartender' }}"
+            />
           </div>
           <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttUsername">Username</label>
-            <input id="mqttUsername" class="form-control" type="text" value="{{ settings.mqtt_username or '' }}" autocomplete="off" />
+            <input
+              id="mqttUsername"
+              class="form-control"
+              type="text"
+              value="{{ settings.mqtt_username or '' }}"
+              autocomplete="off"
+            />
           </div>
           <div class="settings-inline-field settings-mqtt-field">
             <label for="mqttPassword">Password</label>
-            <input id="mqttPassword" class="form-control" type="password" value="" autocomplete="new-password" />
+            <input
+              id="mqttPassword"
+              class="form-control"
+              type="password"
+              value=""
+              autocomplete="new-password"
+            />
           </div>
           <div class="form-group">
             <label class="radio-label">
-              <input type="checkbox" id="mqttTls" {% if settings.mqtt_tls %}checked{% endif %} />
+              <input
+                type="checkbox"
+                id="mqttTls"
+                {%
+                if
+                settings.mqtt_tls
+                %}checked{%
+                endif
+                %}
+              />
               Use TLS
             </label>
           </div>
           <div class="form-actions" style="margin-top: 0.5rem">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="testMqttConnection()">
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              onclick="testMqttConnection()"
+            >
               Test MQTT Connection
             </button>
             <span id="mqttTestMsg" class="save-msg"></span>
@@ -1337,9 +1465,7 @@ content %}
       <details class="settings-collapsible" open>
         <summary>📺 External URLs</summary>
         <div class="settings-collapsible-body">
-          <p class="muted">
-            Use these external links for read-only access.
-          </p>
+          <p class="muted">Use these external links for read-only access.</p>
           <p class="muted" style="margin-top: 0.5rem">
             QR Status: {% if qr_ready %}
             <strong style="color: #15803d">Ready</strong>
@@ -1659,6 +1785,7 @@ content %}
     `{{ (settings.environment_mode or 'production') | tojson }}`,
   );
   const TAPS = JSON.parse(`{{ (taps or []) | tojson }}`);
+  const INLINE_DEVICES = JSON.parse(`{{ (inline_devices or []) | tojson }}`);
   const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
   const INITIAL_POS_PROVIDER_CATALOG = JSON.parse(
     `{{ (pos_sync_provider_catalog or []) | tojson }}`,
@@ -1777,7 +1904,8 @@ content %}
     const normalizedAssignments = collectSelectedDisplayTapAssignments().length
       ? normalizeDisplayTapAssignments(collectSelectedDisplayTapAssignments())
       : currentDisplayTapAssignments;
-    const normalizedBarStockAssignments = collectDisplayBarStockAssignments().length
+    const normalizedBarStockAssignments = collectDisplayBarStockAssignments()
+      .length
       ? normalizeDisplayBarStockAssignments(collectDisplayBarStockAssignments())
       : currentDisplayBarStockAssignments;
     const tapList = Array.isArray(TAPS) ? TAPS : [];
@@ -1800,7 +1928,9 @@ content %}
         const selectedCount = selectedNumbers.length;
         const displayUrl = `${AUTO_EXTERNAL_DISPLAY_URL}?display=${index + 1}`;
         const barStockId = `displayBarStockAssignment-${index + 1}`;
-        const barStockChecked = normalizedBarStockAssignments[index] ? "checked" : "";
+        const barStockChecked = normalizedBarStockAssignments[index]
+          ? "checked"
+          : "";
         return `
           <details class="settings-collapsible display-tap-assignment" ${selectedCount ? "open" : ""}>
             <summary>
@@ -1839,15 +1969,18 @@ content %}
       .join("");
 
     container
-      .querySelectorAll(".display-tap-assignment-checkbox, .display-bar-stock-assignment")
+      .querySelectorAll(
+        ".display-tap-assignment-checkbox, .display-bar-stock-assignment",
+      )
       .forEach((checkbox) => {
         checkbox.addEventListener("change", () => {
           currentDisplayTapAssignments = normalizeDisplayTapAssignments(
             collectSelectedDisplayTapAssignments(),
           );
-          currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
-            collectDisplayBarStockAssignments(),
-          );
+          currentDisplayBarStockAssignments =
+            normalizeDisplayBarStockAssignments(
+              collectDisplayBarStockAssignments(),
+            );
           scheduleAutoSave(100);
         });
       });
@@ -2054,7 +2187,8 @@ content %}
       ? document.getElementById("mqttUsername").value.trim()
       : "";
     const mqttPassword = document.getElementById("mqttPassword");
-    if (mqttPassword && mqttPassword.value) payload.mqtt_password = mqttPassword.value;
+    if (mqttPassword && mqttPassword.value)
+      payload.mqtt_password = mqttPassword.value;
     payload.mqtt_tls = document.getElementById("mqttTls")
       ? document.getElementById("mqttTls").checked
       : false;
@@ -2223,7 +2357,8 @@ content %}
       savedSettings.display_tap_assignments || currentDisplayTapAssignments,
     );
     currentDisplayBarStockAssignments = normalizeDisplayBarStockAssignments(
-      savedSettings.display_bar_stock_assignments || currentDisplayBarStockAssignments,
+      savedSettings.display_bar_stock_assignments ||
+        currentDisplayBarStockAssignments,
     );
     syncDisplaySettingsAvailability();
 
@@ -3200,9 +3335,12 @@ content %}
   async function downloadLicenseActivationRequest() {
     const message = document.getElementById("licenseMessage");
     try {
-      const response = await fetch(`${INGRESS}/api/licensing/activation-request`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `${INGRESS}/api/licensing/activation-request`,
+        {
+          method: "POST",
+        },
+      );
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || "Unable to generate activation request.");
@@ -3375,7 +3513,10 @@ content %}
     if (!matches.length) return { name: raw, volume: "", unit: "gal" };
 
     const match = matches[matches.length - 1];
-    let name = raw.slice(0, match.index).replace(/[\s,]+$/, "").trim();
+    let name = raw
+      .slice(0, match.index)
+      .replace(/[\s,]+$/, "")
+      .trim();
     name = name.replace(/\(\s*$/, "").trim();
     if (name.includes("(") && !name.endsWith(")")) name += ")";
     const unitToken = match[2].toLowerCase();
@@ -3950,6 +4091,247 @@ content %}
       console.error(err);
     }
   }
+
+  function setInlineDeviceMessage(message, isError = false) {
+    const target = document.getElementById("inlineDeviceMessage");
+    if (!target) return;
+    target.textContent = message;
+    target.style.color = isError ? "#b91c1c" : "";
+  }
+
+  async function inlineDeviceRequest(path, options = {}) {
+    const response = await fetch(`${INGRESS}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+    let body = {};
+    try {
+      body = await response.json();
+    } catch (err) {
+      // Keep the HTTP status as the fallback error.
+    }
+    if (!response.ok) {
+      throw new Error(body.error || `Request failed (${response.status})`);
+    }
+    return body;
+  }
+
+  function showInlineDeviceToken(device, token) {
+    const target = document.getElementById("inlineDeviceProvisioning");
+    if (!target) return;
+    target.hidden = false;
+    target.replaceChildren();
+
+    const heading = document.createElement("strong");
+    heading.textContent =
+      "Copy this device token now. It will not be shown again.";
+    const details = document.createElement("pre");
+    details.style.whiteSpace = "pre-wrap";
+    details.style.overflowWrap = "anywhere";
+    details.textContent = [
+      `Device ID: ${device.id}`,
+      `Events URL: http://${window.location.hostname}:{{ external_api_port }}/api/inline-devices/${device.id}/events`,
+      `Heartbeat URL: http://${window.location.hostname}:{{ external_api_port }}/api/inline-devices/${device.id}/heartbeat`,
+      `Bearer token: ${token}`,
+    ].join("\n");
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "btn btn-sm btn-secondary";
+    copyButton.textContent = "Copy provisioning details";
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(details.textContent);
+        setInlineDeviceMessage("Provisioning details copied.");
+      } catch (err) {
+        setInlineDeviceMessage(
+          "Clipboard unavailable. Select and copy the details above.",
+          true,
+        );
+      }
+    });
+    target.append(heading, details, copyButton);
+  }
+
+  function makeInlineDeviceAction(label, className, handler) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = label;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function renderInlineDevices(devices) {
+    const list = document.getElementById("inlineDevicesList");
+    if (!list) return;
+    list.replaceChildren();
+    if (!devices.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No inline devices registered.";
+      list.append(empty);
+      return;
+    }
+
+    devices.forEach((device) => {
+      const row = document.createElement("div");
+      row.className = "settings-user-row";
+      row.style.cssText =
+        "display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;padding:0.75rem;border:1px solid rgba(148,163,184,0.35);border-radius:8px";
+      const info = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = device.name;
+      const state = document.createElement("div");
+      state.className = "muted";
+      state.textContent = `${device.enabled ? "Enabled" : "Disabled"} · ${device.health.replace(/_/g, " ")} · ${device.tap_label}`;
+      const lastSeen = document.createElement("div");
+      lastSeen.className = "muted";
+      lastSeen.textContent = device.last_seen_at
+        ? `Last contact: ${device.last_seen_at}`
+        : "No authenticated contact yet.";
+      const lastEvent = document.createElement("div");
+      lastEvent.className = "muted";
+      lastEvent.textContent = device.last_event_at
+        ? `Last pour: ${device.last_event_at}`
+        : "No pours received yet.";
+      info.append(name, state, lastSeen, lastEvent);
+      if (device.last_error) {
+        const error = document.createElement("div");
+        error.className = "muted";
+        error.textContent = `Last error: ${device.last_error}`;
+        info.append(error);
+      }
+
+      const controls = document.createElement("div");
+      controls.style.cssText =
+        "display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap";
+      const tapSelect = document.createElement("select");
+      tapSelect.className = "form-control";
+      tapSelect.setAttribute("aria-label", `Tap for ${device.name}`);
+      TAPS.forEach((tap) => {
+        const option = document.createElement("option");
+        option.value = String(tap.id);
+        option.textContent = tap.label || `Tap ${tap.number}`;
+        option.selected = tap.id === device.tap_id;
+        tapSelect.append(option);
+      });
+      controls.append(tapSelect);
+      controls.append(
+        makeInlineDeviceAction(
+          "Save Tap",
+          "btn btn-sm btn-secondary",
+          async () => {
+            try {
+              await inlineDeviceRequest(`/api/inline-devices/${device.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ tap_id: Number(tapSelect.value) }),
+              });
+              await refreshInlineDevices();
+              setInlineDeviceMessage("Device tap updated.");
+            } catch (err) {
+              setInlineDeviceMessage(err.message, true);
+            }
+          },
+        ),
+        makeInlineDeviceAction(
+          device.enabled ? "Disable" : "Enable",
+          "btn btn-sm btn-secondary",
+          async () => {
+            try {
+              await inlineDeviceRequest(`/api/inline-devices/${device.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ enabled: !device.enabled }),
+              });
+              await refreshInlineDevices();
+            } catch (err) {
+              setInlineDeviceMessage(err.message, true);
+            }
+          },
+        ),
+        makeInlineDeviceAction(
+          "Rotate Token",
+          "btn btn-sm btn-secondary",
+          async () => {
+            if (
+              !confirm(
+                `Rotate the token for ${device.name}? The current token will stop working.`,
+              )
+            )
+              return;
+            try {
+              const result = await inlineDeviceRequest(
+                `/api/inline-devices/${device.id}/rotate-token`,
+                { method: "POST", body: "{}" },
+              );
+              showInlineDeviceToken(result.device, result.token);
+              await refreshInlineDevices();
+              setInlineDeviceMessage(
+                "Token rotated. Update the device configuration now.",
+              );
+            } catch (err) {
+              setInlineDeviceMessage(err.message, true);
+            }
+          },
+        ),
+        makeInlineDeviceAction("Revoke", "btn btn-sm btn-danger", async () => {
+          if (
+            !confirm(
+              `Revoke ${device.name}? Its token will stop working immediately.`,
+            )
+          )
+            return;
+          try {
+            await inlineDeviceRequest(`/api/inline-devices/${device.id}`, {
+              method: "DELETE",
+            });
+            await refreshInlineDevices();
+            setInlineDeviceMessage("Device revoked.");
+          } catch (err) {
+            setInlineDeviceMessage(err.message, true);
+          }
+        }),
+      );
+      row.append(info, controls);
+      list.append(row);
+    });
+  }
+
+  async function refreshInlineDevices() {
+    try {
+      const body = await inlineDeviceRequest("/api/inline-devices");
+      renderInlineDevices(Array.isArray(body.devices) ? body.devices : []);
+    } catch (err) {
+      setInlineDeviceMessage(err.message, true);
+    }
+  }
+
+  async function registerInlineDevice() {
+    const name = document.getElementById("inlineDeviceName").value.trim();
+    const tapId = document.getElementById("inlineDeviceTap").value;
+    if (!name || !tapId) {
+      setInlineDeviceMessage("Enter a device name and select a tap.", true);
+      return;
+    }
+    try {
+      const result = await inlineDeviceRequest("/api/inline-devices", {
+        method: "POST",
+        body: JSON.stringify({ name, tap_id: Number(tapId) }),
+      });
+      document.getElementById("inlineDeviceName").value = "";
+      showInlineDeviceToken(result.device, result.token);
+      await refreshInlineDevices();
+      setInlineDeviceMessage(
+        "Device registered. Store the token in its firmware configuration.",
+      );
+    } catch (err) {
+      setInlineDeviceMessage(err.message, true);
+    }
+  }
+
+  renderInlineDevices(INLINE_DEVICES);
 
   async function importArchive(e) {
     e.preventDefault();
