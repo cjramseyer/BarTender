@@ -26,17 +26,17 @@ beer system before putting the line into service.
 
 ## Required Hardware
 
-| Item | Quantity | Requirements |
-| --- | ---: | --- |
-| Titan Enterprises 800 Series beverage flowmeter | 1 per keg line | Order a variant with a pulse/frequency output. Verify the exact model's wetted materials, pressure and temperature ratings, flow range, cleaning compatibility, and port/fitting standard. |
-| ESP32 development board | 1 per meter node | 2.4 GHz Wi-Fi and one interrupt-capable GPIO per meter. The example below uses GPIO 27 for one meter. |
-| Output-matched signal interface | 1 per meter output | Select a 3.3 V-safe level shifter or optoisolator for the exact flowmeter output type and voltage. Do not connect an unverified meter output directly to an ESP32 GPIO. |
-| Regulated power supplies | As required | Supply the ESP32 and flowmeter at the voltages/currents specified for their exact variants. Do not assume the ESP32 board can power the meter. |
-| Low-voltage wiring and connectors | As needed | Use secure, strain-relieved connections and protect them from moisture. |
-| Beer-line fittings, seals, and compatible tubing | 1 set per meter | Match the meter ports and existing line standard; use beverage-compatible materials and avoid unnecessary bore reduction. |
-| Protective enclosure | 1 per node | Protect the electronics from spills and condensation in a cold, humid environment. |
-| Wi-Fi network access | 1 per node | Provide reliable 2.4 GHz coverage at the controller location. |
-| Calibration vessel or scale | 1 | Measure known pours to calibrate and validate volume readings. |
+| Item                                             |           Quantity | Requirements                                                                                                                                                                               |
+| ------------------------------------------------ | -----------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Titan Enterprises 800 Series beverage flowmeter  |     1 per keg line | Order a variant with a pulse/frequency output. Verify the exact model's wetted materials, pressure and temperature ratings, flow range, cleaning compatibility, and port/fitting standard. |
+| ESP32 development board                          |   1 per meter node | 2.4 GHz Wi-Fi and one interrupt-capable GPIO per meter. The example below uses GPIO 27 for one meter.                                                                                      |
+| Output-matched signal interface                  | 1 per meter output | Select a 3.3 V-safe level shifter or optoisolator for the exact flowmeter output type and voltage. Do not connect an unverified meter output directly to an ESP32 GPIO.                    |
+| Regulated power supplies                         |        As required | Supply the ESP32 and flowmeter at the voltages/currents specified for their exact variants. Do not assume the ESP32 board can power the meter.                                             |
+| Low-voltage wiring and connectors                |          As needed | Use secure, strain-relieved connections and protect them from moisture.                                                                                                                    |
+| Beer-line fittings, seals, and compatible tubing |    1 set per meter | Match the meter ports and existing line standard; use beverage-compatible materials and avoid unnecessary bore reduction.                                                                  |
+| Protective enclosure                             |         1 per node | Protect the electronics from spills and condensation in a cold, humid environment.                                                                                                         |
+| Wi-Fi network access                             |         1 per node | Provide reliable 2.4 GHz coverage at the controller location.                                                                                                                              |
+| Calibration vessel or scale                      |                  1 | Measure known pours to calibrate and validate volume readings.                                                                                                                             |
 
 Also have food-safe cleaning/sanitizing supplies compatible with the meter and
 beer system, and a multimeter or logic probe for checking the supply and
@@ -73,19 +73,19 @@ designed for that output rather than this diagram.
 
 1. In **Settings -> Pour Presets**, select **Inline Device** mode.
 2. In **Settings -> Inline Devices**, enter a name and select the tap served by
-  this flowmeter, then choose **Register Device**.
+   this flowmeter, then choose **Register Device**.
 3. Copy the one-time provisioning details shown by BarTender. Configure the
-  device with that device ID, the event and heartbeat URLs, and its bearer
-  token. The token is shown only at registration or rotation; BarTender stores
-  only its hash.
+   device with that device ID, the event and heartbeat URLs, and its bearer
+   token. The token is shown only at registration or rotation; BarTender stores
+   only its hash.
 4. The device is linked to this app instance by the registered device ID and
-  token. The server-side registration binds it to one tap; each event follows
-  that tap's current keg assignment, so keg changes do not require reflashing
-  the device. A tap can have only one enabled inline device.
+   token. The server-side registration binds it to one tap; each event follows
+   that tap's current keg assignment, so keg changes do not require reflashing
+   the device. A tap can have only one enabled inline device.
 5. Ensure the device can reach this instance's external API listener on port
-  `8110`. Use the address reachable from the device's network, not necessarily
-  the address used to open the Home Assistant UI. If configured, the API IP
-  allowlist must include the device.
+   `8110`. Use the address reachable from the device's network, not necessarily
+   the address used to open the Home Assistant UI. If configured, the API IP
+   allowlist must include the device.
 
 Device requests use their own bearer token and do not need the shared external
 API write token. Submit a pour to:
@@ -102,7 +102,7 @@ Content-Type: application/json
   "occurred_at": "2026-10-10T12:34:56Z",
   "amount": 473,
   "unit": "ml",
-  "metadata": {"meter": "titan-800"}
+  "metadata": { "meter": "titan-800" }
 }
 ```
 
@@ -333,13 +333,13 @@ pour and successive pours are not merged.
 1. Verify the meter supply voltage and output signal with test equipment before
    connecting the signal interface to the ESP32.
 2. Confirm the device ID/token and listener reachability. Test with a small
-  measured pour and verify that the mapped tap's current keg volume decreases.
+   measured pour and verify that the mapped tap's current keg volume decreases.
 3. Measure several pours at normal serving rates. Set `PULSES_PER_LITER` from
    the meter documentation, then refine it using the measured volume and pulse
    totals.
 4. Check for leaks, abnormal foaming, and unacceptable flow restriction. Verify
    the selected meter tolerates the bar's cleaning/sanitizing process.
 5. Disconnect Wi-Fi briefly and confirm queued retries reuse the same event ID.
-  Test heartbeat freshness, token rotation, device disable/revoke, and replay
-  of an accepted event. Do not use the sample for unattended inventory
-  accounting until pending events are durably queued across power loss.
+   Test heartbeat freshness, token rotation, device disable/revoke, and replay
+   of an accepted event. Do not use the sample for unattended inventory
+   accounting until pending events are durably queued across power loss.
