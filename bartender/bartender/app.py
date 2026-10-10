@@ -433,7 +433,8 @@ def acquire_mutation_lock():
 
 
 @app.teardown_request
-def release_mutation_lock(exception=None):
+def release_mutation_lock(_exception=None):
+    del _exception
     if getattr(g, "data_state_lock_acquired", False):
         DATA_STATE_LOCK.release()
 
@@ -737,7 +738,16 @@ def enforce_external_api_controls():
         if not _is_client_ip_allowed(client_ip, allowlist):
             return jsonify({"error": "Client IP is not allowed."}), 403
 
-    if _coerce_bool(settings.get("external_api_token_auth_enabled"), True):
+    is_inline_device_request = bool(
+        re.fullmatch(
+            r"/api/inline-devices/[^/]+/(?:events|heartbeat)",
+            request_path,
+        )
+    )
+    if (
+        _coerce_bool(settings.get("external_api_token_auth_enabled"), True)
+        and not is_inline_device_request
+    ):
         presented = _extract_request_api_token()
         legacy_token = _normalize_external_api_token(settings.get("external_api_token", ""))
         read_token = _normalize_external_api_token(settings.get("external_api_read_token", ""))
@@ -896,6 +906,8 @@ DEFAULT_DATA = {
     "kegs": [],
     "taps": [],
     "pour_events": [],
+    "inline_devices": [],
+    "inline_device_events": [],
     "team_users": [
         {
             "id": "owner",
@@ -1122,6 +1134,10 @@ def _load_data_unlocked() -> dict:
             data["station_registrations"] = []
         if not isinstance(data.get("mobile_tokens"), list):
             data["mobile_tokens"] = []
+        if not isinstance(data.get("inline_devices"), list):
+            data["inline_devices"] = []
+        if not isinstance(data.get("inline_device_events"), list):
+            data["inline_device_events"] = []
         data["beers"] = _normalize_beers(data.get("beers", []))
         data["settings"]["keg_type_choices"] = _normalize_keg_type_choices(
             data["settings"].get("keg_type_choices", []),
@@ -1437,7 +1453,7 @@ def _reset_display_configuration_to_defaults(data: dict) -> dict:
 def _normalize_pour_mode(value, brewery_type: str | None = None) -> str:
     mode = str(value or "manual").strip().lower()
     normalized_type = _normalize_brewery_type(brewery_type)
-    if mode == "pos" and normalized_type != "pro":
+    if mode in ("pos", "inline_device") and normalized_type != "pro":
         return "manual"
     if mode in ("manual", "pos", "inline_device"):
         return mode
@@ -1661,6 +1677,52 @@ def _get_current_team_user() -> dict:
     role = _normalize_team_role(request.headers.get("X-BarTender-Role", "owner"))
     name = str(request.headers.get("X-BarTender-Name", user_id or "Owner")).strip() or "Owner"
     return {"id": user_id or "owner", "name": name, "role": role}
+
+
+def _inline_device_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _public_inline_device(device: dict, taps: list[dict] | None = None) -> dict:
+    tap_id = device.get("tap_id")
+    tap = next(
+        (item for item in (taps or []) if item.get("id") == tap_id),
+        None,
+    )
+    last_seen_at = str(device.get("last_seen_at", "") or "")
+    health = "disabled" if not device.get("enabled", True) else "never_connected"
+    if last_seen_at and device.get("enabled", True):
+        try:
+            last_seen = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            health = (
+                "online"
+                if datetime.now(timezone.utc) - last_seen <= timedelta(minutes=5)
+                else "stale"
+            )
+        except ValueError:
+            health = "unknown"
+    return {
+        "id": str(device.get("id", "")),
+        "name": str(device.get("name", "")),
+        "tap_id": tap_id,
+        "tap_label": str((tap or {}).get("label") or (tap or {}).get("number") or "Unassigned tap"),
+        "enabled": bool(device.get("enabled", True)),
+        "health": health,
+        "created_at": str(device.get("created_at", "") or ""),
+        "last_seen_at": last_seen_at,
+        "last_event_at": str(device.get("last_event_at", "") or ""),
+        "last_error": str(device.get("last_error", "") or ""),
+    }
+
+
+def _inline_device_actor(device: dict) -> dict:
+    return {
+        "id": f"inline-device:{device.get('id', '')}",
+        "name": str(device.get("name", "Inline device")),
+        "role": "staff",
+    }
 
 
 def _find_team_user_by_identifier(users: list[dict], value: str) -> dict | None:
@@ -2263,6 +2325,10 @@ def _record_pour_event(
     tap_id=None,
     preset_name: str = "",
     actor: dict | None = None,
+    event_id: str = "",
+    device_id: str = "",
+    occurred_at: str = "",
+    metadata: dict | None = None,
 ) -> None:
     normalized_unit = _normalize_volume_unit(unit)
     event = {
@@ -2276,6 +2342,14 @@ def _record_pour_event(
         "preset_name": preset_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if event_id:
+        event["event_id"] = event_id
+    if device_id:
+        event["device_id"] = device_id
+    if occurred_at:
+        event["occurred_at"] = occurred_at
+    if metadata:
+        event["metadata"] = metadata
     data.setdefault("pour_events", []).append(event)
     if actor is not None:
         _record_team_audit(
@@ -2290,6 +2364,7 @@ def _record_pour_event(
                 "unit": normalized_unit,
                 "source": source,
                 "preset_name": preset_name,
+                **({"device_id": device_id, "event_id": event_id} if device_id else {}),
             },
         )
 
@@ -3723,6 +3798,14 @@ def settings():
         "settings.html",
         settings=template_settings,
         taps=data.get("taps", []),
+        inline_devices=(
+            [
+                _public_inline_device(device, data.get("taps", []))
+                for device in data.get("inline_devices", [])
+            ]
+            if _normalize_brewery_type(data["settings"].get("brewery_type")) == "pro"
+            else []
+        ),
         pos_sync_providers=sorted(POS_SYNC_PROVIDERS.keys()),
         pos_sync_provider_catalog=get_pos_provider_catalog(data["settings"]),
         team_users=[_public_team_user(user) for user in data.get("team_users", [])],
@@ -5845,6 +5928,13 @@ KEG_STATUSES = ["full", "in_use", "empty", "cleaning", "retired"]
 API_REFERENCE_ENDPOINTS = [
     ("GET", "/api/settings", "Get current settings"),
     ("POST", "/api/settings", "Update settings"),
+    ("GET", "/api/inline-devices", "List registered inline devices (owner/manager)"),
+    ("POST", "/api/inline-devices", "Register an inline device and issue a one-time token"),
+    ("PATCH", "/api/inline-devices/<id>", "Update an inline device name, tap, or enabled state"),
+    ("POST", "/api/inline-devices/<id>/rotate-token", "Rotate an inline device token"),
+    ("POST", "/api/inline-devices/<id>/heartbeat", "Update authenticated inline device health"),
+    ("POST", "/api/inline-devices/<id>/events", "Submit an idempotent device pour event"),
+    ("DELETE", "/api/inline-devices/<id>", "Revoke an inline device"),
     ("POST", "/api/settings/mqtt/test", "Test MQTT connectivity and publishing"),
     ("POST", "/api/settings/displays/reset", "Reset Pro display configuration to defaults"),
     ("GET", "/api/storage/status", "Get credential-safe storage status"),
@@ -5889,6 +5979,390 @@ API_REFERENCE_ENDPOINTS = [
     ("GET", "/api/menu/qr", "Generate printable menu QR code PNG"),
     ("GET", "/api/menu/qr/health", "Check runtime QR dependency readiness"),
 ]
+
+
+def _inline_device_management_allowed():
+    current_user = _get_current_team_user()
+    if not _team_can(current_user.get("role", "staff"), "settings"):
+        return None, (jsonify({"error": "Insufficient permissions"}), 403)
+    data = load_data()
+    if _normalize_brewery_type(data.get("settings", {}).get("brewery_type")) != "pro":
+        return None, (
+            jsonify({
+                "error": "Inline Devices require a Pro profile.",
+                "code": "INLINE_DEVICE_PRO_REQUIRED",
+            }),
+            403,
+        )
+    return current_user, None
+
+
+def _find_inline_device(data: dict, device_id: str) -> dict | None:
+    return next(
+        (
+            item for item in data.get("inline_devices", [])
+            if str(item.get("id", "")) == device_id
+        ),
+        None,
+    )
+
+
+def _validate_inline_device_tap(data: dict, tap_id_value):
+    tap_id = _coerce_int(tap_id_value, None)
+    if tap_id is None:
+        return None, (jsonify({"error": "A valid tap_id is required.", "code": "INVALID_TAP_ID"}), 400)
+    tap = next((item for item in data.get("taps", []) if item.get("id") == tap_id), None)
+    if tap is None:
+        return None, (jsonify({"error": "Tap not found.", "code": "TAP_NOT_FOUND"}), 404)
+    return tap, None
+
+
+def _authenticate_inline_device(data: dict, device_id: str):
+    device = _find_inline_device(data, device_id)
+    if device is None:
+        return None, (jsonify({"error": "Inline device not found.", "code": "DEVICE_NOT_FOUND"}), 404)
+    if not device.get("enabled", True):
+        return None, (jsonify({"error": "Inline device is disabled.", "code": "DEVICE_DISABLED"}), 403)
+
+    presented = _extract_request_api_token()
+    if not presented or not secrets.compare_digest(
+        str(device.get("token_hash", "")), _inline_device_token_hash(presented)
+    ):
+        return None, (jsonify({"error": "Invalid or missing device token.", "code": "INVALID_DEVICE_TOKEN"}), 401)
+
+    allowed, retry_after_seconds = _consume_external_api_rate_limit(
+        f"inline-device:{device_id}",
+        DEFAULT_EXTERNAL_API_RATE_LIMIT_PER_MINUTE,
+    )
+    if not allowed:
+        response = jsonify({
+            "error": "Device rate limit exceeded.",
+            "code": "DEVICE_RATE_LIMITED",
+            "retry_after_seconds": retry_after_seconds,
+        })
+        response.status_code = 429
+        response.headers["Retry-After"] = str(retry_after_seconds)
+        return None, response
+    return device, None
+
+
+@app.route("/api/inline-devices", methods=["GET"])
+def api_list_inline_devices():
+    _, error = _inline_device_management_allowed()
+    if error is not None:
+        return error
+    data = load_data()
+    devices = [
+        _public_inline_device(device, data.get("taps", []))
+        for device in data.get("inline_devices", [])
+    ]
+    return jsonify({"devices": devices, "pour_mode": data["settings"].get("pour_mode", "manual")})
+
+
+@app.route("/api/inline-devices", methods=["POST"])
+def api_register_inline_device():
+    current_user, error = _inline_device_management_allowed()
+    if error is not None:
+        return error
+    if current_user is None:
+        return jsonify({"error": "Insufficient permissions"}), 403
+    data = load_data()
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "A JSON object is required.", "code": "INVALID_REQUEST"}), 400
+
+    name = str(body.get("name", "") or "").strip()[:80]
+    if not name:
+        return jsonify({"error": "Device name is required.", "code": "INVALID_DEVICE_NAME"}), 400
+    tap, tap_error = _validate_inline_device_tap(data, body.get("tap_id"))
+    if tap_error is not None:
+        return tap_error
+    if tap is None:
+        return jsonify({"error": "Tap not found.", "code": "TAP_NOT_FOUND"}), 404
+    if any(
+        item.get("enabled", True) and item.get("tap_id") == tap["id"]
+        for item in data.get("inline_devices", [])
+    ):
+        return jsonify({"error": "An enabled inline device is already linked to this tap.", "code": "TAP_DEVICE_ALREADY_LINKED"}), 409
+    if len(data.get("inline_devices", [])) >= 100:
+        return jsonify({"error": "The device limit has been reached.", "code": "DEVICE_LIMIT_REACHED"}), 409
+
+    raw_token = secrets.token_urlsafe(32)
+    device = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "tap_id": tap["id"],
+        "enabled": True,
+        "token_hash": _inline_device_token_hash(raw_token),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_seen_at": "",
+        "last_event_at": "",
+        "last_error": "",
+    }
+    data.setdefault("inline_devices", []).append(device)
+    _record_team_audit(data, current_user, "inline_device_registered", f"inline-device:{device['id']}", {
+        "name": name,
+        "tap_id": tap["id"],
+    })
+    save_data(data)
+    return jsonify({"device": _public_inline_device(device, data.get("taps", [])), "token": raw_token}), 201
+
+
+@app.route("/api/inline-devices/<device_id>", methods=["PATCH"])
+def api_update_inline_device(device_id: str):
+    current_user, error = _inline_device_management_allowed()
+    if error is not None:
+        return error
+    if current_user is None:
+        return jsonify({"error": "Insufficient permissions"}), 403
+    data = load_data()
+    device = _find_inline_device(data, device_id)
+    if device is None:
+        return jsonify({"error": "Inline device not found.", "code": "DEVICE_NOT_FOUND"}), 404
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "A JSON object is required.", "code": "INVALID_REQUEST"}), 400
+
+    if "name" in body:
+        name = str(body.get("name", "") or "").strip()[:80]
+        if not name:
+            return jsonify({"error": "Device name is required.", "code": "INVALID_DEVICE_NAME"}), 400
+        device["name"] = name
+    if "tap_id" in body:
+        tap, tap_error = _validate_inline_device_tap(data, body.get("tap_id"))
+        if tap_error is not None:
+            return tap_error
+        if tap is None:
+            return jsonify({"error": "Tap not found.", "code": "TAP_NOT_FOUND"}), 404
+        if any(
+            item.get("id") != device_id
+            and item.get("enabled", True)
+            and item.get("tap_id") == tap["id"]
+            for item in data.get("inline_devices", [])
+        ):
+            return jsonify({"error": "An enabled inline device is already linked to this tap.", "code": "TAP_DEVICE_ALREADY_LINKED"}), 409
+        device["tap_id"] = tap["id"]
+    if "enabled" in body:
+        if not isinstance(body["enabled"], bool):
+            return jsonify({"error": "enabled must be true or false.", "code": "INVALID_ENABLED_STATE"}), 400
+        if body["enabled"] and any(
+            item.get("id") != device_id
+            and item.get("enabled", True)
+            and item.get("tap_id") == device.get("tap_id")
+            for item in data.get("inline_devices", [])
+        ):
+            return jsonify({"error": "An enabled inline device is already linked to this tap.", "code": "TAP_DEVICE_ALREADY_LINKED"}), 409
+        device["enabled"] = body["enabled"]
+
+    _record_team_audit(data, current_user, "inline_device_updated", f"inline-device:{device_id}", {
+        "name": device.get("name"),
+        "tap_id": device.get("tap_id"),
+        "enabled": device.get("enabled", True),
+    })
+    save_data(data)
+    return jsonify({"device": _public_inline_device(device, data.get("taps", []))})
+
+
+@app.route("/api/inline-devices/<device_id>/rotate-token", methods=["POST"])
+def api_rotate_inline_device_token(device_id: str):
+    current_user, error = _inline_device_management_allowed()
+    if error is not None:
+        return error
+    if current_user is None:
+        return jsonify({"error": "Insufficient permissions"}), 403
+    data = load_data()
+    device = _find_inline_device(data, device_id)
+    if device is None:
+        return jsonify({"error": "Inline device not found.", "code": "DEVICE_NOT_FOUND"}), 404
+    raw_token = secrets.token_urlsafe(32)
+    device["token_hash"] = _inline_device_token_hash(raw_token)
+    _record_team_audit(data, current_user, "inline_device_token_rotated", f"inline-device:{device_id}", {})
+    save_data(data)
+    return jsonify({"device": _public_inline_device(device, data.get("taps", [])), "token": raw_token})
+
+
+@app.route("/api/inline-devices/<device_id>", methods=["DELETE"])
+def api_revoke_inline_device(device_id: str):
+    current_user, error = _inline_device_management_allowed()
+    if error is not None:
+        return error
+    if current_user is None:
+        return jsonify({"error": "Insufficient permissions"}), 403
+    data = load_data()
+    device = _find_inline_device(data, device_id)
+    if device is None:
+        return jsonify({"error": "Inline device not found.", "code": "DEVICE_NOT_FOUND"}), 404
+    data["inline_devices"] = [item for item in data.get("inline_devices", []) if item.get("id") != device_id]
+    _record_team_audit(data, current_user, "inline_device_revoked", f"inline-device:{device_id}", {
+        "name": device.get("name"),
+        "tap_id": device.get("tap_id"),
+    })
+    save_data(data)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/inline-devices/<device_id>/heartbeat", methods=["POST"])
+def api_inline_device_heartbeat(device_id: str):
+    data = load_data()
+    device, error = _authenticate_inline_device(data, device_id)
+    if error is not None:
+        return error
+    if device is None:
+        return jsonify({"error": "Inline device not found.", "code": "DEVICE_NOT_FOUND"}), 404
+    now = datetime.now(timezone.utc).isoformat()
+    device["last_seen_at"] = now
+    save_data(data)
+    return jsonify({"ok": True, "device_id": device_id, "received_at": now})
+
+
+@app.route("/api/inline-devices/<device_id>/events", methods=["POST"])
+def api_inline_device_event(device_id: str):
+    data = load_data()
+    device, error = _authenticate_inline_device(data, device_id)
+    if error is not None:
+        return error
+    if device is None:
+        return jsonify({"error": "Inline device not found.", "code": "DEVICE_NOT_FOUND"}), 404
+
+    received_at = datetime.now(timezone.utc).isoformat()
+
+    def event_error(status: int, code: str, message: str):
+        device["last_seen_at"] = received_at
+        device["last_error"] = message[:240]
+        save_data(data)
+        return jsonify({"error": message, "code": code}), status
+
+    if _normalize_brewery_type(data.get("settings", {}).get("brewery_type")) != "pro":
+        return event_error(403, "INLINE_DEVICE_PRO_REQUIRED", "Inline Devices require a Pro profile.")
+
+    if request.content_length is not None and request.content_length > 8192:
+        return event_error(413, "PAYLOAD_TOO_LARGE", "Request body is too large.")
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return event_error(400, "INVALID_REQUEST", "A JSON object is required.")
+
+    try:
+        event_id = str(uuid.UUID(str(body.get("event_id", "")))).lower()
+    except (ValueError, TypeError, AttributeError):
+        return event_error(400, "INVALID_EVENT_ID", "event_id must be a UUID.")
+    occurred_at_raw = str(body.get("occurred_at", "") or "").strip()
+    try:
+        occurred_at_dt = datetime.fromisoformat(occurred_at_raw.replace("Z", "+00:00"))
+        if occurred_at_dt.tzinfo is None:
+            raise ValueError("timezone required")
+        occurred_at_dt = occurred_at_dt.astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        return event_error(400, "INVALID_EVENT_TIME", "occurred_at must be an ISO 8601 timestamp with a timezone.")
+    now_dt = datetime.now(timezone.utc)
+    if occurred_at_dt > now_dt + timedelta(minutes=5) or occurred_at_dt < now_dt - timedelta(days=30):
+        return event_error(400, "EVENT_TIME_OUT_OF_RANGE", "Event timestamp must be within the last 30 days and no more than 5 minutes in the future.")
+
+    raw_amount = body.get("amount")
+    if isinstance(raw_amount, bool):
+        raw_amount = None
+    amount = _coerce_float(raw_amount, None)
+    unit = _normalize_volume_unit(body.get("unit"))
+    if amount is None or not math.isfinite(amount) or amount <= 0:
+        return event_error(400, "INVALID_AMOUNT", "amount must be a finite number greater than zero.")
+    if unit not in {"ml", "l", "oz", "gal"}:
+        return event_error(400, "INVALID_UNIT", "unit must be ml, l, oz, or gal.")
+    amount_ml = _convert_volume(amount, unit, "ml")
+    if amount_ml is None or amount_ml > 20000:
+        return event_error(400, "POUR_TOO_LARGE", "A single pour must not exceed 20000 ml.")
+
+    metadata = body.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return event_error(400, "INVALID_METADATA", "metadata must be a JSON object.")
+    try:
+        metadata_json = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return event_error(400, "INVALID_METADATA", "metadata must contain JSON-compatible values.")
+    if len(metadata_json) > 2048:
+        return event_error(400, "METADATA_TOO_LARGE", "metadata must not exceed 2048 bytes.")
+
+    normalized_occurred_at = occurred_at_dt.isoformat()
+    fingerprint_payload = {
+        "occurred_at": normalized_occurred_at,
+        "amount_ml": round(amount_ml, 3),
+        "metadata": metadata,
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    previous_event = next(
+        (
+            item for item in data.get("inline_device_events", [])
+            if item.get("device_id") == device_id and item.get("event_id") == event_id
+        ),
+        None,
+    )
+    if previous_event is not None:
+        if not secrets.compare_digest(str(previous_event.get("fingerprint", "")), fingerprint):
+            return event_error(409, "EVENT_ID_CONFLICT", "event_id was already used with different event data.")
+        device["last_seen_at"] = now_dt.isoformat()
+        device["last_error"] = ""
+        save_data(data)
+        return jsonify({
+            "ok": True,
+            "duplicate": True,
+            "event_id": event_id,
+            "amount_ml": round(amount_ml, 3),
+        })
+
+    if data.get("settings", {}).get("pour_mode") != "inline_device":
+        return event_error(409, "INLINE_DEVICE_MODE_DISABLED", "Inline Device pour mode is not active.")
+    tap = next((item for item in data.get("taps", []) if item.get("id") == device.get("tap_id")), None)
+    if tap is None:
+        return event_error(404, "TAP_NOT_FOUND", "The device's configured tap no longer exists.")
+    keg_id = tap.get("keg_id")
+    if keg_id is None:
+        return event_error(409, "TAP_HAS_NO_KEG", "The configured tap has no keg assigned.")
+    keg = next((item for item in data.get("kegs", []) if item.get("id") == keg_id), None)
+    if keg is None:
+        return event_error(404, "KEG_NOT_FOUND", "The configured tap's keg no longer exists.")
+    if keg.get("status") not in ("full", "in_use") or keg.get("line_cleaning_keg"):
+        return event_error(409, "KEG_NOT_AVAILABLE", "The assigned keg is not available for pours.")
+
+    pour, status = _apply_pour_to_keg(data, keg, amount_ml, "ml")
+    if status != 200:
+        return event_error(status, "INVALID_POUR", pour.get("error", "Invalid pour."))
+
+    actor = _inline_device_actor(device)
+    _record_pour_event(
+        data,
+        keg,
+        amount_ml,
+        "ml",
+        "inline_device",
+        tap_id=tap.get("id"),
+        preset_name="Inline device",
+        actor=actor,
+        event_id=event_id,
+        device_id=device_id,
+        occurred_at=normalized_occurred_at,
+        metadata=metadata,
+    )
+    device["last_seen_at"] = now_dt.isoformat()
+    device["last_event_at"] = now_dt.isoformat()
+    device["last_error"] = ""
+    data.setdefault("inline_device_events", []).append({
+        "device_id": device_id,
+        "event_id": event_id,
+        "fingerprint": fingerprint,
+        "created_at": now_dt.isoformat(),
+    })
+    save_data(data)
+    return jsonify({
+        "ok": True,
+        "duplicate": False,
+        "event_id": event_id,
+        "amount_ml": round(amount_ml, 3),
+        "tap_id": tap.get("id"),
+        "keg_id": keg.get("id"),
+        "keg_status": keg.get("status"),
+        "current_volume": keg.get("current_volume"),
+        "volume_unit": keg.get("volume_unit"),
+    })
 
 
 def _today_utc_date() -> str:
@@ -6930,6 +7404,8 @@ def _export_date_stamp() -> str:
 
 def _build_export_json_payload(data: dict) -> dict:
     export_data = json.loads(json.dumps(data))
+    export_data.pop("inline_devices", None)
+    export_data.pop("inline_device_events", None)
     export_settings = export_data.get("settings", {})
     if isinstance(export_settings, dict):
         export_settings.pop("brewfather_api_key", None)
@@ -7081,7 +7557,14 @@ def _merge_collection(existing: list[dict], incoming: list[dict]) -> list[dict]:
 
 def _apply_import_payload(existing_data: dict, payload: dict, mode: str) -> dict:
     if mode == "replace":
-        return _sanitize_import_payload(payload)
+        replacement = _sanitize_import_payload(payload)
+        replacement["inline_devices"] = json.loads(
+            json.dumps(existing_data.get("inline_devices", []))
+        )
+        replacement["inline_device_events"] = json.loads(
+            json.dumps(existing_data.get("inline_device_events", []))
+        )
+        return replacement
 
     merged = json.loads(json.dumps(existing_data))
     incoming = _sanitize_import_payload(payload)

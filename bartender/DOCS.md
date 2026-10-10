@@ -34,6 +34,11 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - Use **Settings -> API Settings -> Test External API Access** to validate config.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
+- Pro-profile inline devices are registered and tap-linked in **Settings -> Inline Devices**.
+  Each device uses its own one-time bearer token with
+  `POST /api/inline-devices/<device_id>/events`; see the
+  [inline device design guide](../docs/inline-device-hardware.md) for wiring,
+  setup, heartbeats, and the idempotent event contract.
 
 ### POS Sync Providers
 
@@ -219,7 +224,7 @@ Some features have additional browser requirements:
 
 ## Key Settings
 
-- **Pour Mode**: Manual, POS (API), Inline Device (planned) (Settings -> Pour Presets)
+- **Pour Mode**: Manual, POS (API), Inline Device (Pro profile) (Settings -> Pour Presets)
 - **Keg Types**: editable keg/container options and defaults
 - **Pour Presets**: named preset volumes and default preset
 - **Analytics**: low-keg threshold and days-left forecasting window
