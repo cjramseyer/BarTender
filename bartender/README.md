@@ -41,6 +41,12 @@ Use **Settings -> Read-Only External URLs** to copy generated external links.
 - Admin validation endpoint: `POST /api/settings/external-auth/test`
 - Admin UI remains on Home Assistant ingress.
 
+Pro-profile inline flow-meter devices are registered and tap-linked in
+**Settings -> Inline Devices**. Each device gets a one-time bearer token and submits UUID-keyed pour
+events to `POST /api/inline-devices/<device_id>/events`; heartbeats update device
+health without changing inventory. See the [inline device design guide](../docs/inline-device-hardware.md)
+for the Titan 800 wiring, setup, and event contract.
+
 ### POS Sync Providers
 
 Built-in providers: Arryved, Clover, Lightspeed, MOCK (testing/sandbox), Square,
@@ -231,7 +237,7 @@ than by the browser UI.
 
 ## Key Settings
 
-- **Pour Mode**: Manual, POS (API), Inline Device (planned) (Settings -> Pour Presets)
+- **Pour Mode**: Manual, POS (API), Inline Device (Pro profile) (Settings -> Pour Presets)
 - **Keg Types**: editable keg/container options and defaults
 - **Pour Presets**: named preset volumes and default preset
 - **Analytics**: low-keg threshold and days-left forecasting window

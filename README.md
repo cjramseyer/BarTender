@@ -34,6 +34,7 @@ Sample dashboard with seeded data:
 - **Team Access** — Dedicated owner/manager-only Team Access screen for owner profile management, per-user PINs, QR/NFC scan credentials, PIN resets, disable/enable controls, and staff access restrictions
 - **Audit Trail** — Read-only audit log available to all signed-in users from the Menu; owners can configure retention and clear the log with their Owner PIN, while owners and managers can export it
 - **Pour Workflow** — Record pours against keg volume with unit conversion and validation; hide pour controls unless Manual mode is selected
+- **Inline Device Integration (Pro)** — Register flow-meter controllers to a tap with per-device bearer tokens, heartbeat health, and idempotent pour events; see the [device design guide](docs/inline-device-hardware.md)
 - **Setup Wizard** — First-run setup flow that captures the bar name before first use
 - **Analytics** — Dashboard summary for recent pours, depletion forecasting, low-volume alerts, and a reset option for clearing historical pour data from settings
 - **Anonymous Usage Statistics** — Owner-only, disabled-by-default opt-in that sends a daily anonymous installation ID and app/add-on versions to estimate active installations

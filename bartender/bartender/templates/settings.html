@@ -426,6 +426,73 @@ content %}
       </details>
 
       {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+      <details class="settings-collapsible" id="inlineDevicesSettings">
+        <summary>Inline Devices <span class="pro-feature-badge">Pro</span></summary>
+        <div class="settings-collapsible-body">
+          <p class="muted">
+            Register each flow-meter controller to this BarTender instance and
+            assign it to one tap. Devices send authenticated, idempotent pour
+            events to the external API listener on port {{ external_api_port }}.
+            Keep that listener on a trusted network.
+          </p>
+          <p class="muted">
+            Events are accepted only while Pour Mode is set to Inline Device.
+            Registrations remain stored when switching modes, but device pours
+            are rejected until Inline Device mode is active again.
+          </p>
+          <p>
+            <a
+              class="btn btn-sm btn-secondary"
+              href="{{ ingress }}/static/firmware/inline_device_esp32.ino"
+              download
+              >Download ESP32 firmware template</a
+            >
+          </p>
+          <p class="muted">
+            After registering, copy the value labeled Bearer token into the
+            downloaded sketch's <code>DEVICE_TOKEN</code> constant, replacing
+            <code>PASTE_DEVICE_TOKEN_HERE</code>.
+          </p>
+          <div class="form-group">
+            <label for="inlineDeviceName">Device Name</label>
+            <input
+              type="text"
+              id="inlineDeviceName"
+              class="form-control"
+              maxlength="80"
+              placeholder="Cold room tap 1"
+            />
+          </div>
+          <div class="form-group">
+            <label for="inlineDeviceTap">Linked Tap</label>
+            <select id="inlineDeviceTap" class="form-control">
+              <option value="">Select a tap</option>
+              {% for tap in taps %}
+              <option value="{{ tap.id }}">
+                {{ tap.label or ('Tap ' ~ (tap.number|string)) }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            onclick="registerInlineDevice()"
+          >
+            Register Device
+          </button>
+          <span id="inlineDeviceMessage" class="save-msg" role="status"></span>
+          <div id="inlineDeviceProvisioning" class="form-group" hidden></div>
+          <div
+            id="inlineDevicesList"
+            class="stack-gap-sm"
+            style="margin-top: 0.75rem"
+          ></div>
+        </div>
+      </details>
+      {% endif %}
+
+      {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
       <details class="settings-collapsible">
         <summary>Displays <span class="pro-feature-badge">Pro</span></summary>
         <div class="settings-collapsible-body">
@@ -532,17 +599,16 @@ content %}
               <option value="pos" selected>POS (API)</option>
               {% else %}
               <option value="pos">POS (API)</option>
-              {% endif %} {% endif %} {% if (settings.pour_mode or 'manual') ==
-              'inline_device' %}
+              {% endif %} {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+              {% if (settings.pour_mode or 'manual') == 'inline_device' %}
               <option value="inline_device" selected>Inline Device</option>
               {% else %}
               <option value="inline_device">Inline Device</option>
-              {% endif %}
+              {% endif %} {% endif %}
             </select>
             <small class="muted"
-              >POS mode is only available for Pro setups. Inline Device is
-              available for both modes. Non-manual modes hide the pour button in
-              the UI.</small
+              >POS and Inline Device modes require a Pro profile. Non-manual
+              modes hide the pour button in the UI.</small
             >
           </div>
           {% if (settings.brewery_type or 'homebrewer') == 'pro' and
@@ -1659,6 +1725,7 @@ content %}
     `{{ (settings.environment_mode or 'production') | tojson }}`,
   );
   const TAPS = JSON.parse(`{{ (taps or []) | tojson }}`);
+  const INLINE_DEVICES = JSON.parse(`{{ (inline_devices or []) | tojson }}`);
   const TEAM_USERS = JSON.parse(`{{ (team_users or []) | tojson }}`);
   const INITIAL_POS_PROVIDER_CATALOG = JSON.parse(
     `{{ (pos_sync_provider_catalog or []) | tojson }}`,
@@ -3950,6 +4017,210 @@ content %}
       console.error(err);
     }
   }
+
+  function setInlineDeviceMessage(message, isError = false) {
+    const target = document.getElementById("inlineDeviceMessage");
+    if (!target) return;
+    target.textContent = message;
+    target.style.color = isError ? "#b91c1c" : "";
+  }
+
+  async function inlineDeviceRequest(path, options = {}) {
+    const response = await fetch(`${INGRESS}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+    let body = {};
+    try {
+      body = await response.json();
+    } catch (err) {
+      // Keep the HTTP status as the fallback error.
+    }
+    if (!response.ok) {
+      throw new Error(body.error || `Request failed (${response.status})`);
+    }
+    return body;
+  }
+
+  function showInlineDeviceToken(device, token) {
+    const target = document.getElementById("inlineDeviceProvisioning");
+    if (!target) return;
+    target.hidden = false;
+    target.replaceChildren();
+
+    const heading = document.createElement("strong");
+    heading.textContent = "Copy this device token now. It will not be shown again.";
+    const details = document.createElement("pre");
+    details.style.whiteSpace = "pre-wrap";
+    details.style.overflowWrap = "anywhere";
+    details.textContent = [
+      `Device ID: ${device.id}`,
+      `Events URL: http://${window.location.hostname}:{{ external_api_port }}/api/inline-devices/${device.id}/events`,
+      `Heartbeat URL: http://${window.location.hostname}:{{ external_api_port }}/api/inline-devices/${device.id}/heartbeat`,
+      `Bearer token: ${token}`,
+    ].join("\n");
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "btn btn-sm btn-secondary";
+    copyButton.textContent = "Copy provisioning details";
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(details.textContent);
+        setInlineDeviceMessage("Provisioning details copied.");
+      } catch (err) {
+        setInlineDeviceMessage("Clipboard unavailable. Select and copy the details above.", true);
+      }
+    });
+    target.append(heading, details, copyButton);
+  }
+
+  function makeInlineDeviceAction(label, className, handler) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = label;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function renderInlineDevices(devices) {
+    const list = document.getElementById("inlineDevicesList");
+    if (!list) return;
+    list.replaceChildren();
+    if (!devices.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No inline devices registered.";
+      list.append(empty);
+      return;
+    }
+
+    devices.forEach((device) => {
+      const row = document.createElement("div");
+      row.className = "settings-user-row";
+      row.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap;padding:0.75rem;border:1px solid rgba(148,163,184,0.35);border-radius:8px";
+      const info = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = device.name;
+      const state = document.createElement("div");
+      state.className = "muted";
+      state.textContent = `${device.enabled ? "Enabled" : "Disabled"} · ${device.health.replace(/_/g, " ")} · ${device.tap_label}`;
+      const lastSeen = document.createElement("div");
+      lastSeen.className = "muted";
+      lastSeen.textContent = device.last_seen_at
+        ? `Last contact: ${device.last_seen_at}`
+        : "No authenticated contact yet.";
+      const lastEvent = document.createElement("div");
+      lastEvent.className = "muted";
+      lastEvent.textContent = device.last_event_at
+        ? `Last pour: ${device.last_event_at}`
+        : "No pours received yet.";
+      info.append(name, state, lastSeen, lastEvent);
+      if (device.last_error) {
+        const error = document.createElement("div");
+        error.className = "muted";
+        error.textContent = `Last error: ${device.last_error}`;
+        info.append(error);
+      }
+
+      const controls = document.createElement("div");
+      controls.style.cssText = "display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap";
+      const tapSelect = document.createElement("select");
+      tapSelect.className = "form-control";
+      tapSelect.setAttribute("aria-label", `Tap for ${device.name}`);
+      TAPS.forEach((tap) => {
+        const option = document.createElement("option");
+        option.value = String(tap.id);
+        option.textContent = tap.label || `Tap ${tap.number}`;
+        option.selected = tap.id === device.tap_id;
+        tapSelect.append(option);
+      });
+      controls.append(tapSelect);
+      controls.append(
+        makeInlineDeviceAction("Save Tap", "btn btn-sm btn-secondary", async () => {
+          try {
+            await inlineDeviceRequest(`/api/inline-devices/${device.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ tap_id: Number(tapSelect.value) }),
+            });
+            await refreshInlineDevices();
+            setInlineDeviceMessage("Device tap updated.");
+          } catch (err) {
+            setInlineDeviceMessage(err.message, true);
+          }
+        }),
+        makeInlineDeviceAction(device.enabled ? "Disable" : "Enable", "btn btn-sm btn-secondary", async () => {
+          try {
+            await inlineDeviceRequest(`/api/inline-devices/${device.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ enabled: !device.enabled }),
+            });
+            await refreshInlineDevices();
+          } catch (err) {
+            setInlineDeviceMessage(err.message, true);
+          }
+        }),
+        makeInlineDeviceAction("Rotate Token", "btn btn-sm btn-secondary", async () => {
+          if (!confirm(`Rotate the token for ${device.name}? The current token will stop working.`)) return;
+          try {
+            const result = await inlineDeviceRequest(`/api/inline-devices/${device.id}/rotate-token`, { method: "POST", body: "{}" });
+            showInlineDeviceToken(result.device, result.token);
+            await refreshInlineDevices();
+            setInlineDeviceMessage("Token rotated. Update the device configuration now.");
+          } catch (err) {
+            setInlineDeviceMessage(err.message, true);
+          }
+        }),
+        makeInlineDeviceAction("Revoke", "btn btn-sm btn-danger", async () => {
+          if (!confirm(`Revoke ${device.name}? Its token will stop working immediately.`)) return;
+          try {
+            await inlineDeviceRequest(`/api/inline-devices/${device.id}`, { method: "DELETE" });
+            await refreshInlineDevices();
+            setInlineDeviceMessage("Device revoked.");
+          } catch (err) {
+            setInlineDeviceMessage(err.message, true);
+          }
+        }),
+      );
+      row.append(info, controls);
+      list.append(row);
+    });
+  }
+
+  async function refreshInlineDevices() {
+    try {
+      const body = await inlineDeviceRequest("/api/inline-devices");
+      renderInlineDevices(Array.isArray(body.devices) ? body.devices : []);
+    } catch (err) {
+      setInlineDeviceMessage(err.message, true);
+    }
+  }
+
+  async function registerInlineDevice() {
+    const name = document.getElementById("inlineDeviceName").value.trim();
+    const tapId = document.getElementById("inlineDeviceTap").value;
+    if (!name || !tapId) {
+      setInlineDeviceMessage("Enter a device name and select a tap.", true);
+      return;
+    }
+    try {
+      const result = await inlineDeviceRequest("/api/inline-devices", {
+        method: "POST",
+        body: JSON.stringify({ name, tap_id: Number(tapId) }),
+      });
+      document.getElementById("inlineDeviceName").value = "";
+      showInlineDeviceToken(result.device, result.token);
+      await refreshInlineDevices();
+      setInlineDeviceMessage("Device registered. Store the token in its firmware configuration.");
+    } catch (err) {
+      setInlineDeviceMessage(err.message, true);
+    }
+  }
+
+  renderInlineDevices(INLINE_DEVICES);
 
   async function importArchive(e) {
     e.preventDefault();
