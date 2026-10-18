@@ -81,8 +81,12 @@ Runtime setting:
 User setup behavior:
 
 - On first launch, user enters server URL.
-- URL is validated for scheme presence (http/https).
+- The server screen can test connectivity by loading the enabled team-member list.
+- Sign-in selects an enabled team member from that list.
+- URL is validated as an HTTP or HTTPS URL.
 - URL is reused for future sessions until user disconnects.
+- Signed-in users can return to server settings with **Change server**; the URL is
+  prefilled and the saved sign-in token is removed before navigating.
 
 Connectivity assumptions:
 
@@ -93,11 +97,15 @@ Connectivity assumptions:
 
 The mobile viewer reads from:
 
+- GET /api/mobile/users
 - GET /api/taps
 - GET /api/kegs
 - GET /api/stock
 - POST /api/taps/<id>/pour
 - POST /api/mobile/login
+
+The public mobile-users endpoint returns only enabled team-member IDs and names for
+the sign-in dropdown. The setup screen uses the same endpoint to test connectivity.
 
 Additional endpoint available for integrations:
 

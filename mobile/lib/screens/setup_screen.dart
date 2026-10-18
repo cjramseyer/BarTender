@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/api_service.dart';
 import 'login_screen.dart';
 
 class SetupScreen extends StatefulWidget {
-  const SetupScreen({super.key});
+  final String initialUrl;
+
+  const SetupScreen({super.key, this.initialUrl = ''});
 
   @override
   State<SetupScreen> createState() => _SetupScreenState();
@@ -12,7 +15,37 @@ class SetupScreen extends StatefulWidget {
 
 class _SetupScreenState extends State<SetupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _urlController = TextEditingController();
+  late final TextEditingController _urlController;
+  bool _testingConnection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController(text: widget.initialUrl);
+  }
+
+  Future<void> _testConnection() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _testingConnection = true);
+    try {
+      final users =
+          await ApiService(_urlController.text.trim()).fetchMobileUsers();
+      if (!mounted) return;
+      final message = users.isEmpty
+          ? 'Connected, but no enabled team members were found.'
+          : 'Connection successful. Found ${users.length} team member${users.length == 1 ? '' : 's'}.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connection failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _testingConnection = false);
+    }
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -49,7 +82,10 @@ class _SetupScreenState extends State<SetupScreen> {
                 Text(
                   'BarTender',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -69,13 +105,30 @@ class _SetupScreenState extends State<SetupScreen> {
                     prefixIcon: Icon(Icons.link),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'URL is required';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'URL is required';
+                    }
                     final uri = Uri.tryParse(value.trim());
-                    if (uri == null || !uri.hasScheme) return 'Enter a valid URL';
+                    if (uri == null ||
+                        !uri.hasAuthority ||
+                        !['http', 'https'].contains(uri.scheme.toLowerCase())) {
+                      return 'Enter a valid HTTP or HTTPS URL';
+                    }
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: _testingConnection ? null : _testConnection,
+                  child: _testingConnection
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Test connection'),
+                ),
+                const SizedBox(height: 8),
                 FilledButton(
                   onPressed: _save,
                   child: const Text('Connect'),

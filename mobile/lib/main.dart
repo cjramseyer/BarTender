@@ -26,7 +26,10 @@ class BarTenderApp extends StatelessWidget {
       title: 'BarTender',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.amber),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.amber,
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       home: initialUrl.isNotEmpty
