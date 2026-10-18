@@ -101,6 +101,22 @@ def test_mobile_login_issues_token_for_user_pin(tmp_path):
     assert app_module.load_data()["mobile_tokens"]
 
 
+def test_mobile_login_accepts_owner_pin_when_owner_is_only_user(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["team_users"] = [{"id": "owner", "name": "Owner", "role": "owner"}]
+    data["settings"]["owner_pin"] = "1357"
+    app_module.save_data(data)
+    client = app_module.app.test_client()
+
+    wrong = client.post("/api/mobile/login", json={"user_id": "owner", "pin": "0000"})
+    assert wrong.status_code == 401
+
+    response = client.post("/api/mobile/login", json={"user_id": "owner", "pin": "1357"})
+    assert response.status_code == 200
+    assert response.get_json()["user"]["id"] == "owner"
+
+
 def test_mobile_users_lists_only_enabled_public_login_fields(tmp_path):
     app_module = _load_app_module(tmp_path)
     data = app_module.load_data()
