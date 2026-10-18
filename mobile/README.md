@@ -3,15 +3,17 @@
 Flutter client for the BarTender API. The app is currently a lightweight mobile
 viewer with tap-pour support:
 
+- Dark mode by default, regardless of the device theme.
 - View taps, assigned kegs, keg status, and fill levels.
 - View keg details and bar stock.
 - Record half-pint, pint, or large pours from a tap.
 - Pull to refresh each data view.
-- Save the configured BarTender server URL locally.
+- Test connectivity and save the configured BarTender server URL locally.
+- Select a team member from the server-provided list when signing in.
 
-The client does not yet provide inventory, tap, keg, team-management, or login
-workflows. Native Android/iOS builds are the primary target; Flutter web support is
-included for development previews.
+The client does not yet provide inventory, tap, keg, or team-management workflows.
+Native Android/iOS builds are the primary target; Flutter web support is included for
+development previews.
 
 ## Run Locally
 
@@ -53,13 +55,16 @@ The management port must be exposed by the Home Assistant add-on or provided thr
 a reachable reverse proxy. Home Assistant ingress URLs are usually session-scoped and
 are not a reliable direct mobile API endpoint.
 
-The URL is stored with `shared_preferences`. Use **Disconnect** in the app bar to
-clear it and configure another server.
+Use **Test connection** on the server screen to verify the server and check that team
+members are available. The URL is stored with `shared_preferences`. Use **Change
+server** in the app bar to edit it; **Disconnect** clears the saved URL and sign-in.
 
 ## API Usage
 
 The client currently calls:
 
+- `GET /api/mobile/users`
+- `POST /api/mobile/login`
 - `GET /api/taps`
 - `GET /api/kegs`
 - `GET /api/stock`

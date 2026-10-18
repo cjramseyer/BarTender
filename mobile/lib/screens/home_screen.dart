@@ -39,6 +39,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _changeServer() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('mobile_token');
+    await const FlutterSecureStorage().delete(key: 'mobile_token');
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => SetupScreen(initialUrl: widget.serverUrl),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
@@ -53,6 +65,11 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings_ethernet),
+            tooltip: 'Change server',
+            onPressed: _changeServer,
+          ),
+          IconButton(
             icon: const Icon(Icons.link_off),
             tooltip: 'Disconnect',
             onPressed: _disconnect,
@@ -62,7 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
       body: screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) =>
+            setState(() => _selectedIndex = index),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.local_bar), label: 'Taps'),
           NavigationDestination(icon: Icon(Icons.sports_bar), label: 'Kegs'),
