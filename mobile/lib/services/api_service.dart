@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/keg.dart';
 import '../models/stock_item.dart';
+import '../models/team_member.dart';
 import '../models/tap.dart';
 
 class ApiService {
@@ -20,7 +21,8 @@ class ApiService {
 
   Map<String, String> get _headers => {
         'Accept': 'application/json',
-        if (token != null && token!.isNotEmpty) 'Authorization': 'Bearer $token',
+        if (token != null && token!.isNotEmpty)
+          'Authorization': 'Bearer $token',
       };
 
   Future<String> login({required String userId, required String pin}) async {
@@ -37,25 +39,40 @@ class ApiService {
     return token!;
   }
 
+  Future<List<TeamMember>> fetchMobileUsers() async {
+    final response = await http
+        .get(_uri('/api/mobile/users'), headers: _headers)
+        .timeout(const Duration(seconds: 10));
+    _checkStatus(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final users = body['users'] as List<dynamic>;
+    return users
+        .map((user) => TeamMember.fromJson(user as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<Tap>> fetchTaps() async {
-    final response =
-        await http.get(_uri('/api/taps'), headers: _headers).timeout(const Duration(seconds: 10));
+    final response = await http
+        .get(_uri('/api/taps'), headers: _headers)
+        .timeout(const Duration(seconds: 10));
     _checkStatus(response);
     final list = json.decode(response.body) as List<dynamic>;
     return list.map((e) => Tap.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<Keg>> fetchKegs() async {
-    final response =
-        await http.get(_uri('/api/kegs'), headers: _headers).timeout(const Duration(seconds: 10));
+    final response = await http
+        .get(_uri('/api/kegs'), headers: _headers)
+        .timeout(const Duration(seconds: 10));
     _checkStatus(response);
     final list = json.decode(response.body) as List<dynamic>;
     return list.map((e) => Keg.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<StockItem>> fetchStock() async {
-    final response =
-        await http.get(_uri('/api/stock'), headers: _headers).timeout(const Duration(seconds: 10));
+    final response = await http
+        .get(_uri('/api/stock'), headers: _headers)
+        .timeout(const Duration(seconds: 10));
     _checkStatus(response);
     final list = json.decode(response.body) as List<dynamic>;
     return list

@@ -652,7 +652,7 @@ def require_login_for_web_views():
     if normalized_path in ("/login", "/logout") or normalized_path.startswith("/auth/scan/"):
         return None
     if normalized_path.startswith("/api/"):
-        if normalized_path == "/api/mobile/login":
+        if normalized_path in ("/api/mobile/login", "/api/mobile/users"):
             return None
         if request.method == "OPTIONS":
             return None
@@ -3573,6 +3573,19 @@ def mobile_login():
         "name": user.get("name", ""),
         "role": _normalize_team_role(user.get("role", "staff")),
     }})
+
+
+@app.route("/api/mobile/users", methods=["GET"])
+def mobile_users():
+    data = load_data()
+    users = [
+        {"id": str(user.get("id", "")), "name": str(user.get("name", ""))}
+        for user in data.get("team_users", [])
+        if not _coerce_bool(user.get("disabled"), False)
+        and str(user.get("id", "")).strip()
+        and str(user.get("name", "")).strip()
+    ]
+    return jsonify({"users": users})
 
 
 # ---------------------------------------------------------------------------

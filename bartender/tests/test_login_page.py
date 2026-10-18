@@ -101,6 +101,36 @@ def test_mobile_login_issues_token_for_user_pin(tmp_path):
     assert app_module.load_data()["mobile_tokens"]
 
 
+def test_mobile_users_lists_only_enabled_public_login_fields(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    data = app_module.load_data()
+    data["team_users"] = [
+        {
+            "id": "owner",
+            "name": "Owner",
+            "role": "owner",
+            "pin": "secret",
+            "disabled": False,
+            "scan_token_hash": "sensitive",
+        },
+        {
+            "id": "inactive",
+            "name": "Inactive",
+            "role": "staff",
+            "pin": "secret",
+            "disabled": True,
+        },
+    ]
+    app_module.save_data(data)
+    app_module.app.config["TESTING"] = False
+    client = app_module.app.test_client()
+
+    response = client.get("/api/mobile/users")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"users": [{"id": "owner", "name": "Owner"}]}
+
+
 def test_owner_can_start_pro_trial(tmp_path):
     app_module = _load_app_module(tmp_path)
     client = app_module.app.test_client()

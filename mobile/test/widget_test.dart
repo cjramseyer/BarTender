@@ -5,11 +5,24 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bartender_mobile/main.dart';
 
 void main() {
+  testWidgets('defaults to dark mode even on a light-mode device',
+      (WidgetTester tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+    await tester.pumpWidget(const BarTenderApp(initialUrl: ''));
+
+    final context = tester.element(find.byType(Scaffold));
+    expect(Theme.of(context).brightness, Brightness.dark);
+    expect(Theme.of(context).colorScheme.brightness, Brightness.dark);
+  });
+
   testWidgets('setup screen renders for an unconfigured app',
       (WidgetTester tester) async {
     await tester.pumpWidget(const BarTenderApp(initialUrl: ''));
@@ -17,6 +30,7 @@ void main() {
     expect(find.text('BarTender'), findsOneWidget);
     expect(find.text('Enter your BarTender server URL to get started.'),
         findsOneWidget);
+    expect(find.text('Test connection'), findsOneWidget);
     expect(find.text('Connect'), findsOneWidget);
   });
 }
