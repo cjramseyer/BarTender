@@ -994,13 +994,45 @@ def test_disabled_users_are_hidden_from_login_dropdown(tmp_path):
 def test_unauthenticated_request_redirects_to_ingress_login_path(tmp_path):
     app_module = _load_app_module(tmp_path)
     app_module.INGRESS_PATH = "/api/hassio_ingress/test-token"
-    app_module.app.config["APPLICATION_ROOT"] = app_module.INGRESS_PATH
+    client = app_module.app.test_client()
+
+    response = client.get(
+        "/",
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/api/hassio_ingress/test-token/login"
+
+
+def test_direct_port_request_ignores_configured_ingress_path(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = "/api/hassio_ingress/test-token"
     client = app_module.app.test_client()
 
     response = client.get("/", follow_redirects=False)
 
     assert response.status_code == 302
-    assert response.headers["Location"] == "/api/hassio_ingress/test-token/login"
+    assert response.headers["Location"] == "/login"
+
+
+def test_session_cookie_path_follows_request_origin(tmp_path):
+    app_module = _load_app_module(tmp_path)
+    app_module.INGRESS_PATH = "/api/hassio_ingress/test-token"
+    client = app_module.app.test_client()
+
+    direct = client.post("/login", data={"user_id": "owner"}, follow_redirects=False)
+    assert "Path=/;" in direct.headers["Set-Cookie"]
+
+    ingress_client = app_module.app.test_client()
+    proxied = ingress_client.post(
+        "/login",
+        data={"user_id": "owner"},
+        headers={"X-Ingress-Path": "/api/hassio_ingress/test-token"},
+        follow_redirects=False,
+    )
+    assert "Path=/api/hassio_ingress/test-token" in proxied.headers["Set-Cookie"]
 
 
 def test_owner_requires_pin_when_other_users_exist(tmp_path):
