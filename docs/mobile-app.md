@@ -126,7 +126,7 @@ Timeout behavior:
 
 Implemented:
 
-- Mobile sign-in using a team member ID and PIN. Tokens are stored in platform secure storage.
+- Mobile sign-in using a team member and PIN. The owner uses the Owner PIN from Settings -> Team Access; other team members use their user PIN. Tokens are stored in platform secure storage.
 - Inventory, tap, and keg write operations are not supported beyond recording a tap pour.
 - Beer catalog management UI (currently web UI only).
 - Background sync or push notifications.
