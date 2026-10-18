@@ -78,7 +78,9 @@ from flask import (
     redirect,
     session,
     url_for,
+    has_request_context,
 )
+from flask.sessions import SecureCookieSessionInterface
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
@@ -398,9 +400,19 @@ STANDARD_BEER_ALLERGENS = [
     "Isinglass",
 ]
 
+class _IngressAwareSessionInterface(SecureCookieSessionInterface):
+    def get_cookie_path(self, app):
+        if has_request_context():
+            ingress = _effective_ingress_path()
+            if ingress:
+                return ingress
+        return "/"
+
+
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
-app.config["APPLICATION_ROOT"] = INGRESS_PATH or "/"
+app.session_interface = _IngressAwareSessionInterface()
+app.config["APPLICATION_ROOT"] = "/"
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or _load_or_create_secret_key()
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
 app.config["SESSION_REFRESH_EACH_REQUEST"] = True
@@ -601,8 +613,9 @@ def enforce_session_timeout():
 
 
 def _effective_ingress_path() -> str:
+    # Only requests proxied by Home Assistant ingress carry X-Ingress-Path; direct
+    # requests to the exposed port must not be redirected into the ingress prefix.
     for candidate in (
-        INGRESS_PATH,
         request.headers.get("X-Ingress-Path"),
         request.headers.get("X-Forwarded-Prefix"),
         request.script_root,
