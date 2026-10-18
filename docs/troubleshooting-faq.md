@@ -42,6 +42,7 @@ Checks:
 - Confirm the selected account is not disabled in Settings -> Team Access.
 - If a user PIN is configured for that account, provide the user PIN at login.
 - If owner login is used with multiple users, ensure Owner PIN is configured and entered.
+- Mobile app sign-in always requires a PIN. The owner signs in with the Owner PIN from Settings -> Team Access; other team members use their user PIN.
 
 ### Edit button does nothing in web UI
 

@@ -3563,7 +3563,7 @@ def mobile_login():
         return jsonify({"error": "Invalid mobile login."}), 401
 
     expected_pin = _normalize_team_user_pin(user.get("pin", ""))
-    if str(user.get("role", "")).lower() == "owner" and len(data.get("team_users", [])) > 1:
+    if str(user.get("role", "")).lower() == "owner":
         expected_pin = _normalize_owner_pin(data.get("settings", {}).get("owner_pin", "")) or expected_pin
     if not expected_pin or not secrets.compare_digest(expected_pin, pin):
         return jsonify({"error": "Invalid mobile login."}), 401
