@@ -45,11 +45,15 @@ Sample dashboard with seeded data:
 - **Internal Storage** — Uses a transactional SQLite state store at `bartender.db`, with automatic migration from and compatibility mirroring to `bartender.json`
 - **External Storage Options** — Set `STORAGE_BACKEND=postgresql` or `STORAGE_BACKEND=mariadb` with a deployment-only `DATABASE_URL`; SQLite remains the default
 - **Display View** — Minimal read-only tap board suitable for a wall display
-- **Printable Menu** — Printer-friendly "currently on tap" page with optional QR code linking back to the menu URL
+- **Printable Menu** — Assigned taps, packaged beers, public bottle/drink stock, and published Pro recipes, with optional QR code linking back to the menu URL
 - **Standalone Window Launch** — Open the main app in a new browser tab/window from the in-app Menu while still using Home Assistant ingress
 - **API Reference + Tester** — In-app endpoint documentation with a request tester for GET/POST/PUT/DELETE calls
 - **Ingress** — Admin UI runs behind the Home Assistant ingress proxy
 - **External Integrations API** — Dedicated external API listener for POS/hardware integrations (port `8110`)
+
+See the [Pro drink and shopping walkthrough](docs/getting-started.md#pro-drink-workflow) for recipe setup, stock associations, and guest-menu publishing.
+
+Updated desktop and mobile examples are in the [screenshot gallery](docs/getting-started.md#screenshots).
 
 ## Recent Changes
 
@@ -103,6 +107,8 @@ Sample dashboard with seeded data:
 4. Start the add-on and open the web UI via the **BarTender** sidebar panel.
 
 ## Configuration
+
+The add-on also accepts `session_timeout_minutes` (default 240; range 5-43200), `cors_allowed_origins`, `license_portal_url`, and `license_public_key`. See the [complete configuration reference](docs/core-app.md#configuration-reference).
 
 No required configuration. Optional options can be set in the add-on configuration tab.
 

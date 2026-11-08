@@ -1,22 +1,22 @@
 # BarTender Core App and Add-on Documentation
 
-Last updated: 2026-09-07
+Last updated: 2026-11-08
 Doc scope: Home Assistant add-on (web app + display service)
 
 ## Overview
 
 BarTender is a Home Assistant add-on for bar management. It provides:
 
-- A management web UI for stock, kegs, taps, and settings.
+- A management web UI for stock, beers, kegs, taps, settings, and Pro drink recipes/shopping.
 - A JSON REST API used by web and mobile clients.
 - A read-only display service for wallboard-style viewing.
-- A printer-friendly menu page that lists currently assigned taps.
+- A printer-friendly menu for assigned taps, packaged beers, public bottle/drink stock, and published Pro recipes.
 
 Primary runtime components:
 
 - Management server: Flask app on port 8099 (ingress-enabled).
 - Display server: Flask app on port 8100 (read-only).
-- Persistent storage: JSON file at /data/bartender.json.
+- Persistent storage: transactional SQLite state at `/data/bartender.db` by default, or a configured PostgreSQL/MariaDB backend. `/data/bartender.json` is a compatibility mirror used by the read-only server; older JSON installations migrate automatically.
 
 ## Feature Set
 
@@ -24,6 +24,8 @@ Primary runtime components:
 - Beer catalog CRUD (create, list, update, delete).
 - Bar stock CRUD (create, list, update, delete).
 - Pro drink recipe catalog with ingredient stock links, live availability, traditional methods, and guest-menu publishing.
+- Pro Shopping List, with each shortage listed once by drink, shared references, printing, and pre-filled stock creation/replenishment.
+- App-Only Stock Categories configured in Settings to exclude recipe extras from public views without per-item checkboxes.
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
 - Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
@@ -42,10 +44,13 @@ Primary runtime components:
 ```mermaid
 flowchart LR
   HA[Home Assistant Ingress] --> WEB[Flask Management App :8099]
-  HA --> DISP[Flask Display App :8100]
+  GUEST[Read-only viewers] --> DISP[Flask Display App :8100]
 
-  WEB --> DATA[/data/bartender.json]
-  DISP --> DATA
+  WEB --> STORE[Transactional state store]
+  STORE --> SQLITE[(SQLite bartender.db)]
+  STORE -. external alternative .-> DB[(PostgreSQL or MariaDB)]
+  WEB --> MIRROR[/data/bartender.json compatibility mirror]
+  DISP --> MIRROR
   MOBILE[Flutter Mobile Viewer] --> WEB
 ```
 
@@ -58,11 +63,16 @@ Code locations:
 
 ## Configuration Reference
 
-Add-on metadata and runtime behavior are defined in bartender/config.yaml.
+Add-on metadata and runtime behavior are defined in [the add-on configuration](../bartender/config.yaml).
 
 Current add-on options:
 
-- No user-configurable options in the add-on config schema.
+- `storage_backend`: `internal` (SQLite default), `postgresql`, or `mariadb`.
+- `database_url`: deployment-only connection URL for an external backend; keep credentials private.
+- `session_timeout_minutes`: global idle timeout, default 240; allowed range 5-43200 minutes.
+- `cors_allowed_origins`: trusted browser origins for cross-origin clients; empty by default.
+- `license_portal_url`: optional owner-facing licensing portal link.
+- `license_public_key`: Ed25519 public key for signed license verification; never configure a private signing key here.
 - UI settings are managed in-app through /api/settings.
 
 Home Assistant add-on metadata:
@@ -116,7 +126,8 @@ GET /api/settings
 POST /api/settings
 
 - Purpose: Update one or more settings.
-- Accepted keys: measurement, theme, bar_name, bar_logo_url, external_base_url, external_api_token_auth_enabled, external_api_token, external_api_read_token, external_api_write_token, owner_pin, external_api_allowlist_enabled, external_api_allowlist, external_api_rate_limit_enabled, external_api_rate_limit_per_minute, audit_retention_days, api_reference_enabled, pour_mode, environment_mode, setup_completed, dashboard_manage_button_position, bar_stock_enabled, analytics_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset, analytics_low_keg_threshold_percent, analytics_days_left_method, analytics_days_left_window_days.
+- Profile and public-stock fields: `brewery_type` selects the homebrewer/pro profile; `public_stock_hidden_categories` lists app-only categories excluded from displays and menus.
+- Accepted keys include measurement, theme, bar_name, brewery_type, bar_logo_url, external_base_url, external_api_token_auth_enabled, external_api_token, external_api_read_token, external_api_write_token, owner_pin, external_api_allowlist_enabled, external_api_allowlist, external_api_rate_limit_enabled, external_api_rate_limit_per_minute, audit_retention_days, api_reference_enabled, pour_mode, environment_mode, setup_completed, dashboard_manage_button_position, bar_stock_enabled, public_stock_hidden_categories, analytics_enabled, default_keg_type, keg_type_choices, menu_qr_mode, pour_options, default_pour_preset, analytics_low_keg_threshold_percent, analytics_days_left_method, analytics_days_left_window_days.
 - Request example:
 
 ```json
@@ -575,7 +586,7 @@ GET /api-reference
 
 GET /menu
 
-- Renders printer-friendly "currently on tap" menu content.
+- Renders assigned taps, packaged beers, and public stock in Bottles and Drinks. Pro profiles also show published Cocktails and Nonalcoholic Drinks sections. Internal notes, recipe steps, and app-only stock categories are omitted.
 
 GET /api/menu/qr
 
@@ -616,7 +627,7 @@ POST /api/import/json
 Import mode behavior:
 
 - replace: overwrite current settings, beers, drink recipes, kegs, taps, and bar stock.
-- merge: merge settings keys and upsert beers/kegs/taps/stock by id.
+- merge: merge settings keys and upsert beers/drink recipes/kegs/taps/stock by id.
 
 ## Error Behavior
 
@@ -633,13 +644,14 @@ Notes:
 
 ## Data Model Reference
 
-Top-level document structure:
+Primary inventory document structure (additional audit, session, and device collections are also stored):
 
 ```json
 {
   "settings": {},
   "bar_stock": [],
   "beers": [],
+  "drink_recipes": [],
   "kegs": [],
   "taps": []
 }
@@ -650,8 +662,10 @@ settings fields:
 - measurement: string (us or metric expected by UI)
 - theme: string (light or dark)
 - bar_name: string
+- brewery_type: string (homebrewer or pro; the legacy commercial value normalizes to pro)
 - dashboard_manage_button_position: string (top-right, bottom-left, bottom-right)
 - bar_stock_enabled: boolean
+- public_stock_hidden_categories: array of app-only category names excluded from public displays and menus
 - default_keg_type: string
 - menu_qr_mode: string (off, display, print, both)
 - pour_options: array of preset objects (name, amount, unit)

@@ -17,6 +17,8 @@ Manage your home bar with a web UI built into Home Assistant.
 - Printable menu: `/menu`
 - API reference page: `/api-reference`
 
+Signed-in Pro users can open Drinks at `/drinks` and Shopping List through **Menu -> Shopping List**. These management views are not exposed by the read-only display server.
+
 Use **Settings -> Read-Only External URLs** to copy generated external links.
 
 ## External API Integrations (POS/Hardware)
@@ -59,12 +61,16 @@ selected provider is shown in the Settings About panel.
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
+- **Drinks and Recipes (Pro)** — Saved recipes, traditional preparation methods, stock links, ingredient availability, and guest-menu publishing
+- **Classic Catalog (Pro)** — 33 editable bar recipes; Add Classics imports missing recipes without overwriting existing drinks or publishing them automatically
+- **Shopping List (Pro)** — One row per missing/out-of-stock ingredient, organized by drink, with shared references and pre-filled Add to Bar Stock actions
+- **Public Stock Categories** — Settings-controlled app-only categories exclude garnishes and recipe extras from displays and menus, without per-item visibility checkboxes
 - **Beer Catalog** — Manage reusable beer records for consistent keg assignment
 - **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog
 - **Tap Management** — Assign kegs to numbered, labelled tap lines with single-tap keg assignment protection
 - **Data Backup & Restore** — Export portable JSON or ZIP archive with date-stamped filenames; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
-- **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
+- **Printable Menu** — Assigned taps, packaged beers, public bottle/drink stock, and published Pro recipes, with optional QR code
 - **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, Team Access (owner profile, per-user PIN, reset PIN, disable/enable), pour mode in Pour Presets, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode in General
 - **Pour Workflow** — Track pours and automatically decrement current keg volume; manual pour controls are hidden when a non-manual pour mode is selected
 - **First-Time Setup** — Wizard captures the bar name and initial defaults on first launch
@@ -73,6 +79,10 @@ selected provider is shown in the Settings About panel.
 
 ## Recent Changes
 
+- Added Pro Drinks, the 33-recipe classic catalog, and guest-menu recipe publishing.
+- Added a drink-organized Shopping List with deduplicated ingredients, stock creation, replenishment, and automatic recipe links.
+- Added App-Only Stock Categories in Settings -> General to filter public displays and menus.
+- Removed the dashboard Bar Stock card; inventory remains available from Bar Stock in the navigation.
 - Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
 - Added first-time setup wizard requiring a bar name before initial use.
 - Added pour mode settings and conditional pour control visibility.
@@ -112,8 +122,12 @@ selected provider is shown in the Settings About panel.
 Most BarTender settings are managed from within the web UI after the add-on starts.
 The add-on configuration also provides:
 
+- `storage_backend`: internal (SQLite default), postgresql, or mariadb; `database_url` supplies the external backend connection URL.
+- `cors_allowed_origins`: trusted origins for browser clients hosted elsewhere.
+- `license_portal_url` and `license_public_key`: optional owner portal link and public key for signed license verification.
+
 - `session_timeout_minutes`: idle timeout for signed-in browser sessions. The default is
-  `240` minutes (4 hours); valid values range from 5 minutes to 240 minutes. Change this
+  `240` minutes (4 hours); valid values range from 5 minutes to 43200 minutes. Change this
   under the add-on's **Configuration** tab and restart the add-on for the new value to
   take effect.
 
@@ -221,6 +235,23 @@ Some features have additional browser requirements:
 - Standard size options include 12 oz bottle, 16 oz bottle, and 12 oz can.
 - Frequently used custom sizes are promoted into main size options.
 - Disable the Bar Stock feature from Settings if not needed.
+- Categorize garnishes and extras appropriately, then configure **Settings -> General -> App-Only Stock Categories**. Excluded categories stay in the app and recipe calculations but do not appear on displays or menus. Uncategorized items are treated as Other.
+
+### Drinks and Recipes (Pro)
+
+- Select the Pro bar profile to enable Drinks and Shopping List. A non-Pro profile hides their links and rejects direct access, without deleting recipes or backups.
+- Use Add Classics for the 33 starter recipes, or Add Drink for a custom specification. Repeating Add Classics skips existing names.
+- Review house measures, traditional build/stir/shake/muddle/blend steps, glassware, ice, garnish, and allergens. Do not shake carbonated ingredients.
+- Link each ingredient to bar stock. In stock, Out of stock, Not in bar stock, and Availability unknown indicators reflect current inventory.
+- Owners/managers can edit recipes; staff can read them. Publish on guest menu exposes only the drink's name, description, price, allergens, and availability.
+
+### Shopping List (Pro)
+
+- Open **Menu -> Shopping List**. The list covers all saved recipes, including unpublished drinks.
+- Each ingredient appears once under the first alphabetical drink that needs it, with references to other affected drinks. Required items precede items optional for every drink.
+- Add to Bar Stock opens the stock dialog with available details pre-filled. Saving new stock links the missing recipe ingredients; restocking preserves the existing record and avoids duplicates.
+- Saving returns to the refreshed list. Print List omits navigation and action controls.
+- Stock on hand does not guarantee enough measured liquid for a serving. Unknown quantities are not guessed, and recipe lookup never deducts stock.
 
 ## Key Settings
 
@@ -229,6 +260,7 @@ Some features have additional browser requirements:
 - **Pour Presets**: named preset volumes and default preset
 - **Analytics**: low-keg threshold and days-left forecasting window
 - **Menu QR**: where QR appears on display/print output (Settings -> General)
+- **App-Only Stock Categories**: categories excluded from public displays/menus while remaining available internally (Settings -> General)
 
 ## Troubleshooting
 
@@ -238,6 +270,9 @@ Some features have additional browser requirements:
 - **QR unavailable**: verify dependencies from `requirements.txt` are installed.
 - **Display not reachable externally**: confirm display port mapping and host networking in your add-on environment.
 - **User cannot sign in**: check whether the user is disabled or requires a user PIN.
+- **Drinks or Shopping List missing**: select the Pro bar profile; these options are not available in a non-Pro profile.
+- **Stock item absent from public views**: check its category against App-Only Stock Categories; changing visibility does not change inventory quantities.
+- **Ingredient still listed after buying it**: confirm a positive quantity and the recipe's stock association. Use Add to Bar Stock from Shopping List to create/link or replenish the correct item.
 
 ## Support
 
