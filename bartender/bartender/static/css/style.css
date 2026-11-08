@@ -1219,24 +1219,23 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   position: absolute;
   inset: 8px 3px 4px;
   border-radius: 5px;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 17%,
-      rgba(30, 41, 59, 0.62) 17%,
-      rgba(30, 41, 59, 0.62) 26%,
-      transparent 26%,
-      transparent 45%,
-      rgba(30, 41, 59, 0.62) 45%,
-      rgba(30, 41, 59, 0.62) 55%,
-      transparent 55%,
-      transparent 74%,
-      rgba(30, 41, 59, 0.62) 74%,
-      rgba(30, 41, 59, 0.62) 83%,
-      transparent 83%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 17%,
+    rgba(30, 41, 59, 0.62) 17%,
+    rgba(30, 41, 59, 0.62) 26%,
+    transparent 26%,
+    transparent 45%,
+    rgba(30, 41, 59, 0.62) 45%,
+    rgba(30, 41, 59, 0.62) 55%,
+    transparent 55%,
+    transparent 74%,
+    rgba(30, 41, 59, 0.62) 74%,
+    rgba(30, 41, 59, 0.62) 83%,
+    transparent 83%,
+    transparent 100%
+  );
   opacity: 0.88;
   pointer-events: none;
   z-index: 3;

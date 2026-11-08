@@ -281,14 +281,14 @@ Select **Publish on guest menu** to list a drink in the Cocktails or Nonalcoholi
 
 Recipe API:
 
-| Method | Endpoint | Behavior |
-| --- | --- | --- |
-| GET | `/api/drinks` | List recipes with computed stock status; supports `q`, `category`, `method`, and `can_make=true` |
-| GET | `/api/drinks/<id>` | Read one recipe with stock status |
-| POST | `/api/drinks` | Create a recipe; owner/manager required |
-| POST | `/api/drinks/classics` | Add missing classic recipes; owner/manager required; existing drinks are preserved |
-| PUT | `/api/drinks/<id>` | Partially update a recipe; owner/manager required |
-| DELETE | `/api/drinks/<id>` | Delete a recipe; owner/manager required |
+| Method | Endpoint               | Behavior                                                                                         |
+| ------ | ---------------------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/api/drinks`          | List recipes with computed stock status; supports `q`, `category`, `method`, and `can_make=true` |
+| GET    | `/api/drinks/<id>`     | Read one recipe with stock status                                                                |
+| POST   | `/api/drinks`          | Create a recipe; owner/manager required                                                          |
+| POST   | `/api/drinks/classics` | Add missing classic recipes; owner/manager required; existing drinks are preserved               |
+| PUT    | `/api/drinks/<id>`     | Partially update a recipe; owner/manager required                                                |
+| DELETE | `/api/drinks/<id>`     | Delete a recipe; owner/manager required                                                          |
 
 The API returns per-ingredient `availability` and `stock_name`, plus recipe-level `can_make`, `missing_ingredients`, and `unknown_ingredients`. Computed fields are not persisted. Invalid specifications or new links to nonexistent stock return 400; insufficient editing permissions return 403; unknown recipes return 404. External tokens alone do not grant the owner/manager role required to edit recipes.
 

@@ -1,5 +1,6 @@
 import copy
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bartender.drink_recipes import classic_recipes, guest_drinks, normalize_recipes, recipe_availability, shopping_list, shopping_list_by_drink, validate_recipe
 from bartender.bar_stock import public_bar_stock, stock_is_public
+
+
+class _RenderedHTML(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.elements = []
+        self._active = []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("a", "option", "span"):
+            self._active.append({"tag": tag, "attrs": dict(attrs), "chunks": []})
+
+    def handle_data(self, data):
+        for element in self._active:
+            element["chunks"].append(data)
+
+    def handle_endtag(self, tag):
+        for index in range(len(self._active) - 1, -1, -1):
+            if self._active[index]["tag"] == tag:
+                element = self._active.pop(index)
+                self.elements.append({
+                    "tag": tag,
+                    "attrs": element["attrs"],
+                    "text": " ".join("".join(element["chunks"]).split()),
+                })
+                break
 
 
 def _recipe():
@@ -371,7 +399,12 @@ def test_shopping_list_link_is_only_in_menu_dropdown(tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert html.count('href="/shopping-list"') == 1
-    assert '<a class="nav-menu-item" href="/shopping-list" role="menuitem">Shopping List</a>' in html
+    links = [element for element in _RenderedHTML(html).elements
+             if element["tag"] == "a" and element["attrs"].get("href") == "/shopping-list"]
+    assert len(links) == 1
+    assert "nav-menu-item" in links[0]["attrs"].get("class", "").split()
+    assert links[0]["attrs"].get("role") == "menuitem"
+    assert links[0]["text"] == "Shopping List"
 
 
 @pytest.mark.parametrize("profile,allowed", [("homebrewer", False), ("pro", True), ("commercial", True), ("invalid", False)])
@@ -457,8 +490,10 @@ def test_add_classics_permissions_and_starter_editor(tmp_path):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     assert 'id="addClassicsBtn"' in html
-    assert '<option value="old-fashioned">Old Fashioned</option>' in html
-    assert '<option value="shirley-temple">Shirley Temple (nonalcoholic)</option>' in html
+    options = {element["attrs"].get("value"): element["text"]
+               for element in _RenderedHTML(html).elements if element["tag"] == "option"}
+    assert options["old-fashioned"] == "Old Fashioned"
+    assert options["shirley-temple"] == "Shirley Temple (nonalcoholic)"
     with client.session_transaction() as session:
         session["user_role"] = "staff"
     assert 'id="addClassicsBtn"' not in client.get("/drinks").get_data(as_text=True)
@@ -526,8 +561,10 @@ def test_unstocked_ingredient_label_uses_inventory_wording(tmp_path):
         response = client.get(path)
         assert response.status_code == 200
         html = response.get_data(as_text=True)
-        assert "Not in bar stock" in html
-        assert "Missing stock link" not in html
+        labels = [element["text"] for element in _RenderedHTML(html).elements
+              if element["tag"] == "span" and "drink-status" in element["attrs"].get("class", "").split()]
+        assert "Not in bar stock" in labels
+        assert "Missing stock link" not in labels
     assert client.get("/api/shopping-list").get_json()[0]["availability"] == "not_linked"
 
 

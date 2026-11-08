@@ -179,8 +179,8 @@
       <div class="menu-grid">
         {% for entry in on_tap %} {% set tap = entry.tap %} {% set keg =
         entry.keg %} {% set fill_pct = entry.fill_pct %} {% set brewery =
-        keg.beer_brewery or keg.brewery %} {% set brewer = keg.beer_brewer %}
-        {% set abv = keg.beer_abv or keg.abv %}
+        keg.beer_brewery or keg.brewery %} {% set brewer = keg.beer_brewer %} {%
+        set abv = keg.beer_abv or keg.abv %}
         <article class="menu-item">
           <div class="menu-item-header">
             <h2>Tap {{ tap.number }}</h2>
@@ -223,9 +223,7 @@
       </div>
       {% else %}
       <p class="muted">No bottled/can beers in the catalog.</p>
-      {% endif %}
-
-      {% include "drink_menu_sections.html" %}
+      {% endif %} {% include "drink_menu_sections.html" %}
       <div class="actions">
         <button class="btn" onclick="window.print()">Print Menu</button>
       </div>

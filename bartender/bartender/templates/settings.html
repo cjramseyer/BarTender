@@ -415,10 +415,25 @@ content %}
           </div>
           <div class="form-group">
             <label>App-Only Stock Categories</label>
-            <div class="stock-category-options" id="publicStockHiddenCategories">
+            <div
+              class="stock-category-options"
+              id="publicStockHiddenCategories"
+            >
               {% for category in stock_category_choices %}
               <label class="radio-label">
-                <input type="checkbox" name="public_stock_hidden_category" value="{{ category }}" {% if category in settings.public_stock_hidden_categories %}checked{% endif %} />
+                <input
+                  type="checkbox"
+                  name="public_stock_hidden_category"
+                  value="{{ category }}"
+                  {%
+                  if
+                  category
+                  in
+                  settings.public_stock_hidden_categories
+                  %}checked{%
+                  endif
+                  %}
+                />
                 {{ category }}
               </label>
               {% endfor %}
@@ -2062,8 +2077,10 @@ content %}
         ? document.getElementById("barStockEnabled").checked
         : true,
       public_stock_hidden_categories: Array.from(
-        document.querySelectorAll('input[name="public_stock_hidden_category"]:checked'),
-      ).map(input => input.value),
+        document.querySelectorAll(
+          'input[name="public_stock_hidden_category"]:checked',
+        ),
+      ).map((input) => input.value),
       analytics_enabled: document.getElementById("analyticsEnabled")
         ? document.getElementById("analyticsEnabled").checked
         : true,
@@ -4088,9 +4105,11 @@ content %}
     input.addEventListener("blur", () => scheduleAutoSave(0));
   });
 
-  document.querySelectorAll('input[name="public_stock_hidden_category"]').forEach(input => {
-    input.addEventListener("change", () => scheduleAutoSave(100));
-  });
+  document
+    .querySelectorAll('input[name="public_stock_hidden_category"]')
+    .forEach((input) => {
+      input.addEventListener("change", () => scheduleAutoSave(100));
+    });
 
   async function saveSettings(e) {
     e.preventDefault();

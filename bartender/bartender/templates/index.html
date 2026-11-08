@@ -21,7 +21,7 @@ content %}
         <button
           class="dashboard-edit-trigger tap-number"
           type="button"
-          onclick='openDashboardTapEdit({{ tap | tojson | forceescape }})'
+          onclick="openDashboardTapEdit({{ tap | tojson | forceescape }})"
         >
           Tap {{ tap.number }}
         </button>
@@ -44,7 +44,7 @@ content %}
         <button
           class="dashboard-edit-trigger tap-label"
           type="button"
-          onclick='openDashboardKegEdit({{ keg | tojson | forceescape }})'
+          onclick="openDashboardKegEdit({{ keg | tojson | forceescape }})"
         >
           {{ keg.name if keg else (tap.label or ('Tap ' ~ tap.number)) }}
         </button>
@@ -93,9 +93,9 @@ content %}
         </div>
         {% else %}
         <span class="tap-label tap-volume-remaining"
-          >Remaining: {% if keg.current_volume is not none %}{% set
-          volume_token = '%g' | format(keg.current_volume) %}{{ volume_token }}
-          {{ keg.volume_unit or '—' }}{% else %}—{% endif %}</span
+          >Remaining: {% if keg.current_volume is not none %}{% set volume_token
+          = '%g' | format(keg.current_volume) %}{{ volume_token }} {{
+          keg.volume_unit or '—' }}{% else %}—{% endif %}</span
         >
         {% endif %} {% endif %} {% else %} {% set tap_state_label = 'Needs
         cleaning' if tap.ever_assigned_keg else 'Available' %} {% set
@@ -161,18 +161,19 @@ content %}
       %} {% if keg.id in connected_keg_ids.values %} {% set
       tapped_keg_count.value = tapped_keg_count.value + 1 %}
       <li>
-        {% set volume_token = '%g' | format(keg.current_volume)
-        if keg.current_volume is not none else '—' %}
+        {% set volume_token = '%g' | format(keg.current_volume) if
+        keg.current_volume is not none else '—' %}
         <div class="keg-summary-line keg-summary-line-primary">
           <button
             class="dashboard-edit-trigger keg-summary-title"
             type="button"
-            onclick='openDashboardKegEdit({{ keg | tojson | forceescape }})'
+            onclick="openDashboardKegEdit({{ keg | tojson | forceescape }})"
           >
             {{ keg.beer_name or 'Unknown Beer' }}
           </button>
           <span class="muted"
-            >Volume Remaining: {{ volume_token }} {{ keg.volume_unit or '' }}</span
+            >Volume Remaining: {{ volume_token }} {{ keg.volume_unit or ''
+            }}</span
           >
         </div>
         <div class="keg-summary-line keg-summary-line-secondary muted">
@@ -223,7 +224,8 @@ content %}
       </summary>
       <div class="analytics-panel-body">
         <div class="muted" style="margin-bottom: 0.25rem">
-          Low keg threshold: {{ dashboard_analytics.low_keg_threshold_percent }}%
+          Low keg threshold: {{ dashboard_analytics.low_keg_threshold_percent
+          }}%
         </div>
         <div class="muted" style="margin-bottom: 0.5rem">
           Days left method: trailing window over {{
@@ -298,7 +300,13 @@ content %}
   <div class="modal-dialog">
     <div class="modal-header">
       <h3>Edit Tap</h3>
-      <button class="btn btn-icon" type="button" onclick="closeModal('dashboardTapEditModal')">✕</button>
+      <button
+        class="btn btn-icon"
+        type="button"
+        onclick="closeModal('dashboardTapEditModal')"
+      >
+        ✕
+      </button>
     </div>
     <form onsubmit="saveDashboardTap(event)">
       <input type="hidden" id="dashboardTapId" />
@@ -311,7 +319,10 @@ content %}
         <select id="dashboardTapKeg" class="form-control">
           <option value="">No keg</option>
           {% for keg in kegs %}
-          <option value="{{ keg.id }}">{{ keg.name or 'Unnamed Keg' }}{% if keg.beer_name %} — {{ keg.beer_name }}{% endif %}</option>
+          <option value="{{ keg.id }}">
+            {{ keg.name or 'Unnamed Keg' }}{% if keg.beer_name %} — {{
+            keg.beer_name }}{% endif %}
+          </option>
           {% endfor %}
         </select>
       </div>
@@ -326,10 +337,20 @@ content %}
       </div>
       <div class="form-group">
         <label for="dashboardTapNotes">Notes</label>
-        <textarea id="dashboardTapNotes" class="form-control" rows="2"></textarea>
+        <textarea
+          id="dashboardTapNotes"
+          class="form-control"
+          rows="2"
+        ></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn" onclick="closeModal('dashboardTapEditModal')">Cancel</button>
+        <button
+          type="button"
+          class="btn"
+          onclick="closeModal('dashboardTapEditModal')"
+        >
+          Cancel
+        </button>
         <button type="submit" class="btn btn-primary">Save Tap</button>
       </div>
     </form>
@@ -340,7 +361,13 @@ content %}
   <div class="modal-dialog">
     <div class="modal-header">
       <h3>Edit Keg</h3>
-      <button class="btn btn-icon" type="button" onclick="closeModal('dashboardKegEditModal')">✕</button>
+      <button
+        class="btn btn-icon"
+        type="button"
+        onclick="closeModal('dashboardKegEditModal')"
+      >
+        ✕
+      </button>
     </div>
     <form onsubmit="saveDashboardKeg(event)">
       <input type="hidden" id="dashboardKegId" />
@@ -361,13 +388,25 @@ content %}
         </div>
         <div class="form-group">
           <label for="dashboardKegPercent">Percent Full</label>
-          <input id="dashboardKegPercent" class="form-control" type="number" min="0" max="100" />
+          <input
+            id="dashboardKegPercent"
+            class="form-control"
+            type="number"
+            min="0"
+            max="100"
+          />
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label for="dashboardKegVolume">Current Volume</label>
-          <input id="dashboardKegVolume" class="form-control" type="number" min="0" step="0.01" />
+          <input
+            id="dashboardKegVolume"
+            class="form-control"
+            type="number"
+            min="0"
+            step="0.01"
+          />
         </div>
         <div class="form-group">
           <label for="dashboardKegUnit">Volume Unit</label>
@@ -381,10 +420,20 @@ content %}
       </div>
       <div class="form-group">
         <label for="dashboardKegNotes">Notes</label>
-        <textarea id="dashboardKegNotes" class="form-control" rows="2"></textarea>
+        <textarea
+          id="dashboardKegNotes"
+          class="form-control"
+          rows="2"
+        ></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn" onclick="closeModal('dashboardKegEditModal')">Cancel</button>
+        <button
+          type="button"
+          class="btn"
+          onclick="closeModal('dashboardKegEditModal')"
+        >
+          Cancel
+        </button>
         <button type="submit" class="btn btn-primary">Save Keg</button>
       </div>
     </form>
