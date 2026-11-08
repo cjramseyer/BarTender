@@ -58,7 +58,15 @@ from bartender.pos_sync.brewfather import (
     utc_now as brewfather_now,
 )
 from bartender.storage import create_state_store
+from bartender.bar_stock import (
+    DEFAULT_HIDDEN_STOCK_CATEGORIES, STOCK_CATEGORY_CHOICES,
+    normalize_hidden_stock_categories, public_bar_stock,
+)
 from bartender.mqtt import publish_state_async, test_connection as test_mqtt_connection
+from bartender.drink_recipes import (
+    DRINK_CATEGORIES, DRINK_METHODS, INGREDIENT_UNITS,
+    classic_recipes, normalize_recipes, recipe_availability, guest_drinks, shopping_list, shopping_list_by_drink, validate_recipe,
+)
 
 try:
     import qrcode  # type: ignore[reportMissingModuleSource]
@@ -880,6 +888,7 @@ DEFAULT_DATA = {
         "setup_completed": False,
         "dashboard_manage_button_position": "top-right",
         "bar_stock_enabled": True,
+        "public_stock_hidden_categories": list(DEFAULT_HIDDEN_STOCK_CATEGORIES),
         "analytics_enabled": True,
         "default_keg_type": "",
         "keg_type_choices": STANDARD_KEG_TYPE_CHOICES,
@@ -916,6 +925,7 @@ DEFAULT_DATA = {
     },
     "bar_stock": [],
     "beers": [],
+    "drink_recipes": [],
     "kegs": [],
     "taps": [],
     "pour_events": [],
@@ -955,6 +965,7 @@ def _load_data_unlocked() -> dict:
         for key, value in DEFAULT_DATA.items():
             if key not in data:
                 data[key] = value
+        data["drink_recipes"] = normalize_recipes(data.get("drink_recipes"))
         if not isinstance(data.get("brewfather_conflicts"), list):
             data["brewfather_conflicts"] = []
         # Ensure nested settings keys exist for backward compatibility.
@@ -964,6 +975,9 @@ def _load_data_unlocked() -> dict:
             for key, value in DEFAULT_DATA["settings"].items():
                 data["settings"].setdefault(key, value)
 
+        data["settings"]["public_stock_hidden_categories"] = normalize_hidden_stock_categories(
+            data["settings"].get("public_stock_hidden_categories")
+        )
         _ensure_owner_team_user(data)
         normalized_team_users = []
         for user in data.get("team_users", []):
@@ -1972,6 +1986,9 @@ def _normalize_settings_in_place(data: dict, setup_completed_explicit: bool = Fa
     settings.pop("manage_button_position", None)
 
     settings["bar_stock_enabled"] = _coerce_bool(settings.get("bar_stock_enabled"), True)
+    settings["public_stock_hidden_categories"] = normalize_hidden_stock_categories(
+        settings.get("public_stock_hidden_categories")
+    )
     settings["analytics_enabled"] = _coerce_bool(settings.get("analytics_enabled"), True)
     settings["api_reference_enabled"] = _coerce_bool(settings.get("api_reference_enabled"), True)
     settings["brewery_type"] = _normalize_brewery_type(settings.get("brewery_type"))
@@ -3656,12 +3673,35 @@ def stock():
     if not _bar_stock_enabled(data):
         return _redirect_to_endpoint("index")
     ingress_path = _effective_ingress_path()
+    shopping_item = _shopping_stock_item(
+        data, request.args.get("shopping_item", ""), request.args.get("shopping_stock_id"),
+    )
+    stock_prefill = None
+    if shopping_item:
+        existing = next((item for item in data["bar_stock"] if item["id"] == shopping_item["stock_id"]), None)
+        stock_prefill = {
+            **(existing or {}), "name": shopping_item["name"], "quantity": 1,
+            "category": (existing or {}).get("category", "Other"),
+            "notes": (existing or {}).get("notes", "For: " + ", ".join(recipe["name"] for recipe in shopping_item["recipes"])),
+        }
     return render_template(
         "stock.html",
         settings=data["settings"],
         bar_stock=data["bar_stock"],
+        stock_prefill=stock_prefill,
+        shopping_item=shopping_item,
         ingress=ingress_path,
     )
+
+
+def _shopping_stock_item(data: dict, name, stock_id_value) -> dict | None:
+    if not name or _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return None
+    stock_id = _coerce_int(stock_id_value, None)
+    if stock_id_value is not None and (stock_id is None or stock_id <= 0):
+        return None
+    return next((item for item in shopping_list(data)
+                 if item["name"] == name and item["stock_id"] == stock_id), None)
 
 
 @app.route("/kegs")
@@ -3710,6 +3750,45 @@ def kegs():
         location_choices=location_choices,
         gas_choices=gas_choices,
         ingress=ingress_path,
+    )
+
+
+@app.route("/drinks")
+def drinks():
+    data = load_data()
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({"error": "Drinks require a Pro profile.", "code": "DRINKS_PRO_REQUIRED"}), 403
+    return render_template(
+        "drinks.html",
+        settings=data["settings"],
+        recipes=[recipe_availability(recipe, data["bar_stock"], _bar_stock_enabled(data))
+                 for recipe in data.get("drink_recipes", [])],
+        bar_stock=data["bar_stock"] if _bar_stock_enabled(data) else [],
+        methods=DRINK_METHODS,
+        categories=DRINK_CATEGORIES,
+        ingredient_units=INGREDIENT_UNITS,
+        starters=classic_recipes(data["bar_stock"] if _bar_stock_enabled(data) else []),
+        can_manage=_get_current_team_user().get("role") in ("owner", "manager"),
+        ingress=_effective_ingress_path(),
+    )
+
+
+@app.route("/shopping-list")
+def shopping_list_view():
+    data = load_data()
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({
+            "error": "Shopping List requires a Pro profile.",
+            "code": "SHOPPING_LIST_PRO_REQUIRED",
+        }), 403
+    items = shopping_list(data)
+    return render_template(
+        "shopping_list.html",
+        settings=data["settings"],
+        items=items,
+        drink_groups=shopping_list_by_drink(items),
+        drink_count=len({recipe["id"] for item in items for recipe in item["recipes"]}),
+        ingress=_effective_ingress_path(),
     )
 
 
@@ -3823,6 +3902,15 @@ def settings():
     return render_template(
         "settings.html",
         settings=template_settings,
+        stock_category_choices=sorted({
+            category.strip().casefold(): category.strip()
+            for category in (
+                list(STOCK_CATEGORY_CHOICES)
+                + [item.get("category", "") for item in data.get("bar_stock", [])]
+                + template_settings.get("public_stock_hidden_categories", [])
+            )
+            if isinstance(category, str) and category.strip()
+        }.values(), key=str.casefold),
         taps=data.get("taps", []),
         inline_devices=(
             [
@@ -3932,7 +4020,7 @@ def display_view():
         settings=data["settings"],
         taps=taps,
         kegs=data["kegs"],
-        bar_stock=data["bar_stock"],
+        bar_stock=public_bar_stock(data["bar_stock"], data["settings"]["public_stock_hidden_categories"]),
         on_deck_kegs=on_deck_kegs,
         qr_image_path=qr_image_path,
         menu_qr_mode=menu_qr_mode,
@@ -3990,6 +4078,8 @@ def menu_view():
         settings=data["settings"],
         on_tap=on_tap,
         packaged_beers=packaged_beers,
+        drinks=guest_drinks(data),
+        menu_bar_stock=public_bar_stock(data["bar_stock"], data["settings"]["public_stock_hidden_categories"]) if _bar_stock_enabled(data) else [],
         menu_path=menu_path,
         qr_image_path=qr_image_path,
         menu_qr_mode=menu_qr_mode,
@@ -4362,6 +4452,12 @@ def api_save_settings():
                 "restricted_fields": restricted_keys_found,
             }), 403
 
+    if "public_stock_hidden_categories" in body:
+        categories = body["public_stock_hidden_categories"]
+        if not isinstance(categories, list) or len(categories) > 100 or any(
+            not isinstance(category, str) or len(category) > 100 for category in categories
+        ):
+            return jsonify({"error": "Hidden stock categories must be a list of category names."}), 400
     previous_settings = json.loads(json.dumps(data["settings"]))
     allowed = {
         "measurement",
@@ -4396,6 +4492,7 @@ def api_save_settings():
         "setup_completed",
         "dashboard_manage_button_position",
         "bar_stock_enabled",
+        "public_stock_hidden_categories",
         "analytics_enabled",
         "default_keg_type",
         "keg_type_choices",
@@ -5522,6 +5619,11 @@ def api_add_stock():
     if not _bar_stock_enabled(data):
         return jsonify({"error": "Bar stock feature is disabled"}), 403
     body = request.get_json(force=True)
+    shopping_item = _shopping_stock_item(data, body.get("shopping_item", ""), body.get("shopping_stock_id"))
+    if body.get("shopping_item") and shopping_item is None:
+        return jsonify({"error": "This shopping-list item is no longer available. Refresh the shopping list."}), 409
+    if shopping_item and any(item["id"] == shopping_item["stock_id"] for item in data["bar_stock"]):
+        return jsonify({"error": "Replenish the existing stock item instead of creating a duplicate."}), 400
     size_label = body.get("size_label", body.get("unit", ""))
     size_value = body.get("size_value", None)
     size_unit = body.get("size_unit", "")
@@ -5538,6 +5640,21 @@ def api_add_stock():
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     data["bar_stock"].append(item)
+    if shopping_item:
+        ingredient_name = " ".join(shopping_item["name"].split()).casefold()
+        for recipe in data.get("drink_recipes", []):
+            linked = []
+            for ingredient in recipe["ingredients"]:
+                same_name = " ".join(ingredient["name"].split()).casefold() == ingredient_name
+                if ingredient.get("stock_id") == shopping_item["stock_id"] and (shopping_item["stock_id"] is not None or same_name):
+                    ingredient["stock_id"] = item["id"]
+                    linked.append(ingredient["name"])
+            if linked:
+                recipe["revision"] += 1
+                recipe["updated_at"] = item["updated_at"]
+                _record_team_audit(data, current_user, "drink_stock_linked", f"drink:{recipe['id']}", {
+                    "stock_id": item["id"], "ingredients": linked,
+                })
     _record_team_audit(
         data,
         current_user,
@@ -5591,6 +5708,10 @@ def api_delete_stock(item_id: int):
         return jsonify({"error": "Bar stock feature is disabled"}), 403
     deleted_item = next((item for item in data["bar_stock"] if item["id"] == item_id), None)
     data["bar_stock"] = [i for i in data["bar_stock"] if i["id"] != item_id]
+    for recipe in data.get("drink_recipes", []):
+        for ingredient in recipe["ingredients"]:
+            if ingredient.get("stock_id") == item_id:
+                ingredient["stock_id"] = None
     if deleted_item is not None:
         _record_team_audit(
             data,
@@ -5601,6 +5722,113 @@ def api_delete_stock(item_id: int):
         )
     save_data(data)
     return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# API - Drinks
+# ---------------------------------------------------------------------------
+
+@app.route("/api/shopping-list", methods=["GET"])
+def api_shopping_list():
+    data = load_data()
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({
+            "error": "Shopping List requires a Pro profile.",
+            "code": "SHOPPING_LIST_PRO_REQUIRED",
+        }), 403
+    return jsonify(shopping_list(data))
+
+
+@app.route("/api/drinks/classics", methods=["POST"])
+def api_add_classic_drinks():
+    current_user = _get_current_team_user()
+    if current_user.get("role") not in ("owner", "manager"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    data = load_data()
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({"error": "Drinks require a Pro profile.", "code": "DRINKS_PRO_REQUIRED"}), 403
+    recipes = data.get("drink_recipes", [])
+    existing_names = {recipe["name"].strip().casefold() for recipe in recipes}
+    catalog = classic_recipes(data["bar_stock"] if _bar_stock_enabled(data) else [])
+    next_id = _next_id(recipes)
+    added = 0
+    updated_at = datetime.now(timezone.utc).isoformat()
+    for recipe in catalog.values():
+        if recipe["name"].casefold() in existing_names:
+            continue
+        recipe.update(id=next_id, revision=1, updated_at=updated_at)
+        recipes.append(recipe)
+        existing_names.add(recipe["name"].casefold())
+        next_id += 1
+        added += 1
+    if added:
+        data["drink_recipes"] = recipes
+        _record_team_audit(data, current_user, "drink_classics_added", "drinks", {
+            "added": added, "skipped": len(catalog) - added,
+        })
+        save_data(data)
+    return jsonify({"added": added, "skipped": len(catalog) - added}), 201 if added else 200
+
+
+@app.route("/api/drinks", methods=["GET", "POST"])
+@app.route("/api/drinks/<int:recipe_id>", methods=["GET", "PUT", "DELETE"])
+def api_drinks(recipe_id: int | None = None):
+    data = load_data()
+    if _normalize_brewery_type(data["settings"].get("brewery_type")) != "pro":
+        return jsonify({"error": "Drinks require a Pro profile.", "code": "DRINKS_PRO_REQUIRED"}), 403
+    recipes = data.get("drink_recipes", [])
+    existing = next((recipe for recipe in recipes if recipe["id"] == recipe_id), None)
+    current_user = _get_current_team_user()
+    if request.method != "GET" and current_user.get("role") not in ("owner", "manager"):
+        return jsonify({"error": "Insufficient permissions"}), 403
+    if recipe_id is not None and existing is None:
+        return jsonify({"error": "Recipe not found"}), 404
+    if request.method == "GET":
+        if existing is not None:
+            return jsonify(recipe_availability(existing, data["bar_stock"], _bar_stock_enabled(data)))
+        result = [recipe_availability(recipe, data["bar_stock"], _bar_stock_enabled(data)) for recipe in recipes]
+        query = str(request.args.get("q", "")).strip().casefold()
+        if query:
+            result = [recipe for recipe in result if query in " ".join(
+                [recipe.get(field, "") for field in ("name", "base_spirit", "flavor", "method", "description")]
+                + [item["name"] for item in recipe["ingredients"]]
+            ).casefold()]
+        category = request.args.get("category")
+        method = request.args.get("method")
+        if category:
+            result = [recipe for recipe in result if recipe["category"] == category]
+        if method:
+            result = [recipe for recipe in result if recipe["method"] == method]
+        if request.args.get("can_make") == "true":
+            result = [recipe for recipe in result if recipe["can_make"]]
+        return jsonify(sorted(result, key=lambda recipe: recipe["name"].casefold()))
+    if request.method == "DELETE":
+        data["drink_recipes"] = [recipe for recipe in recipes if recipe["id"] != recipe_id]
+        _record_team_audit(data, current_user, "drink_deleted", f"drink:{recipe_id}", {"name": existing["name"]})
+        save_data(data)
+        return jsonify({"ok": True})
+    try:
+        recipe = validate_recipe(request.get_json(silent=True), existing)
+        stock_ids = {item["id"] for item in data["bar_stock"]}
+        previous_links = {item.get("stock_id") for item in (existing or {}).get("ingredients", [])}
+        for ingredient in recipe["ingredients"]:
+            stock_id = ingredient["stock_id"]
+            if stock_id is not None and stock_id not in stock_ids and stock_id not in previous_links:
+                raise ValueError(f"Stock item for {ingredient['name']} does not exist.")
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    recipe["id"] = recipe_id if existing else _next_id(recipes)
+    recipe["revision"] = (existing or {}).get("revision", 0) + 1
+    recipe["updated_at"] = datetime.now(timezone.utc).isoformat()
+    if existing:
+        recipes[recipes.index(existing)] = recipe
+    else:
+        recipes.append(recipe)
+    data["drink_recipes"] = recipes
+    _record_team_audit(data, current_user, "drink_updated" if existing else "drink_created",
+                       f"drink:{recipe['id']}", {"name": recipe["name"], "revision": recipe["revision"]})
+    save_data(data)
+    return jsonify(recipe_availability(recipe, data["bar_stock"], _bar_stock_enabled(data))), 200 if existing else 201
 
 
 # ---------------------------------------------------------------------------
@@ -5969,6 +6197,13 @@ API_REFERENCE_ENDPOINTS = [
     ("PUT", "/api/stock/<id>", "Update a stock item"),
     ("DELETE", "/api/stock/<id>", "Delete a stock item"),
     ("GET", "/api/beers", "List all beers"),
+    ("GET", "/api/drinks", "List recipes with live ingredient availability (Pro); filters: q, category, method, can_make"),
+    ("GET", "/api/shopping-list", "List missing/out-of-stock ingredients across saved drink recipes (Pro profile)"),
+    ("POST", "/api/drinks", "Create a drink recipe (Pro, owner/manager)"),
+    ("POST", "/api/drinks/classics", "Add missing classic bar recipes without overwriting existing recipes (Pro, owner/manager)"),
+    ("GET", "/api/drinks/<id>", "Get a drink recipe with ingredient availability (Pro)"),
+    ("PUT", "/api/drinks/<id>", "Update a drink recipe (Pro, owner/manager)"),
+    ("DELETE", "/api/drinks/<id>", "Delete a drink recipe (Pro, owner/manager)"),
     ("POST", "/api/beers", "Add a beer"),
     ("PUT", "/api/beers/<id>", "Update a beer"),
     ("DELETE", "/api/beers/<id>", "Delete a beer"),
@@ -7465,6 +7700,7 @@ def _build_export_archive(data: dict) -> bytes:
         zf.writestr("taps.json", json.dumps(export_data.get("taps", []), indent=2))
         zf.writestr("beers.json", json.dumps(export_data.get("beers", []), indent=2))
         zf.writestr("bar_stock.json", json.dumps(export_data.get("bar_stock", []), indent=2))
+        zf.writestr("drink_recipes.json", json.dumps(export_data.get("drink_recipes", []), indent=2))
         zf.writestr("pour_events.json", json.dumps(export_data.get("pour_events", []), indent=2))
         zf.writestr("bartender_export.json", json.dumps(payload, indent=2))
 
@@ -7516,6 +7752,7 @@ def _import_archive_payload(file_bytes: bytes):
                 "taps": taps if isinstance(taps, list) else [],
                 "beers": beers if isinstance(beers, list) else [],
                 "bar_stock": bar_stock if isinstance(bar_stock, list) else [],
+                "drink_recipes": _read_archive_json(zf, "drink_recipes.json", []),
                 "pour_events": _read_archive_json(zf, "pour_events.json", []),
             }
     except zipfile.BadZipFile:
@@ -7530,6 +7767,7 @@ def _sanitize_import_payload(raw_data: dict) -> dict:
         "taps": [x for x in raw_data.get("taps", []) if isinstance(raw_data.get("taps", []), list) and isinstance(x, dict)] if isinstance(raw_data.get("taps", []), list) else [],
         "beers": [x for x in raw_data.get("beers", []) if isinstance(x, dict)] if isinstance(raw_data.get("beers", []), list) else [],
         "bar_stock": [x for x in raw_data.get("bar_stock", []) if isinstance(x, dict)] if isinstance(raw_data.get("bar_stock", []), list) else [],
+        "drink_recipes": normalize_recipes(raw_data.get("drink_recipes", [])),
         "pour_events": [x for x in raw_data.get("pour_events", []) if isinstance(x, dict)] if isinstance(raw_data.get("pour_events", []), list) else [],
     }
 
@@ -7617,6 +7855,10 @@ def _apply_import_payload(existing_data: dict, payload: dict, mode: str) -> dict
         merged.get("bar_stock", []),
         incoming.get("bar_stock", []),
     )
+    merged["drink_recipes"] = _merge_collection(
+        merged.get("drink_recipes", []),
+        incoming.get("drink_recipes", []),
+    )
     return merged
 
 
@@ -7633,6 +7875,7 @@ def _import_summary(payload: dict) -> dict:
         "taps": len(taps),
         "beers": len(beers),
         "bar_stock": len(bar_stock),
+        "drink_recipes": len(payload.get("drink_recipes", [])),
     }
 
 @app.route("/api/export/json")

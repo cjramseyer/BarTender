@@ -39,12 +39,17 @@
         <span>{{ settings.bar_name }}</span>
       </a>
       {% if (settings.environment_mode or 'production') == 'sandbox' %}
-      <span id="navSandboxIndicator" class="nav-mode-indicator" title="Sandbox mode is active"
+      <span
+        id="navSandboxIndicator"
+        class="nav-mode-indicator"
+        title="Sandbox mode is active"
         >Sandbox Mode</span
       >
-      {% endif %}
-      {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
-      <span id="navProIndicator" class="nav-mode-indicator" title="Pro bar profile is active"
+      {% endif %} {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+      <span
+        id="navProIndicator"
+        class="nav-mode-indicator"
+        title="Pro bar profile is active"
         >Pro</span
       >
       {% endif %}
@@ -53,7 +58,9 @@
         <li><a href="{{ ingress }}/taps">Taps</a></li>
         <li><a href="{{ ingress }}/kegs">Kegs</a></li>
         <li><a href="{{ ingress }}/beers">Beers</a></li>
-        {% if settings.bar_stock_enabled %}
+        {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+        <li><a href="{{ ingress }}/drinks">Drinks</a></li>
+        {% endif %} {% if settings.bar_stock_enabled %}
         <li><a href="{{ ingress }}/stock">Bar Stock</a></li>
         {% endif %} {% if settings.api_reference_enabled %}
         <li>
@@ -126,7 +133,12 @@
                   <label class="nav-menu-checkbox">
                     <input
                       type="checkbox"
-                      {% if settings.bar_stock_enabled %}checked{% endif %}
+                      {%
+                      if
+                      settings.bar_stock_enabled
+                      %}checked{%
+                      endif
+                      %}
                       onchange="toggleNavSetting('bar_stock_enabled', this)"
                     />
                     <span>Bar Stock</span>
@@ -134,7 +146,12 @@
                   <label class="nav-menu-checkbox">
                     <input
                       type="checkbox"
-                      {% if settings.api_reference_enabled %}checked{% endif %}
+                      {%
+                      if
+                      settings.api_reference_enabled
+                      %}checked{%
+                      endif
+                      %}
                       onchange="toggleNavSetting('api_reference_enabled', this)"
                     />
                     <span>API Reference</span>
@@ -150,6 +167,17 @@
                 >
               </div>
             </details>
+            {% if (settings.brewery_type or 'homebrewer') == 'pro' %}
+            <a class="nav-menu-item" href="{{ ingress }}/drinks" role="menuitem"
+              >Bartender Recipes</a
+            >
+            <a
+              class="nav-menu-item"
+              href="{{ ingress }}/shopping-list"
+              role="menuitem"
+              >Shopping List</a
+            >
+            {% endif %}
             <div class="nav-menu-section">
               <div class="nav-menu-section-title">Team</div>
               <a
@@ -282,7 +310,12 @@
                         checked
                       />
                       {% else %}
-                      <input type="radio" name="setup_theme" value="light" onchange="previewSetupTheme(this.value)" />
+                      <input
+                        type="radio"
+                        name="setup_theme"
+                        value="light"
+                        onchange="previewSetupTheme(this.value)"
+                      />
                       {% endif %} ☀ Light
                     </label>
                     <label class="radio-label">
@@ -295,7 +328,12 @@
                         checked
                       />
                       {% else %}
-                      <input type="radio" name="setup_theme" value="dark" onchange="previewSetupTheme(this.value)" />
+                      <input
+                        type="radio"
+                        name="setup_theme"
+                        value="dark"
+                        onchange="previewSetupTheme(this.value)"
+                      />
                       {% endif %} 🌙 Dark
                     </label>
                   </div>

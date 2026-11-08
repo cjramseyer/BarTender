@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 
 from flask import Flask, render_template, send_file, request
+from bartender.drink_recipes import guest_drinks
+from bartender.bar_stock import public_bar_stock
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_FILE = DATA_DIR / "bartender.json"
@@ -27,6 +29,7 @@ DEFAULT_DATA = {
         "display_bar_stock_assignments": [],
     },
     "beers": [],
+    "drink_recipes": [],
     "bar_stock": [],
     "kegs": [],
     "taps": [],
@@ -203,7 +206,7 @@ def index():
         settings=data["settings"],
         taps=taps,
         kegs=data.get("kegs", []),
-        bar_stock=data.get("bar_stock", []),
+        bar_stock=public_bar_stock(data.get("bar_stock", []), data["settings"].get("public_stock_hidden_categories")),
         on_deck_kegs=on_deck_kegs,
         selected_display_index=selected_display_index,
         show_taps=show_taps,
@@ -253,6 +256,8 @@ def menu():
         settings=data["settings"],
         on_tap=on_tap,
         packaged_beers=packaged_beers,
+        drinks=guest_drinks(data),
+        menu_bar_stock=public_bar_stock(data.get("bar_stock", []), data["settings"].get("public_stock_hidden_categories")) if _coerce_bool(data["settings"].get("bar_stock_enabled"), True) else [],
     )
 
 

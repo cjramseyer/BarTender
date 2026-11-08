@@ -1219,24 +1219,23 @@ body[data-manage-pos="bottom-right"] .dashboard-manage-row {
   position: absolute;
   inset: 8px 3px 4px;
   border-radius: 5px;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 17%,
-      rgba(30, 41, 59, 0.62) 17%,
-      rgba(30, 41, 59, 0.62) 26%,
-      transparent 26%,
-      transparent 45%,
-      rgba(30, 41, 59, 0.62) 45%,
-      rgba(30, 41, 59, 0.62) 55%,
-      transparent 55%,
-      transparent 74%,
-      rgba(30, 41, 59, 0.62) 74%,
-      rgba(30, 41, 59, 0.62) 83%,
-      transparent 83%,
-      transparent 100%
-    );
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 17%,
+    rgba(30, 41, 59, 0.62) 17%,
+    rgba(30, 41, 59, 0.62) 26%,
+    transparent 26%,
+    transparent 45%,
+    rgba(30, 41, 59, 0.62) 45%,
+    rgba(30, 41, 59, 0.62) 55%,
+    transparent 55%,
+    transparent 74%,
+    rgba(30, 41, 59, 0.62) 74%,
+    rgba(30, 41, 59, 0.62) 83%,
+    transparent 83%,
+    transparent 100%
+  );
   opacity: 0.88;
   pointer-events: none;
   z-index: 3;
@@ -1896,6 +1895,17 @@ small.muted {
 [data-theme="dark"] .settings-warning-block {
   border-color: #f59e0b;
   background: #3b2a10;
+}
+
+.stock-category-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.5rem;
+}
+.stock-category-options .radio-label {
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+  margin-bottom: 0;
 }
 
 .menu-screen-actions {
