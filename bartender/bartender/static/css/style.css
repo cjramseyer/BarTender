@@ -1898,6 +1898,17 @@ small.muted {
   background: #3b2a10;
 }
 
+.stock-category-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.5rem;
+}
+.stock-category-options .radio-label {
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+  margin-bottom: 0;
+}
+
 .menu-screen-actions {
   margin-top: 1.2rem;
 }

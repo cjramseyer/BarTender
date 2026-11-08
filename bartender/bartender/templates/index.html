@@ -291,32 +291,6 @@ content %}
       >
     </div>
   </div>
-  {% endif %} {% if settings.bar_stock_enabled %}
-  <div class="card">
-    <h2 class="dashboard-panel-title">
-      <a class="dashboard-card-title-link" href="{{ ingress }}/stock"
-        >📦 Bar Stock ({{ bar_stock | length }} items)</a
-      >
-    </h2>
-    {% if bar_stock %}
-    <ul class="stock-summary">
-      {% for item in bar_stock[:5] %}
-      <li>{{ item.name }} – {{ item.quantity }} {{ item.unit }}</li>
-      {% endfor %} {% if bar_stock | length > 5 %}
-      <li class="muted">…and {{ bar_stock | length - 5 }} more</li>
-      {% endif %}
-    </ul>
-    {% else %}
-    <p class="muted">
-      No stock items. <a href="{{ ingress }}/stock">Add stock</a>.
-    </p>
-    {% endif %}
-    <div class="dashboard-manage-row">
-      <a class="btn btn-sm dashboard-manage-btn" href="{{ ingress }}/stock"
-        >Manage Stock</a
-      >
-    </div>
-  </div>
   {% endif %}
 </div>
 

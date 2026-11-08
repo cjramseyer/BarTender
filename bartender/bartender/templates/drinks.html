@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Drinks{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ ingress }}/static/css/drinks.css" />
+<div class="page-header">
+  <h1>Drinks</h1>
+  {% if can_manage %}
+  <div class="drink-actions">
+  <button type="button" class="btn btn-secondary" id="addClassicsBtn">Add Classics</button>
+  <button type="button" class="btn btn-primary" id="addDrinkBtn">+ Add Drink</button>
+  </div>
+  {% endif %}
+</div>
+<div class="drink-toolbar">
+  <div class="form-group"><label for="drinkSearch">Search</label><input id="drinkSearch" class="form-control" type="search" placeholder="Name, spirit, flavor or ingredient" /></div>
+  <div class="form-group"><label for="drinkCategoryFilter">Category</label><select id="drinkCategoryFilter" class="form-control"><option value="">All drinks</option>{% for category in categories %}<option value="{{ category }}">{{ 'Nonalcoholic' if category == 'nonalcoholic' else category | title }}</option>{% endfor %}</select></div>
+  <div class="form-group"><label for="drinkMethodFilter">Method</label><select id="drinkMethodFilter" class="form-control"><option value="">All methods</option>{% for method in methods %}<option value="{{ method }}">{{ method | title }}</option>{% endfor %}</select></div>
+  <label class="drink-check"><input id="drinkReadyFilter" type="checkbox" /> Can Make Now</label>
+  <a href="{{ ingress }}/menu" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Guest Menu</a>
+</div>
+<p class="muted" id="drinkResultCount" role="status"></p>
+<p id="drinkPageError" class="drink-error" role="alert" hidden></p>
+<div id="drinkList">
+  {% set status_labels = {'in_stock': 'In stock', 'out_of_stock': 'Out of stock', 'not_linked': 'Not in bar stock', 'missing_stock': 'Stock item missing', 'unknown': 'Availability unknown'} %}
+  {% for recipe in recipes | sort(attribute='name') %}
+  <details class="drink-recipe" id="recipe-{{ recipe.id }}" data-recipe-id="{{ recipe.id }}">
+    <summary>
+      <span class="drink-summary-name">{{ recipe.name }}<span class="muted drink-summary-meta">{{ recipe.category | title }} / {{ recipe.method | title }}{% if recipe.base_spirit %} / {{ recipe.base_spirit }}{% endif %}</span></span>
+      <span class="drink-status {{ 'drink-status-ready' if recipe.can_make else 'drink-status-missing' if recipe.missing_ingredients else 'drink-status-unknown' }}">{{ 'Stock on hand' if recipe.can_make else 'Missing: ' ~ recipe.missing_ingredients | join(', ') if recipe.missing_ingredients else 'Availability unknown' }}</span>
+    </summary>
+    <div class="drink-recipe-body">
+      {% if recipe.description %}<p>{{ recipe.description }}</p>{% endif %}
+      <dl class="drink-specs">
+        {% for field, label in [('glassware', 'Glass'), ('ice', 'Ice'), ('garnish', 'Garnish'), ('flavor', 'Flavor')] %}
+        {% if recipe[field] %}<div><dt>{{ label }}</dt><dd>{{ recipe[field] }}</dd></div>{% endif %}
+        {% endfor %}
+      </dl>
+      <h2>Ingredients</h2>
+      <ul class="drink-ingredients">
+        {% for ingredient in recipe.ingredients %}
+        <li>
+          <span>{{ ingredient.amount }} {{ ingredient.unit }} <strong>{{ ingredient.name }}</strong>{% if ingredient.optional %} <span class="muted">(optional)</span>{% endif %}</span>
+          <span class="muted">{{ ingredient.stock_name or 'Not linked to bar stock' }}</span>
+          <span class="drink-status {{ 'drink-status-ready' if ingredient.availability == 'in_stock' else 'drink-status-unknown' if ingredient.availability == 'unknown' else 'drink-status-missing' }}">{{ status_labels[ingredient.availability] }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      <h2>Preparation / {{ recipe.method | title }}</h2>
+      <ol class="drink-steps">{% for step in recipe.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+      {% for field, label in [('substitutions', 'Substitutions'), ('allergens', 'Allergens'), ('notes', 'Notes')] %}
+      {% if recipe[field] %}<p><strong>{{ label }}:</strong> {{ recipe[field] }}</p>{% endif %}
+      {% endfor %}
+      {% if recipe.source_url %}<p><a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">Recipe source</a></p>{% endif %}
+      <div class="drink-footer">
+        <span class="muted">Revision {{ recipe.revision }} / {{ 'On guest menu' if recipe.menu_visible else 'Staff only' }}{% if recipe.price %} / {{ recipe.price }}{% endif %}</span>
+        {% if can_manage %}<div class="drink-actions"><button type="button" class="btn btn-sm btn-secondary" data-edit-drink="{{ recipe.id }}">Edit</button><button type="button" class="btn btn-sm btn-danger" data-delete-drink="{{ recipe.id }}">Delete</button></div>{% endif %}
+      </div>
+    </div>
+  </details>
+  {% endfor %}
+</div>
+<p id="drinkEmpty" class="muted text-center" hidden>No drinks match these filters.</p>
+{% if can_manage %}
+<div class="modal" id="drinkModal" role="dialog" aria-modal="true" aria-labelledby="drinkModalTitle">
+  <div class="modal-dialog modal-dialog-lg">
+    <div class="modal-header"><h3 id="drinkModalTitle">Add Drink</h3><button type="button" class="btn btn-icon" title="Close" aria-label="Close" onclick="closeModal('drinkModal')">&times;</button></div>
+    <form id="drinkForm">
+      <input type="hidden" id="drinkId" />
+      <div id="drinkStarterGroup" class="form-group"><label for="drinkStarter">Classic specification</label><select id="drinkStarter" class="form-control"><option value="">Custom drink</option>{% for key, starter in starters.items() | sort(attribute='1.name') %}<option value="{{ key }}">{{ starter.name }}{% if starter.category == 'nonalcoholic' %} (nonalcoholic){% endif %}</option>{% endfor %}</select></div>
+      <div class="form-row">
+        <div class="form-group"><label for="drinkName">Name *</label><input id="drinkName" class="form-control" required maxlength="200" /></div>
+        <div class="form-group"><label for="drinkCategory">Category</label><select id="drinkCategory" class="form-control">{% for category in categories %}<option value="{{ category }}">{{ category | title }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="form-group"><label for="drinkDescription">Menu description</label><textarea id="drinkDescription" class="form-control" rows="2" maxlength="4000"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label for="drinkBaseSpirit">Base spirit</label><input id="drinkBaseSpirit" class="form-control" maxlength="200" /></div>
+        <div class="form-group"><label for="drinkFlavor">Flavor</label><input id="drinkFlavor" class="form-control" maxlength="200" /></div>
+        <div class="form-group"><label for="drinkMethod">Method</label><select id="drinkMethod" class="form-control">{% for method in methods %}<option value="{{ method }}">{{ method | title }}</option>{% endfor %}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="drinkGlassware">Glassware</label><input id="drinkGlassware" class="form-control" maxlength="200" /></div>
+        <div class="form-group"><label for="drinkIce">Ice</label><input id="drinkIce" class="form-control" maxlength="200" /></div>
+        <div class="form-group"><label for="drinkGarnish">Garnish</label><input id="drinkGarnish" class="form-control" maxlength="200" /></div>
+      </div>
+      <h4>Ingredients</h4>
+      <div id="drinkIngredientRows"></div>
+      <button type="button" class="btn btn-sm btn-secondary" id="addIngredientBtn">+ Add Ingredient</button>
+      <div class="form-group"><label for="drinkSteps">Preparation steps (one per line) *</label><textarea id="drinkSteps" class="form-control" rows="5" required maxlength="20000"></textarea></div>
+      <div class="form-group"><label for="drinkSubstitutions">Substitutions</label><textarea id="drinkSubstitutions" class="form-control" rows="2" maxlength="4000"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label for="drinkAllergens">Allergens</label><input id="drinkAllergens" class="form-control" maxlength="4000" /></div>
+        <div class="form-group"><label for="drinkPrice">Menu price (include currency)</label><input id="drinkPrice" class="form-control" maxlength="100" /></div>
+      </div>
+      <div class="form-group"><label for="drinkSourceUrl">Source URL</label><input id="drinkSourceUrl" class="form-control" type="url" maxlength="4000" /></div>
+      <div class="form-group"><label for="drinkNotes">Staff notes</label><textarea id="drinkNotes" class="form-control" rows="2" maxlength="4000"></textarea></div>
+      <label class="drink-check"><input id="drinkMenuVisible" type="checkbox" /> Publish on guest menu</label>
+      <p id="drinkFormError" class="drink-error" role="alert" hidden></p>
+      <div class="modal-footer"><button type="button" class="btn" onclick="closeModal('drinkModal')">Cancel</button><button type="submit" class="btn btn-primary" id="saveDrinkBtn">Save</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+<script id="drinkData" type="application/json">{{ {'recipes': recipes, 'stock': bar_stock, 'units': ingredient_units, 'starters': starters, 'ingress': ingress, 'measurement': settings.measurement} | tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ ingress }}/static/js/drinks.js"></script>{% endblock %}

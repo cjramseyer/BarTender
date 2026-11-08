@@ -23,6 +23,7 @@ Primary runtime components:
 - Dashboard overview of taps, kegs, and counts.
 - Beer catalog CRUD (create, list, update, delete).
 - Bar stock CRUD (create, list, update, delete).
+- Pro drink recipe catalog with ingredient stock links, live availability, traditional methods, and guest-menu publishing.
 - Keg CRUD with lifecycle tracking and cleaning constraints.
 - Tap CRUD with keg assignment.
 - Settings management (bar name/logo, measurement, theme, bar stock toggle, API Reference nav toggle, keg type choices/default, default pour preset, dashboard manage button position, printable menu QR mode).
@@ -194,6 +195,12 @@ POST /api/analytics/reset
 
 ### Bar Stock
 
+The management app and stock API retain all inventory, including garnishes and recipe extras. Public displays and the menu's **Bottles and Drinks** section filter stock by category only; there is no per-item visibility checkbox.
+
+In **Settings -> General -> App-Only Stock Categories**, select categories to exclude from displays and menus. Standard categories, categories currently used by stock, and previously configured exclusions are available. Exclusions default to Garnish/Garnishes, Syrups, Bitters, Mixers, Tonic / Soda, Juice, Other, Ingredients, Fruit, Sweeteners, Spices, and Ice. Uncategorized items are treated as Other. All categories not excluded remain public, including custom bottle categories.
+
+The `public_stock_hidden_categories` Settings field is an array of category names. Owners and managers can update it through `POST /api/settings`; comparisons ignore case and surrounding whitespace. An empty array displays all stock categories. The selection is preserved in backups and applies identically to both management and read-only display/menu routes. Public menus omit internal stock notes. Excluding a category never removes stock or changes recipe availability.
+
 GET /api/stock
 
 - Returns list of stock items.
@@ -245,6 +252,66 @@ DELETE /api/stock/<id>
 ```json
 { "ok": true }
 ```
+
+### Drinks and Recipes
+
+With a Pro bar profile, open **Drinks** in the navigation or **Menu -> Bartender Recipes**. Both links are hidden for non-Pro profiles, and direct recipe-page/API access, including Add Classics, returns 403 with `DRINKS_PRO_REQUIRED`. All signed-in team members in a Pro profile can search and read recipes; only owners and managers can create, edit, or delete them. Recipe changes appear in the audit log. Switching away from Pro preserves saved recipes and includes them in backups, but disables recipe access and hides published cocktails/nonalcoholic recipes from both guest-menu servers.
+
+Use **Add Drink** for a custom specification or select one of 33 editable bar starters. The catalog includes Negroni, Manhattan, Daiquiri, Mojito, Old Fashioned, Dry Martini, Vodka Martini, Margarita, Whiskey Sour, Cosmopolitan, Moscow Mule, Gin and Tonic, Tom Collins, Rum and Coke, Cuba Libre, Bloody Mary, Screwdriver, Tequila Sunrise, Mai Tai, Pina Colada, Espresso Martini, Aperol Spritz, French 75, Sidecar, Sazerac, Boulevardier, Paloma, Mint Julep, White Russian, Long Island Iced Tea, Shirley Temple, Virgin Mojito, and Lime Soda.
+
+Owners and managers can use **Add Classics** (`POST /api/drinks/classics`) to add every missing catalog recipe at once. Existing drinks are matched by case-insensitive name and are never overwritten. Repeating the action adds no duplicates. Imported recipes remain staff-only until explicitly published; inventory quantities are unchanged. Exact, unique ingredient-name matches are linked to stock, while all other links must be selected explicitly. The response reports `added` and `skipped` counts, and successful additions are audited.
+
+These recipes are starting bar specifications, not a claim that every bar uses the same ratios. Adjust measures, substitutions, and allergen notes to the house recipe and actual ingredient labels. Optional garnishes and pasteurized egg white are marked explicitly; carbonated ingredients are topped after mixing, not shaken.
+
+Each recipe stores a name, category (`classic`, `house`, `nonalcoholic`), base spirit, flavor, description, preparation method, ordered steps, glassware, ice, garnish, substitutions, allergens, source URL, staff notes, menu price text, publication flag, revision, and update timestamp. Preparation methods are `build`, `stir`, `shake`, `muddle`, and `blend`. Steps should describe chilling, dilution, straining, and when to add ice; carbonated ingredients should be added after shaking, never shaken.
+
+Ingredients have their own names, positive measures, units, optional flags, and nullable `stock_id` links. Units are preserved as entered: `ml`, `cl`, `l`, `oz`, `tsp`, `tbsp`, `dash`, `drop`, and `piece`. The measurement setting supplies the default unit for new ingredients, but never silently converts an existing specification.
+
+Ingredient indicators are calculated from current bar stock whenever recipes are loaded:
+
+- **In stock:** the linked stock item has a known quantity greater than zero.
+- **Out of stock:** the linked item has zero or negative quantity.
+- **Not in bar stock:** no bar-stock item is selected for the ingredient.
+- **Stock item missing:** an imported recipe references a stock item that does not exist.
+- **Availability unknown:** the quantity cannot be determined or Bar Stock is disabled.
+
+**Can Make Now** includes only recipes whose required ingredients all have stock on hand. Optional ingredients still show their own indicators but do not block readiness. Stock quantities represent containers/items, not measured liquid remaining; readiness does not guarantee sufficient volume for a serving. Viewing or saving recipes never deducts stock. Deleting stock clears its recipe links while preserving ingredient names, preventing accidental relinking if a numeric stock ID is reused.
+
+Select **Publish on guest menu** to list a drink in the Cocktails or Nonalcoholic Drinks section on both management and read-only printable menus. Guest menus expose names, descriptions, price text, allergens, and availability only; ingredient lists, measures, steps, stock links, substitutions, and staff notes remain private. Unavailable published drinks are labeled **Currently unavailable**; unknown availability is labeled **Ask about availability**.
+
+Recipe API:
+
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| GET | `/api/drinks` | List recipes with computed stock status; supports `q`, `category`, `method`, and `can_make=true` |
+| GET | `/api/drinks/<id>` | Read one recipe with stock status |
+| POST | `/api/drinks` | Create a recipe; owner/manager required |
+| POST | `/api/drinks/classics` | Add missing classic recipes; owner/manager required; existing drinks are preserved |
+| PUT | `/api/drinks/<id>` | Partially update a recipe; owner/manager required |
+| DELETE | `/api/drinks/<id>` | Delete a recipe; owner/manager required |
+
+The API returns per-ingredient `availability` and `stock_name`, plus recipe-level `can_make`, `missing_ingredients`, and `unknown_ingredients`. Computed fields are not persisted. Invalid specifications or new links to nonexistent stock return 400; insufficient editing permissions return 403; unknown recipes return 404. External tokens alone do not grant the owner/manager role required to edit recipes.
+
+Recipes live in the `drink_recipes` application-state collection using the configured transactional storage backend. JSON backups include recipes; ZIP backups also contain `drink_recipes.json`. Import preview reports recipe counts. Replace restores recipes together with stock; merge updates recipes by ID or appends new IDs. Older backups without recipes remain supported, restoring an empty recipe catalog in replace mode and retaining current recipes in merge mode. Malformed recipe records are excluded during normalization and reflected in preview counts.
+
+### Recipe Shopping List (Pro)
+
+Open **Shopping List** from the Menu dropdown when using a Pro bar profile. The option is hidden for non-Pro profiles, and both `/shopping-list` and `GET /api/shopping-list` return 403 with `SHOPPING_LIST_PRO_REQUIRED` if accessed directly without a Pro profile. This follows the existing profile gate used by other Pro features; it does not introduce a separate license rule. The authenticated page and endpoint derive the list from every saved recipe, including staff-only drinks, without storing another inventory collection. Drinks and recipe stock indicators also require a Pro profile; saved records remain intact when changing profiles.
+
+- Ingredients whose linked stock quantity is zero or negative appear as **Out of stock**.
+- Ingredients without a selected bar-stock item appear as **Not in bar stock**; links to deleted or absent stock appear as **Stock item missing**.
+- Linked ingredients are combined by stock ID. Unlinked ingredients are combined by case-insensitive name with normalized whitespace. Distinct linked stock products remain separate.
+- The page groups ingredients into alphabetically ordered drink sections. Each ingredient appears only once, under the first alphabetical drink that needs it, with references to all other affected drinks. Ingredients required by any drink sort before ingredients that are optional for every drink. Empty sections are omitted, while the summary still counts all affected drinks.
+- In-stock ingredients and ingredients with unknown quantities are excluded. When Bar Stock is disabled, the page reports unknown availability rather than inventing shortages.
+- Stock replenishment, recipe editing, and recipe deletion update the list on its next load. Merely viewing or printing the list never changes inventory.
+
+Use **Print List** for a paper copy; navigation and action controls are omitted from print output. Recipe names link back to the relevant expanded recipe. No purchase quantities are calculated because container counts cannot reliably represent the volume required for an unknown number of servings.
+
+Each item has **Add to Bar Stock**, which opens the existing dialog on the Bar Stock page. New items start with the ingredient name, quantity 1, category Other, and recipe names in Notes. Existing out-of-stock items instead open **Restock Item** with their category, container size, and notes preserved. A recipe measure is never used as a container size. Adjust the fields and save to return to the shopping list.
+
+Creating stock from this workflow automatically links the affected missing recipe ingredients to the new item and audits those links. Replenishing an existing item updates its original record without creating a duplicate. Saved positive quantities remove the resulting shortage on the next list load. Stale shopping-item requests return 409 without creating stock; failed saves leave the dialog open with an error message.
+
+The API retains its combined, deduplicated array of items with `name`, nullable `stock_id`, `availability`, `optional`, and a `recipes` array of `{id, name, optional}` references. Drink grouping is applied to the page, not to the API contract. All signed-in team roles in a Pro profile can view it; unauthenticated API access returns 401.
 
 ### Beers
 
@@ -548,7 +615,7 @@ POST /api/import/json
 
 Import mode behavior:
 
-- replace: overwrite current settings, beers, kegs, taps, and bar stock.
+- replace: overwrite current settings, beers, drink recipes, kegs, taps, and bar stock.
 - merge: merge settings keys and upsert beers/kegs/taps/stock by id.
 
 ## Error Behavior

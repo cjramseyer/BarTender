@@ -169,6 +169,18 @@ content %}
       brewed_on: "2026-08-01",
       notes: "Citrus-forward",
     },
+    "POST /api/drinks": {
+      name: "Negroni", category: "classic", method: "stir",
+      glassware: "Rocks", ice: "Fresh cubes", garnish: "Orange peel",
+      menu_visible: false,
+      ingredients: [
+        { name: "Gin", amount: 30, unit: "ml", stock_id: null },
+        { name: "Campari", amount: 30, unit: "ml", stock_id: null },
+        { name: "Sweet vermouth", amount: 30, unit: "ml", stock_id: null },
+      ],
+      steps: ["Stir ingredients with ice.", "Strain over fresh ice and garnish."],
+    },
+    "PUT /api/drinks/<id>": { menu_visible: true, price: "$12" },
     "PUT /api/beers/<id>": {
       name: "Hazy Trail IPA",
       packaging: "bottled_can",

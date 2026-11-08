@@ -57,6 +57,8 @@ Sync**. The selected provider is displayed in the Settings About panel.
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
+- **Drinks and Recipes (Pro)** — Saved bartender recipes with traditional methods, classic starters, bar-stock links, missing/out-of-stock indicators, and guest-menu publishing; requires a Pro bar profile, with owner/manager editing and JSON/ZIP backup support
+- **Shopping List (Pro)** — Printable list of missing and out-of-stock recipe ingredients, combined across saved drinks and updated from current inventory; requires a Pro bar profile
 - **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, and recipe/source details
 - **Beer CSV Import/Export** — Bulk add or back up catalog entries using a canonical CSV schema with preview validation before apply
 - **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog

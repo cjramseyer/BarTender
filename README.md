@@ -27,6 +27,9 @@ Sample dashboard with seeded data:
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and current status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other bar supplies with quantity and category management
+- **Public Stock Categories** — Settings-controlled app-only categories keep garnishes, syrups, and extra ingredients out of display boards and public menus without per-item visibility checkboxes
+- **Drinks and Recipes (Pro)** — Bartender recipe lookup with traditional methods, classic starters, ingredient measures, stock links and missing/out-of-stock indicators; owner/manager editing, guest-menu publishing, and recipe backup/restore
+- **Classic Bar Catalog (Pro)** — 33 editable traditional and common bar recipes, including nonalcoholic choices; **Add Classics** imports missing recipes without overwriting existing drinks or publishing them to the guest menu
 - **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, and recipe/source details
 - **Keg Management** — Track keg inventory, lifecycle state, fill-level data, and on-deck status; select beer details from the Beer Catalog
 - **Tap Management** — Assign kegs to numbered taps and label each line, with single-tap keg assignment protection
@@ -50,6 +53,7 @@ Sample dashboard with seeded data:
 
 ## Recent Changes
 
+- Added Drinks with saved cocktail/nonalcoholic recipes, traditional methods, bar-stock availability indicators, and guest-menu sections.
 - Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
 - Added first-time setup wizard that requires a bar name before initial use.
 - Added pour mode setting so pour controls only appear in Manual mode.
@@ -140,6 +144,10 @@ External API security is configured in **Settings -> API Settings**:
 ## REST API
 
 The add-on exposes a JSON REST API at the ingress URL.
+
+Drink recipes use `GET/POST /api/drinks` and `GET/PUT/DELETE /api/drinks/<id>`. All drink routes and classic imports require a Pro bar profile. Listing supports `q`, `category`, `method`, and `can_make=true` filters and returns live ingredient stock indicators. Editing also requires an owner/manager session. See [the recipe workflow and API](docs/core-app.md#drinks-and-recipes).
+
+**Shopping List (Pro)** (`/shopping-list`, `GET /api/shopping-list`) automatically combines missing and out-of-stock ingredients across saved drink recipes, identifies the drinks that need them, and supports printing. A Pro bar profile is required for the menu option and direct access. Replenishing stock removes linked items from the list on its next load.
 
 | Method | Endpoint                           | Description                                               |
 | ------ | ---------------------------------- | --------------------------------------------------------- |

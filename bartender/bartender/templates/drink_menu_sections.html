@@ -1,0 +1,33 @@
+{% if menu_bar_stock %}
+<section style="margin-top: 1.5rem">
+  <h2 class="menu-section-title section-title">Bottles and Drinks</h2>
+  <div class="menu-grid">
+    {% for item in menu_bar_stock %}
+    <article class="menu-item">
+      <h3 class="menu-item-name" style="overflow-wrap: anywhere">{{ item.name }}</h3>
+      {% if item.category %}<p class="muted">{{ item.category }}</p>{% endif %}
+      {% if item.size_label or item.unit %}<p class="muted">{{ item.size_label or item.unit }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% for category, title in [('cocktails', 'Cocktails'), ('nonalcoholic', 'Nonalcoholic Drinks')] %}
+{% set items = drinks | selectattr('category', 'equalto', 'nonalcoholic') | list if category == 'nonalcoholic' else drinks | rejectattr('category', 'equalto', 'nonalcoholic') | list %}
+{% if items %}
+<section style="margin-top: 1.5rem">
+  <h2 class="menu-section-title section-title">{{ title }}</h2>
+  <div class="menu-grid">
+    {% for drink in items %}
+    <article class="menu-item">
+      <h3 class="menu-item-name" style="overflow-wrap: anywhere">{{ drink.name }}</h3>
+      {% if drink.description %}<p class="muted" style="overflow-wrap: anywhere">{{ drink.description }}</p>{% endif %}
+      {% if drink.price %}<p>{{ drink.price }}</p>{% endif %}
+      {% if drink.allergens %}<p class="muted">Allergens: {{ drink.allergens }}</p>{% endif %}
+      {% if drink.availability == 'unavailable' %}<p><strong>Currently unavailable</strong></p>{% elif drink.availability == 'unknown' %}<p class="muted">Ask about availability</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endfor %}
