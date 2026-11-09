@@ -1,0 +1,705 @@
+{
+  "negroni": {
+    "name": "Negroni",
+    "base_spirit": "Gin",
+    "method": "stir",
+    "glassware": "Rocks",
+    "ice": "Fresh cubes",
+    "garnish": "Orange peel",
+    "flavor": "Bitter / spirit-forward",
+    "description": "Gin, bitter aperitif and sweet vermouth.",
+    "ingredients": [
+      ["Gin", 30, "ml"],
+      ["Campari", 30, "ml"],
+      ["Sweet vermouth", 30, "ml"],
+      ["Orange peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Add gin, Campari and sweet vermouth to a mixing glass with ice.",
+      "Stir until chilled; strain over fresh ice in a rocks glass.",
+      "Express an orange peel over the drink and garnish."
+    ]
+  },
+  "manhattan": {
+    "name": "Manhattan",
+    "base_spirit": "Rye whiskey",
+    "method": "stir",
+    "glassware": "Coupe",
+    "ice": "Mixing ice; served up",
+    "garnish": "Cocktail cherry",
+    "flavor": "Spirit-forward",
+    "description": "Whiskey, sweet vermouth and aromatic bitters.",
+    "ingredients": [
+      ["Rye whiskey", 50, "ml"],
+      ["Sweet vermouth", 20, "ml"],
+      ["Angostura bitters", 2, "dash"],
+      ["Cocktail cherry", 1, "piece", true]
+    ],
+    "steps": [
+      "Add whiskey, vermouth and bitters to a mixing glass with ice.",
+      "Stir until chilled; strain into a chilled coupe.",
+      "Garnish with a cocktail cherry."
+    ]
+  },
+  "daiquiri": {
+    "name": "Daiquiri",
+    "base_spirit": "White rum",
+    "method": "shake",
+    "glassware": "Coupe",
+    "ice": "Shaking ice; served up",
+    "flavor": "Citrus / tart",
+    "description": "White rum, fresh lime and sugar.",
+    "ingredients": [
+      ["White rum", 60, "ml"],
+      ["Lime juice", 20, "ml"],
+      ["Fine sugar", 2, "tsp"]
+    ],
+    "steps": [
+      "Stir rum, lime juice and sugar in a shaker until the sugar dissolves.",
+      "Add ice and shake until chilled.",
+      "Fine-strain into a chilled coupe."
+    ]
+  },
+  "mojito": {
+    "name": "Mojito",
+    "base_spirit": "White rum",
+    "method": "muddle",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Mint sprig",
+    "flavor": "Fresh / citrus",
+    "description": "Rum, lime and mint topped with soda.",
+    "ingredients": [
+      ["White rum", 45, "ml"],
+      ["Lime juice", 20, "ml"],
+      ["Fine sugar", 2, "tsp"],
+      ["Mint leaves", 6, "piece"],
+      ["Soda water", 60, "ml"]
+    ],
+    "steps": [
+      "Gently press mint with sugar and lime juice in a highball without shredding the leaves.",
+      "Add rum and stir, then fill the glass with ice.",
+      "Top with soda water and stir gently. Do not shake carbonated ingredients."
+    ]
+  },
+  "old-fashioned": {
+    "name": "Old Fashioned",
+    "base_spirit": "Bourbon",
+    "method": "build",
+    "glassware": "Rocks",
+    "ice": "Large cube",
+    "garnish": "Orange peel",
+    "flavor": "Spirit-forward / bittersweet",
+    "description": "Bourbon, sugar and aromatic bitters.",
+    "ingredients": [
+      ["Bourbon", 60, "ml"],
+      ["Sugar cube", 1, "piece"],
+      ["Water", 5, "ml"],
+      ["Angostura bitters", 2, "dash"],
+      ["Orange peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Saturate the sugar cube with bitters and water in a rocks glass; crush and stir to dissolve.",
+      "Add bourbon and a large ice cube, then stir until chilled.",
+      "Express an orange peel over the drink and garnish."
+    ]
+  },
+  "dry-martini": {
+    "name": "Dry Martini",
+    "base_spirit": "Gin",
+    "method": "stir",
+    "glassware": "Martini glass",
+    "ice": "Mixing ice; served up",
+    "garnish": "Lemon twist or olive",
+    "flavor": "Dry / spirit-forward",
+    "description": "Gin and dry vermouth, stirred and served up.",
+    "ingredients": [
+      ["Gin", 60, "ml"],
+      ["Dry vermouth", 10, "ml"],
+      ["Lemon peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Add gin and dry vermouth to a mixing glass with ice.",
+      "Stir until well chilled and strain into a chilled martini glass.",
+      "Garnish with a lemon twist or an olive."
+    ]
+  },
+  "vodka-martini": {
+    "name": "Vodka Martini",
+    "base_spirit": "Vodka",
+    "method": "stir",
+    "glassware": "Martini glass",
+    "ice": "Mixing ice; served up",
+    "garnish": "Lemon twist",
+    "flavor": "Dry / clean",
+    "description": "Vodka and dry vermouth, stirred and served up.",
+    "ingredients": [
+      ["Vodka", 60, "ml"],
+      ["Dry vermouth", 10, "ml"],
+      ["Lemon peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Add vodka and dry vermouth to a mixing glass with ice.",
+      "Stir until well chilled; strain into a chilled martini glass.",
+      "Express a lemon twist over the surface and garnish."
+    ]
+  },
+  "margarita": {
+    "name": "Margarita",
+    "base_spirit": "Tequila",
+    "method": "shake",
+    "glassware": "Coupe or rocks",
+    "ice": "Shaking ice; served up or over fresh cubes",
+    "garnish": "Lime wedge / salt rim",
+    "flavor": "Citrus / tart",
+    "description": "Tequila, orange liqueur and fresh lime.",
+    "ingredients": [
+      ["Blanco tequila", 50, "ml"],
+      ["Triple sec", 20, "ml"],
+      ["Lime juice", 25, "ml"],
+      ["Salt", 0.25, "tsp", true],
+      ["Lime wedge", 1, "piece", true]
+    ],
+    "steps": [
+      "Optionally salt half the rim of a chilled glass.",
+      "Shake tequila, triple sec and lime juice with ice until chilled.",
+      "Strain into the glass, either up or over fresh ice, and garnish with lime."
+    ]
+  },
+  "whiskey-sour": {
+    "name": "Whiskey Sour",
+    "base_spirit": "Bourbon",
+    "method": "shake",
+    "glassware": "Rocks",
+    "ice": "Shaking ice / fresh cubes",
+    "garnish": "Lemon peel",
+    "flavor": "Citrus / balanced",
+    "description": "Bourbon, lemon and sugar with an optional silky foam.",
+    "allergens": "Egg if optional egg white is used",
+    "ingredients": [
+      ["Bourbon", 60, "ml"],
+      ["Lemon juice", 30, "ml"],
+      ["Simple syrup", 20, "ml"],
+      ["Pasteurized egg white", 15, "ml", true]
+    ],
+    "steps": [
+      "Combine bourbon, lemon juice and syrup in a shaker; add optional pasteurized egg white.",
+      "If using egg white, shake without ice first. Then add ice and shake until chilled.",
+      "Fine-strain into a rocks glass over fresh ice and garnish."
+    ]
+  },
+  "cosmopolitan": {
+    "name": "Cosmopolitan",
+    "base_spirit": "Vodka",
+    "method": "shake",
+    "glassware": "Coupe",
+    "ice": "Shaking ice; served up",
+    "garnish": "Orange peel",
+    "flavor": "Citrus / cranberry",
+    "description": "Citrus vodka, orange liqueur, cranberry and lime.",
+    "ingredients": [
+      ["Citrus vodka", 40, "ml"],
+      ["Triple sec", 15, "ml"],
+      ["Cranberry juice", 30, "ml"],
+      ["Lime juice", 15, "ml"],
+      ["Orange peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Shake vodka, triple sec, cranberry juice and lime juice with ice.",
+      "Fine-strain into a chilled coupe.",
+      "Express an orange peel over the surface and garnish."
+    ]
+  },
+  "moscow-mule": {
+    "name": "Moscow Mule",
+    "base_spirit": "Vodka",
+    "method": "build",
+    "glassware": "Mule mug or highball",
+    "ice": "Cubes",
+    "garnish": "Lime wedge",
+    "flavor": "Ginger / citrus",
+    "description": "Vodka and lime topped with ginger beer.",
+    "ingredients": [
+      ["Vodka", 50, "ml"],
+      ["Lime juice", 15, "ml"],
+      ["Ginger beer", 120, "ml"],
+      ["Lime wedge", 1, "piece", true]
+    ],
+    "steps": [
+      "Fill a mug or highball with ice and add vodka and lime juice.",
+      "Top with ginger beer and stir gently.",
+      "Garnish with a lime wedge."
+    ]
+  },
+  "gin-tonic": {
+    "name": "Gin and Tonic",
+    "base_spirit": "Gin",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Lime wedge",
+    "flavor": "Bitter / refreshing",
+    "description": "Gin and tonic water over ice.",
+    "ingredients": [
+      ["Gin", 50, "ml"],
+      ["Tonic water", 150, "ml"],
+      ["Lime wedge", 1, "piece", true]
+    ],
+    "steps": [
+      "Fill a highball with ice and add gin.",
+      "Top with chilled tonic water and stir gently.",
+      "Garnish with lime."
+    ]
+  },
+  "tom-collins": {
+    "name": "Tom Collins",
+    "base_spirit": "Gin",
+    "method": "shake",
+    "glassware": "Collins",
+    "ice": "Shaking ice / fresh cubes",
+    "garnish": "Lemon slice",
+    "flavor": "Citrus / sparkling",
+    "description": "Gin, lemon and sugar lengthened with soda.",
+    "ingredients": [
+      ["Gin", 50, "ml"],
+      ["Lemon juice", 25, "ml"],
+      ["Simple syrup", 20, "ml"],
+      ["Soda water", 100, "ml"],
+      ["Lemon slice", 1, "piece", true]
+    ],
+    "steps": [
+      "Shake gin, lemon juice and syrup with ice; keep soda water out of the shaker.",
+      "Strain into a Collins glass over fresh ice.",
+      "Top with soda water, stir gently and garnish with lemon."
+    ]
+  },
+  "rum-coke": {
+    "name": "Rum and Coke",
+    "base_spirit": "Rum",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "flavor": "Sweet / refreshing",
+    "description": "Rum and cola over ice.",
+    "ingredients": [
+      ["White rum", 50, "ml"],
+      ["Cola", 150, "ml"]
+    ],
+    "steps": [
+      "Fill a highball with ice and add rum.",
+      "Top with chilled cola and stir gently."
+    ]
+  },
+  "cuba-libre": {
+    "name": "Cuba Libre",
+    "base_spirit": "Rum",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Lime wedge",
+    "flavor": "Sweet / citrus",
+    "description": "Rum, cola and fresh lime.",
+    "ingredients": [
+      ["White rum", 50, "ml"],
+      ["Lime juice", 15, "ml"],
+      ["Cola", 120, "ml"],
+      ["Lime wedge", 1, "piece", true]
+    ],
+    "steps": [
+      "Add rum and lime juice to an ice-filled highball.",
+      "Top with cola and stir gently.",
+      "Garnish with a lime wedge."
+    ]
+  },
+  "bloody-mary": {
+    "name": "Bloody Mary",
+    "base_spirit": "Vodka",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Celery stalk",
+    "flavor": "Savory / spicy",
+    "description": "Vodka and tomato juice with lemon and savory seasonings.",
+    "allergens": "Fish in traditional Worcestershire sauce; celery",
+    "ingredients": [
+      ["Vodka", 45, "ml"],
+      ["Tomato juice", 90, "ml"],
+      ["Lemon juice", 15, "ml"],
+      ["Worcestershire sauce", 2, "dash"],
+      ["Hot sauce", 2, "dash"],
+      ["Celery salt", 0.125, "tsp"],
+      ["Black pepper", 0.125, "tsp"],
+      ["Celery stalk", 1, "piece", true]
+    ],
+    "steps": [
+      "Combine vodka, tomato juice, lemon juice and seasonings in a mixing glass.",
+      "Add ice and stir gently to chill without aerating the tomato juice.",
+      "Pour into a highball and garnish with celery. Adjust seasoning to the house specification."
+    ]
+  },
+  "screwdriver": {
+    "name": "Screwdriver",
+    "base_spirit": "Vodka",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Orange slice",
+    "flavor": "Orange / refreshing",
+    "description": "Vodka and orange juice over ice.",
+    "ingredients": [
+      ["Vodka", 50, "ml"],
+      ["Orange juice", 120, "ml"],
+      ["Orange slice", 1, "piece", true]
+    ],
+    "steps": [
+      "Add vodka to an ice-filled highball.",
+      "Add orange juice and stir to combine.",
+      "Garnish with orange."
+    ]
+  },
+  "tequila-sunrise": {
+    "name": "Tequila Sunrise",
+    "base_spirit": "Tequila",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Orange slice",
+    "flavor": "Orange / sweet",
+    "description": "Tequila and orange juice with a grenadine sunrise.",
+    "ingredients": [
+      ["Blanco tequila", 45, "ml"],
+      ["Orange juice", 90, "ml"],
+      ["Grenadine", 15, "ml"],
+      ["Orange slice", 1, "piece", true]
+    ],
+    "steps": [
+      "Add tequila and orange juice to an ice-filled highball and stir.",
+      "Slowly pour grenadine down the inside of the glass so it settles toward the bottom; do not stir again.",
+      "Garnish with orange."
+    ]
+  },
+  "mai-tai": {
+    "name": "Mai Tai",
+    "base_spirit": "Aged rum",
+    "method": "shake",
+    "glassware": "Rocks",
+    "ice": "Shaking ice / crushed ice",
+    "garnish": "Mint sprig",
+    "flavor": "Tropical / citrus / almond",
+    "description": "Aged rum, orange curacao, lime and orgeat.",
+    "allergens": "Almond in traditional orgeat",
+    "ingredients": [
+      ["Aged rum", 60, "ml"],
+      ["Orange curacao", 15, "ml"],
+      ["Lime juice", 30, "ml"],
+      ["Orgeat", 15, "ml"],
+      ["Simple syrup", 5, "ml"],
+      ["Mint leaves", 3, "piece", true]
+    ],
+    "steps": [
+      "Shake rum, curacao, lime juice, orgeat and syrup with ice.",
+      "Strain into a rocks glass over crushed ice.",
+      "Garnish with mint and a spent lime shell if available."
+    ]
+  },
+  "pina-colada": {
+    "name": "Pina Colada",
+    "base_spirit": "White rum",
+    "method": "blend",
+    "glassware": "Hurricane",
+    "ice": "Crushed ice",
+    "garnish": "Pineapple wedge",
+    "flavor": "Tropical / creamy",
+    "description": "Rum, pineapple and cream of coconut.",
+    "allergens": "Coconut; check cream of coconut label for other allergens",
+    "ingredients": [
+      ["White rum", 50, "ml"],
+      ["Pineapple juice", 90, "ml"],
+      ["Cream of coconut", 30, "ml"],
+      ["Ice", 120, "ml"],
+      ["Pineapple wedge", 1, "piece", true]
+    ],
+    "steps": [
+      "Add rum, pineapple juice, cream of coconut and a loosely filled 120 ml measure of crushed ice to a blender.",
+      "Blend until smooth, adjusting ice to the desired texture.",
+      "Pour into a hurricane glass and garnish with pineapple."
+    ]
+  },
+  "espresso-martini": {
+    "name": "Espresso Martini",
+    "base_spirit": "Vodka",
+    "method": "shake",
+    "glassware": "Coupe",
+    "ice": "Shaking ice; served up",
+    "garnish": "Coffee beans",
+    "flavor": "Coffee / rich",
+    "description": "Vodka, coffee liqueur and espresso with a foamy finish.",
+    "ingredients": [
+      ["Vodka", 50, "ml"],
+      ["Coffee liqueur", 25, "ml"],
+      ["Espresso", 30, "ml"],
+      ["Simple syrup", 5, "ml"],
+      ["Coffee beans", 3, "piece", true]
+    ],
+    "steps": [
+      "Combine vodka, coffee liqueur, espresso and syrup in a shaker.",
+      "Add plenty of ice and shake firmly until chilled and foamy.",
+      "Fine-strain into a chilled coupe and garnish with three coffee beans."
+    ]
+  },
+  "aperol-spritz": {
+    "name": "Aperol Spritz",
+    "base_spirit": "Aperol",
+    "method": "build",
+    "glassware": "Wine glass",
+    "ice": "Cubes",
+    "garnish": "Orange slice",
+    "flavor": "Bittersweet / sparkling",
+    "description": "Prosecco, Aperol and soda over ice.",
+    "allergens": "Sulphites in wine",
+    "ingredients": [
+      ["Prosecco", 90, "ml"],
+      ["Aperol", 60, "ml"],
+      ["Soda water", 30, "ml"],
+      ["Orange slice", 1, "piece", true]
+    ],
+    "steps": [
+      "Fill a wine glass with ice and add prosecco and Aperol.",
+      "Top with soda water and stir gently.",
+      "Garnish with orange."
+    ]
+  },
+  "french-75": {
+    "name": "French 75",
+    "base_spirit": "Gin",
+    "method": "shake",
+    "glassware": "Flute",
+    "ice": "Shaking ice; served up",
+    "garnish": "Lemon twist",
+    "flavor": "Citrus / sparkling",
+    "description": "Gin, lemon and sugar topped with sparkling wine.",
+    "allergens": "Sulphites in wine",
+    "ingredients": [
+      ["Gin", 30, "ml"],
+      ["Lemon juice", 15, "ml"],
+      ["Simple syrup", 10, "ml"],
+      ["Champagne", 60, "ml"],
+      ["Lemon peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Shake gin, lemon juice and syrup with ice; keep the sparkling wine out of the shaker.",
+      "Strain into a chilled flute.",
+      "Top with Champagne and garnish with a lemon twist."
+    ]
+  },
+  "sidecar": {
+    "name": "Sidecar",
+    "base_spirit": "Cognac",
+    "method": "shake",
+    "glassware": "Coupe",
+    "ice": "Shaking ice; served up",
+    "garnish": "Orange peel",
+    "flavor": "Citrus / dry",
+    "description": "Cognac, orange liqueur and lemon.",
+    "ingredients": [
+      ["Cognac", 50, "ml"],
+      ["Triple sec", 20, "ml"],
+      ["Lemon juice", 20, "ml"],
+      ["Fine sugar", 1, "tsp", true],
+      ["Orange peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Optionally coat half the rim of a chilled coupe with sugar.",
+      "Shake cognac, triple sec and lemon juice with ice.",
+      "Fine-strain into the coupe and garnish with orange peel."
+    ]
+  },
+  "sazerac": {
+    "name": "Sazerac",
+    "base_spirit": "Rye whiskey",
+    "method": "stir",
+    "glassware": "Rocks",
+    "ice": "Mixing ice; served without ice",
+    "garnish": "Lemon peel",
+    "flavor": "Spirit-forward / anise",
+    "description": "Rye whiskey, sugar and Peychaud's bitters in an absinthe-rinsed glass.",
+    "ingredients": [
+      ["Rye whiskey", 60, "ml"],
+      ["Simple syrup", 5, "ml"],
+      ["Peychaud's bitters", 3, "dash"],
+      ["Absinthe", 5, "ml"],
+      ["Lemon peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Rinse a chilled rocks glass with absinthe and discard the excess.",
+      "Stir whiskey, syrup and bitters with ice in a mixing glass.",
+      "Strain into the rinsed glass without ice; express a lemon peel over the drink."
+    ]
+  },
+  "boulevardier": {
+    "name": "Boulevardier",
+    "base_spirit": "Bourbon",
+    "method": "stir",
+    "glassware": "Rocks",
+    "ice": "Fresh cubes",
+    "garnish": "Orange peel",
+    "flavor": "Bitter / spirit-forward",
+    "description": "Bourbon, Campari and sweet vermouth.",
+    "ingredients": [
+      ["Bourbon", 45, "ml"],
+      ["Campari", 30, "ml"],
+      ["Sweet vermouth", 30, "ml"],
+      ["Orange peel", 1, "piece", true]
+    ],
+    "steps": [
+      "Stir bourbon, Campari and vermouth with ice in a mixing glass.",
+      "Strain into a rocks glass over fresh ice.",
+      "Express an orange peel over the drink and garnish."
+    ]
+  },
+  "paloma": {
+    "name": "Paloma",
+    "base_spirit": "Tequila",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Grapefruit wedge / salt rim",
+    "flavor": "Grapefruit / refreshing",
+    "description": "Tequila and lime topped with grapefruit soda.",
+    "ingredients": [
+      ["Blanco tequila", 50, "ml"],
+      ["Lime juice", 15, "ml"],
+      ["Grapefruit soda", 120, "ml"],
+      ["Salt", 0.25, "tsp", true]
+    ],
+    "steps": [
+      "Optionally salt half the rim of a highball and fill it with ice.",
+      "Add tequila and lime juice, then top with grapefruit soda.",
+      "Stir gently and garnish with grapefruit if available."
+    ]
+  },
+  "mint-julep": {
+    "name": "Mint Julep",
+    "base_spirit": "Bourbon",
+    "method": "muddle",
+    "glassware": "Julep cup or rocks",
+    "ice": "Crushed ice",
+    "garnish": "Mint sprig",
+    "flavor": "Mint / spirit-forward",
+    "description": "Bourbon, mint and sugar over crushed ice.",
+    "ingredients": [
+      ["Bourbon", 60, "ml"],
+      ["Simple syrup", 10, "ml"],
+      ["Mint leaves", 8, "piece"]
+    ],
+    "steps": [
+      "Gently press mint leaves with syrup in a julep cup without shredding them.",
+      "Add bourbon, fill with crushed ice and stir until the cup is chilled.",
+      "Top with more crushed ice and garnish with mint."
+    ]
+  },
+  "white-russian": {
+    "name": "White Russian",
+    "base_spirit": "Vodka",
+    "method": "build",
+    "glassware": "Rocks",
+    "ice": "Cubes",
+    "flavor": "Coffee / creamy",
+    "description": "Vodka, coffee liqueur and cream.",
+    "allergens": "Milk",
+    "ingredients": [
+      ["Vodka", 50, "ml"],
+      ["Coffee liqueur", 25, "ml"],
+      ["Cream", 25, "ml"]
+    ],
+    "steps": [
+      "Add vodka and coffee liqueur to a rocks glass over ice and stir.",
+      "Pour cream over the top.",
+      "Serve layered or stir gently to combine, according to the house specification."
+    ]
+  },
+  "long-island-iced-tea": {
+    "name": "Long Island Iced Tea",
+    "base_spirit": "Mixed spirits",
+    "method": "shake",
+    "glassware": "Highball",
+    "ice": "Shaking ice / fresh cubes",
+    "garnish": "Lemon wedge",
+    "flavor": "Citrus / cola",
+    "description": "Vodka, gin, rum, tequila and orange liqueur with lemon and cola.",
+    "ingredients": [
+      ["Vodka", 15, "ml"],
+      ["Gin", 15, "ml"],
+      ["White rum", 15, "ml"],
+      ["Blanco tequila", 15, "ml"],
+      ["Triple sec", 15, "ml"],
+      ["Lemon juice", 25, "ml"],
+      ["Simple syrup", 15, "ml"],
+      ["Cola", 30, "ml"]
+    ],
+    "steps": [
+      "Shake the spirits, triple sec, lemon juice and syrup with ice; do not add cola to the shaker.",
+      "Strain into a highball over fresh ice.",
+      "Top with cola, stir gently and garnish with lemon."
+    ]
+  },
+  "shirley-temple": {
+    "name": "Shirley Temple",
+    "category": "nonalcoholic",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Cocktail cherry",
+    "flavor": "Sweet / sparkling",
+    "description": "Ginger ale and grenadine with a cherry garnish.",
+    "ingredients": [
+      ["Ginger ale", 150, "ml"],
+      ["Grenadine", 15, "ml"],
+      ["Cocktail cherry", 1, "piece", true]
+    ],
+    "steps": [
+      "Fill a highball with ice and add grenadine.",
+      "Top with ginger ale and stir gently.",
+      "Garnish with a cocktail cherry."
+    ]
+  },
+  "virgin-mojito": {
+    "name": "Virgin Mojito",
+    "category": "nonalcoholic",
+    "method": "muddle",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "garnish": "Mint sprig",
+    "flavor": "Mint / citrus",
+    "description": "Fresh lime, mint and sugar topped with soda.",
+    "ingredients": [
+      ["Lime juice", 25, "ml"],
+      ["Simple syrup", 20, "ml"],
+      ["Mint leaves", 8, "piece"],
+      ["Soda water", 120, "ml"]
+    ],
+    "steps": [
+      "Gently press mint with lime juice and syrup in a highball.",
+      "Fill with ice and top with soda water.",
+      "Stir gently and garnish with mint."
+    ]
+  },
+  "lime-soda": {
+    "name": "Lime Soda",
+    "category": "nonalcoholic",
+    "method": "build",
+    "glassware": "Highball",
+    "ice": "Cubes",
+    "flavor": "Citrus / refreshing",
+    "description": "Fresh lime and soda with a touch of sweetness.",
+    "ingredients": [
+      ["Lime juice", 20, "ml"],
+      ["Simple syrup", 15, "ml"],
+      ["Soda water", 120, "ml"]
+    ],
+    "steps": [
+      "Add lime juice and syrup to a highball and stir.",
+      "Fill with ice, top with soda water and stir gently."
+    ]
+  }
+}

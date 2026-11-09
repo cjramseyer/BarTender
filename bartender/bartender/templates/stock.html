@@ -115,11 +115,14 @@ content %}
         <label>Notes</label>
         <textarea id="stockNotes" class="form-control" rows="2"></textarea>
       </div>
+      <p id="stockFormError" class="muted" role="alert" hidden></p>
       <div class="modal-footer">
         <button type="button" class="btn" onclick="closeModal('addStockModal')">
           Cancel
         </button>
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="submit" class="btn btn-primary" id="saveStockBtn">
+          Save
+        </button>
       </div>
     </form>
   </div>
@@ -129,6 +132,9 @@ content %}
   const INGRESS = "{{ ingress }}";
   const MEASUREMENT = "{{ settings.measurement or 'us' }}";
   const BAR_STOCK = {{ bar_stock | tojson }};
+  const STOCK_PREFILL = {{ stock_prefill | tojson }};
+  const SHOPPING_ITEM = {{ shopping_item | tojson }};
+  let activeShoppingItem = null;
   const DEFAULT_STOCK_CATEGORIES = [
     "Whiskey",
     "Bourbon",
@@ -351,13 +357,15 @@ content %}
   }
 
   function editStock(item) {
+    activeShoppingItem = null;
+    document.getElementById("stockFormError").hidden = true;
     document.getElementById("stockModalTitle").textContent = "Edit Stock Item";
     document.getElementById("stockId").value = item.id;
     document.getElementById("stockName").value = item.name;
-    document.getElementById("stockCategory").value = item.category;
+    document.getElementById("stockCategory").value = item.category || "";
     document.getElementById("stockQuantity").value = item.quantity;
     setStockSizeFromItem(item);
-    document.getElementById("stockNotes").value = item.notes;
+    document.getElementById("stockNotes").value = item.notes || "";
     openModal("addStockModal");
   }
 
@@ -377,12 +385,33 @@ content %}
     };
     const method = id ? "PUT" : "POST";
     const url = id ? `${INGRESS}/api/stock/${id}` : `${INGRESS}/api/stock`;
-    await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    location.reload();
+    if (activeShoppingItem && !id) {
+      body.shopping_item = activeShoppingItem.name;
+      body.shopping_stock_id = activeShoppingItem.stock_id;
+    }
+    document.getElementById("saveStockBtn").disabled = true;
+    document.getElementById("stockFormError").hidden = true;
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Unable to save stock item.");
+      }
+      if (activeShoppingItem) {
+        location.href = `${INGRESS}/shopping-list`;
+      } else {
+        location.reload();
+      }
+    } catch (error) {
+      document.getElementById("stockFormError").textContent = error.message;
+      document.getElementById("stockFormError").hidden = false;
+    } finally {
+      document.getElementById("saveStockBtn").disabled = false;
+    }
   }
 
   async function deleteStock(id) {
@@ -392,6 +421,8 @@ content %}
   }
 
   function openAddStock() {
+    activeShoppingItem = null;
+    document.getElementById("stockFormError").hidden = true;
     document.getElementById("stockModalTitle").textContent = "Add Stock Item";
     document.getElementById("stockForm").reset();
     document.getElementById("stockId").value = "";
@@ -404,5 +435,20 @@ content %}
   populateCategoryOptions();
   populateStockSizeOptions();
   populateCustomStockSizeOptions();
+  if (STOCK_PREFILL) {
+    if (STOCK_PREFILL.id) {
+      editStock(STOCK_PREFILL);
+      document.getElementById("stockModalTitle").textContent = "Restock Item";
+    } else {
+      openAddStock();
+      document.getElementById("stockName").value = STOCK_PREFILL.name;
+      document.getElementById("stockCategory").value = STOCK_PREFILL.category;
+      document.getElementById("stockQuantity").value = STOCK_PREFILL.quantity;
+      document.getElementById("stockNotes").value = STOCK_PREFILL.notes;
+      setStockSizeFromItem(STOCK_PREFILL);
+    }
+    activeShoppingItem = SHOPPING_ITEM;
+    document.getElementById("stockName").focus();
+  }
 </script>
 {% endblock %}

@@ -43,6 +43,7 @@ def test_sample_export_package_round_trips_live_archive_format(tmp_path):
         "taps": 2,
         "beers": 3,
         "bar_stock": 2,
+        "drink_recipes": 0,
     }
 
     archive_path = Path(tmp_path) / "bartender_sample_export.zip"
@@ -55,6 +56,7 @@ def test_sample_export_package_round_trips_live_archive_format(tmp_path):
             "bartender_export.json",
             "beers.csv",
             "beers.json",
+            "drink_recipes.json",
             "kegs.csv",
             "kegs.json",
             "pour_events.json",

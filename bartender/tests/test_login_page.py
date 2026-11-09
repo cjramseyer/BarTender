@@ -574,8 +574,9 @@ def test_authenticated_page_keeps_whats_new_out_of_title_bar(tmp_path):
     assert 'onclick="openWhatsNewFromMenu()"' in page
 
 
-def test_whats_new_reappears_when_release_date_is_newer_than_dismissal(tmp_path):
+def test_whats_new_reappears_when_release_date_is_newer_than_dismissal(tmp_path, monkeypatch):
     app_module = _load_app_module(tmp_path)
+    monkeypatch.setattr(app_module, "RELEASE_HIGHLIGHTS_DATE", "2026-09-15")
     data = app_module.load_data()
     data["settings"]["setup_completed"] = True
     data["team_users"][0]["release_seen_version"] = "2026-09-14"

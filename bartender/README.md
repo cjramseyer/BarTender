@@ -57,13 +57,15 @@ Sync**. The selected provider is displayed in the Settings About panel.
 
 - **Dashboard** — Live overview of all taps with their assigned kegs and status
 - **Bar Stock** — Inventory tracking for bottles, spirits, mixers, and other supplies
+- **Drinks and Recipes (Pro)** — Saved bartender recipes with traditional methods, classic starters, bar-stock links, missing/out-of-stock indicators, and guest-menu publishing; requires a Pro bar profile, with owner/manager editing and JSON/ZIP backup support
+- **Shopping List (Pro)** — Printable list of missing and out-of-stock recipe ingredients, combined across saved drinks and updated from current inventory; requires a Pro bar profile
 - **Beer Catalog** — Manage reusable beer records with style, freshness, menu/allergen, serving, supplier, identifier, and recipe/source details
 - **Beer CSV Import/Export** — Bulk add or back up catalog entries using a canonical CSV schema with preview validation before apply
 - **Keg Management** — Track keg inventory, lifecycle, fill-level data, and on-deck status while selecting beer details from the catalog
 - **Tap Management** — Assign kegs to numbered, labelled tap lines with single-tap keg assignment protection
 - **Data Backup & Restore** — Export portable JSON or ZIP archive with date-stamped filenames; import with preview and replace/merge mode
 - **Display View** — Minimal read-only tap board for a wall display
-- **Printable Menu** — Printer-friendly "currently on tap" menu page with optional QR code
+- **Printable Menu** — Assigned taps, packaged beers, public bottle/drink stock, and published Pro recipes, with optional QR code
 - **Standalone Window Launch** — Open the main app in a new browser tab/window from the in-app Menu while still using Home Assistant ingress
 - **Settings** — Bar name/logo, measurement, theme, bar stock toggle, API Reference nav visibility toggle, external URL override, external API scoped token/allowlist/rate-limit controls, Team Access (owner profile, per-user PIN, reset PIN, disable/enable), pour mode in Pour Presets, keg type choices/default, pour defaults, dashboard button position, and printable menu QR mode in General
 - **Audit Trail** — Read-only Audit Log window for all signed-in users; owners manage retention and clear events with their Owner PIN, and owners/managers can export JSON
@@ -104,6 +106,9 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 
 ## Recent Changes
 
+- Added Pro Drinks, the 33-recipe classic catalog, and guest-menu publishing.
+- Added Shopping List with one row per ingredient, drink grouping, pre-filled stock dialogs, and automatic recipe links.
+- Added App-Only Stock Categories and removed the dashboard Bar Stock card.
 - Added owner PIN recovery for upgraded installs: if multiple team users exist but no owner PIN was ever configured, the owner can sign in once, is redirected to Settings, and must save an Owner PIN before other actions are re-enabled.
 - Added keg volume tracking and pour workflow via `POST /api/kegs/<id>/pour`.
 - Added first-time setup wizard requiring a bar name before initial use.
@@ -144,10 +149,12 @@ Use the **Export CSV** button in the Beer Catalog to generate a valid file, then
 
 ## Configuration
 
+Deployment options include storage_backend (internal/SQLite, postgresql, or mariadb), database_url, session_timeout_minutes, cors_allowed_origins, license_portal_url, and license_public_key. Keep database credentials private and use only a public signing key for license verification. See the [configuration reference](../docs/core-app.md#configuration-reference).
+
 Most BarTender settings are managed from within the web UI after the add-on starts.
 The add-on configuration includes `session_timeout_minutes`, which controls the idle
 timeout for signed-in browser sessions. It defaults to 240 minutes (4 hours), accepts
-values from 5 minutes to 240 minutes, and takes effect after restarting the add-on.
+values from 5 minutes to 43200 minutes, and takes effect after restarting the add-on.
 The Settings UI also provides separate mobile and pour-station session timeouts. Both
 default to 30 minutes and cannot exceed the global timeout. Staff can select pour
 station mode at login. Session and device
@@ -226,6 +233,18 @@ than by the browser UI.
 - Standard size options include 12 oz bottle, 16 oz bottle, and 12 oz can.
 - Frequently used custom sizes are promoted into main size options.
 - Disable the Bar Stock feature from Settings if not needed.
+- Configure Settings -> General -> App-Only Stock Categories to hide garnishes and extras from displays/menus while retaining all inventory in the app. The dashboard no longer includes a Bar Stock card.
+
+### Drinks and Shopping (Pro)
+
+- Select the Pro bar profile, then open Drinks or Menu -> Bartender Recipes. Shopping List is only in the Menu dropdown.
+- Owners/managers can import 33 starters with Add Classics or create a custom recipe. Existing names are skipped; new imports are not published automatically.
+- Review house measures, preparation steps, allergens, and each ingredient's stock association. Can Make Now indicates containers/items on hand, not a guaranteed number of servings.
+- Shopping List shows each shortage once under the first alphabetical drink needing it, with shared references and optional items marked.
+- Add to Bar Stock opens the pre-filled stock dialog; saving links new stock or replenishes the existing record without duplication, then returns to the refreshed list.
+- Publish on guest menu exposes the drink description, optional price, allergens, and availability while keeping preparation and staff notes private.
+- See the [getting-started workflow](../docs/getting-started.md#pro-drink-workflow) for the complete sequence.
+- View the [desktop and mobile screenshots](../docs/getting-started.md#screenshots) for Drinks, Shopping List, category Settings, and the public menu.
 
 ### Audit Trail
 
@@ -242,6 +261,7 @@ than by the browser UI.
 - **Pour Presets**: named preset volumes and default preset
 - **Analytics**: low-keg threshold and days-left forecasting window
 - **Menu QR**: where QR appears on display/print output (Settings -> General)
+- **App-Only Stock Categories**: categories excluded from public views without per-item visibility checkboxes (Settings -> General)
 - **Anonymous Usage Statistics**: owner-only opt-in in Settings -> Privacy. Sends only a locally generated anonymous installation ID and app/add-on versions, at most once per UTC day; the telemetry payload excludes bar, inventory, user, device, and network data.
 
 ## Troubleshooting

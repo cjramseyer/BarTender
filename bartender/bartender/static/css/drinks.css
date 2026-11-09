@@ -1,0 +1,255 @@
+.drink-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.drink-toolbar .form-group {
+  flex: 1 1 150px;
+  margin-bottom: 0;
+  min-width: 0;
+}
+.drink-toolbar .form-group:first-child {
+  flex-basis: 270px;
+}
+.drink-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+}
+.drink-recipe {
+  border-bottom: 1px solid var(--border);
+}
+.drink-recipe summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  cursor: pointer;
+}
+.drink-recipe summary::before {
+  content: "+";
+  flex: 0 0 16px;
+  font-weight: 700;
+}
+.drink-recipe[open] summary::before {
+  content: "-";
+}
+.drink-summary-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.drink-summary-meta {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-top: 0.2rem;
+}
+.drink-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.drink-status-ready {
+  color: #16754b;
+}
+.drink-status-missing,
+.drink-error {
+  color: #b83434;
+}
+.drink-status-unknown {
+  color: #80601a;
+}
+[data-theme="dark"] .drink-status-ready {
+  color: #6fdaa5;
+}
+[data-theme="dark"] .drink-status-missing,
+[data-theme="dark"] .drink-error {
+  color: #ff9292;
+}
+[data-theme="dark"] .drink-status-unknown {
+  color: #e8c875;
+}
+.drink-recipe-body {
+  padding: 0 0 1.25rem 2rem;
+  overflow-wrap: anywhere;
+}
+.drink-recipe-body h2 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.6rem;
+}
+.drink-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin-top: 1rem;
+}
+.drink-specs dt {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.drink-specs dd {
+  margin: 0;
+}
+.drink-ingredients {
+  list-style: none;
+  padding: 0;
+}
+.drink-ingredients li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.drink-ingredients .drink-status {
+  justify-self: start;
+}
+.drink-steps {
+  padding-left: 1.3rem;
+}
+.drink-steps li {
+  padding: 0.25rem 0;
+  white-space: pre-wrap;
+}
+.drink-footer,
+.drink-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.drink-footer {
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+.drink-ingredient-editor {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr)
+    minmax(0, 2fr) auto 32px;
+  gap: 0.5rem;
+  align-items: end;
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 0;
+}
+.drink-ingredient-editor label {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+.drink-ingredient-editor > div {
+  min-width: 0;
+}
+.drink-ingredient-editor .drink-check {
+  align-self: center;
+}
+#drinkIngredientRows {
+  margin-bottom: 0.75rem;
+}
+#drinkForm h4 {
+  margin-top: 0.75rem;
+}
+#drinkSteps {
+  margin-top: 0.25rem;
+}
+#drinkForm > .form-group {
+  margin-top: 0.75rem;
+}
+#drinkFormError,
+#drinkPageError {
+  margin-top: 0.75rem;
+}
+.shopping-items {
+  list-style: none;
+  padding: 0;
+}
+.shopping-drink {
+  margin-top: 1.75rem;
+}
+.shopping-drink > h2 {
+  font-size: 1.15rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border);
+  overflow-wrap: anywhere;
+  break-after: avoid;
+}
+.shopping-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  break-inside: avoid;
+  overflow-wrap: anywhere;
+}
+.shopping-item h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.4rem;
+}
+.shopping-item-name .muted {
+  display: block;
+  margin-top: 0.35rem;
+}
+.shopping-item-recipes ul {
+  list-style: none;
+  padding: 0;
+}
+.shopping-item-recipes li {
+  margin-top: 0.25rem;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 720px) {
+  .drink-recipe summary {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .drink-recipe summary > .drink-status {
+    margin-left: 2rem;
+  }
+  .drink-summary-name {
+    flex-basis: calc(100% - 32px);
+  }
+  .drink-recipe-body {
+    padding-left: 0;
+  }
+  .drink-ingredients li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.3rem;
+  }
+  .drink-ingredient-editor {
+    grid-template-columns: minmax(0, 1fr) minmax(70px, 0.5fr) minmax(
+        70px,
+        0.5fr
+      );
+  }
+  .drink-ingredient-editor > div:nth-child(4) {
+    grid-column: 1 / 3;
+  }
+  .drink-ingredient-editor > .drink-check {
+    grid-column: 3;
+  }
+  .drink-ingredient-editor > button {
+    grid-column: 3;
+    justify-self: end;
+  }
+  .shopping-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .shopping-item > .btn {
+    justify-self: start;
+  }
+}
